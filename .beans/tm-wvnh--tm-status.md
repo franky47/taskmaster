@@ -1,0 +1,31 @@
+---
+# tm-wvnh
+title: tm status
+status: todo
+type: feature
+priority: normal
+created_at: 2026-04-04T19:54:15Z
+updated_at: 2026-04-04T19:54:15Z
+blocked_by:
+    - tm-w8rg
+    - tm-274l
+---
+
+## What to build
+
+The `tm status` subcommand. Rich status view combining task metadata with history data and next-run computation. Shows indented blocks per task with schedule, enabled state, last run result, and next scheduled time.
+
+See PRD Slice 7 for full specification.
+
+## Acceptance criteria
+
+- [ ] tm status outputs an indented block per task: task name as header, followed by indented key-value fields (schedule, enabled, last run with ok/err, next scheduled time) (S7.1)
+- [ ] Fields with no value are omitted (e.g., no last_run line if task has never run) (S7.2)
+- [ ] Disabled tasks omit the next field (S7.3)
+- [ ] Next scheduled time is computed from the cron expression relative to now, respecting the task's timezone (S7.4)
+- [ ] --json outputs a JSON array with all fields including last_run and next_run as ISO8601 strings (S7.5)
+
+## User stories addressed
+
+- As a user, I run tm status and see at a glance which tasks are healthy, which failed last, and when each will next fire
+- As an agent, I run tm status --json to get a complete system overview
