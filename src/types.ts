@@ -1,27 +1,27 @@
 export interface TaskDefinition {
-  name: string;
-  schedule: string;
-  timezone: string | undefined;
-  cwd: string | undefined;
-  claudeArgs: string[];
-  env: Record<string, string>;
-  enabled: boolean;
-  prompt: string;
+  name: string
+  schedule: string
+  timezone: string | undefined
+  cwd: string | undefined
+  claudeArgs: string[]
+  env: Record<string, string>
+  enabled: boolean
+  prompt: string
 }
 
 export interface ParseError {
-  field: string;
-  message: string;
+  field: string
+  message: string
 }
 
 export interface ParseSuccess {
-  ok: true;
-  task: TaskDefinition;
+  ok: true
+  task: TaskDefinition
 }
 
 export interface ParseFailure {
-  ok: false;
-  errors: ParseError[];
+  ok: false
+  errors: ParseError[]
 }
 
-export type ParseResult = ParseSuccess | ParseFailure;
+export type ParseResult = ParseSuccess | ParseFailure

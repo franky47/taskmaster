@@ -1,117 +1,132 @@
-import { readFile } from "node:fs/promises";
-import { basename } from "node:path";
-import { CronExpressionParser } from "cron-parser";
-import matter from "gray-matter";
-import type { ParseError, ParseResult } from "./types.ts";
+import { readFile } from 'node:fs/promises'
+import { basename } from 'node:path'
 
-const TASK_NAME_RE = /^[a-z0-9-]+$/;
+import { CronExpressionParser } from 'cron-parser'
+import matter from 'gray-matter'
 
-const VALID_TIMEZONES = new Set(Intl.supportedValuesOf("timeZone"));
+import type { ParseError, ParseResult } from './types.ts'
+
+const TASK_NAME_RE = /^[a-z0-9-]+$/
+
+const VALID_TIMEZONES = new Set(Intl.supportedValuesOf('timeZone'))
 
 export async function parseTaskFile(filePath: string): Promise<ParseResult> {
-  const filename = basename(filePath);
-  const content = await readFile(filePath, "utf-8");
-  return parseTaskContent(filename, content);
+  const filename = basename(filePath)
+  const content = await readFile(filePath, 'utf-8')
+  return parseTaskContent(filename, content)
 }
 
-export function parseTaskContent(filename: string, content: string): ParseResult {
-  const errors: ParseError[] = [];
+export function parseTaskContent(
+  filename: string,
+  content: string,
+): ParseResult {
+  const errors: ParseError[] = []
 
   // Validate filename
-  const name = filename.replace(/\.md$/, "");
+  const name = filename.replace(/\.md$/, '')
   if (!TASK_NAME_RE.test(name)) {
     errors.push({
-      field: "filename",
+      field: 'filename',
       message: `Task name "${name}" must match [a-z0-9-]+`,
-    });
+    })
   }
 
   // Parse frontmatter
-  let data: Record<string, unknown>;
-  let body: string;
+  let data: Record<string, unknown>
+  let body: string
   try {
-    const parsed = matter(content);
-    data = parsed.data as Record<string, unknown>;
-    body = parsed.content.trim();
+    const parsed = matter(content)
+    data = parsed.data as Record<string, unknown>
+    body = parsed.content.trim()
   } catch {
     return {
       ok: false,
-      errors: [...errors, { field: "frontmatter", message: "Failed to parse YAML frontmatter" }],
-    };
+      errors: [
+        ...errors,
+        { field: 'frontmatter', message: 'Failed to parse YAML frontmatter' },
+      ],
+    }
   }
 
   // Validate schedule (required)
   if (data.schedule === undefined || data.schedule === null) {
-    errors.push({ field: "schedule", message: "schedule is required" });
-  } else if (typeof data.schedule !== "string") {
-    errors.push({ field: "schedule", message: "schedule must be a string" });
+    errors.push({ field: 'schedule', message: 'schedule is required' })
+  } else if (typeof data.schedule !== 'string') {
+    errors.push({ field: 'schedule', message: 'schedule must be a string' })
   } else {
-    const fields = data.schedule.trim().split(/\s+/);
+    const fields = data.schedule.trim().split(/\s+/)
     if (fields.length !== 5) {
       errors.push({
-        field: "schedule",
+        field: 'schedule',
         message: `schedule must be a 5-field cron expression, got ${fields.length} fields`,
-      });
+      })
     } else {
       try {
-        CronExpressionParser.parse(data.schedule);
+        CronExpressionParser.parse(data.schedule)
       } catch (err) {
         errors.push({
-          field: "schedule",
+          field: 'schedule',
           message: `Invalid cron expression: ${err instanceof Error ? err.message : String(err)}`,
-        });
+        })
       }
     }
   }
 
   // Validate timezone (optional)
   if (data.timezone !== undefined) {
-    if (typeof data.timezone !== "string") {
-      errors.push({ field: "timezone", message: "timezone must be a string" });
+    if (typeof data.timezone !== 'string') {
+      errors.push({ field: 'timezone', message: 'timezone must be a string' })
     } else if (!VALID_TIMEZONES.has(data.timezone)) {
       errors.push({
-        field: "timezone",
+        field: 'timezone',
         message: `"${data.timezone}" is not a valid IANA timezone`,
-      });
+      })
     }
   }
 
   // Validate cwd (optional)
-  if (data.cwd !== undefined && typeof data.cwd !== "string") {
-    errors.push({ field: "cwd", message: "cwd must be a string" });
+  if (data.cwd !== undefined && typeof data.cwd !== 'string') {
+    errors.push({ field: 'cwd', message: 'cwd must be a string' })
   }
 
   // Validate claude_args (optional)
   if (data.claude_args !== undefined) {
     if (!Array.isArray(data.claude_args)) {
-      errors.push({ field: "claude_args", message: "claude_args must be an array" });
-    } else if (!data.claude_args.every((v: unknown) => typeof v === "string")) {
       errors.push({
-        field: "claude_args",
-        message: "All claude_args values must be strings",
-      });
+        field: 'claude_args',
+        message: 'claude_args must be an array',
+      })
+    } else if (!data.claude_args.every((v: unknown) => typeof v === 'string')) {
+      errors.push({
+        field: 'claude_args',
+        message: 'All claude_args values must be strings',
+      })
     }
   }
 
   // Validate env (optional)
   if (data.env !== undefined) {
-    if (typeof data.env !== "object" || data.env === null || Array.isArray(data.env)) {
-      errors.push({ field: "env", message: "env must be an object" });
+    if (
+      typeof data.env !== 'object' ||
+      data.env === null ||
+      Array.isArray(data.env)
+    ) {
+      errors.push({ field: 'env', message: 'env must be an object' })
     } else {
-      const envObj = data.env as Record<string, unknown>;
-      if (!Object.values(envObj).every((v) => typeof v === "string")) {
-        errors.push({ field: "env", message: "All env values must be strings" });
+      const envObj = data.env as Record<string, unknown>
+      if (!Object.values(envObj).every((v) => typeof v === 'string')) {
+        errors.push({ field: 'env', message: 'All env values must be strings' })
       }
     }
   }
 
   // Validate enabled (optional)
-  if (data.enabled !== undefined && typeof data.enabled !== "boolean") {
-    errors.push({ field: "enabled", message: "enabled must be a boolean" });
+  if (data.enabled !== undefined && typeof data.enabled !== 'boolean') {
+    errors.push({ field: 'enabled', message: 'enabled must be a boolean' })
   }
 
   if (errors.length > 0) {
-    return { ok: false, errors };
+    return { ok: false, errors }
   }
 
   return {
@@ -126,5 +141,5 @@ export function parseTaskContent(filename: string, content: string): ParseResult
       enabled: (data.enabled as boolean) ?? true,
       prompt: body,
     },
-  };
+  }
 }

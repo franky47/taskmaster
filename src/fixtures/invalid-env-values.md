@@ -1,7 +1,7 @@
 ---
-schedule: "0 8 * * *"
+schedule: '0 8 * * *'
 env:
-  GOOD_KEY: "string_value"
+  GOOD_KEY: 'string_value'
   BAD_KEY: 123
 ---
 
