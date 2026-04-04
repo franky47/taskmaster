@@ -26,6 +26,7 @@
   },
   "dependencies": {
     "cron-parser": "^5.5.0",
+    "errore": "^0.14.1",
     "gray-matter": "^4.0.3"
   }
 }

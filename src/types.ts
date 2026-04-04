@@ -1,3 +1,5 @@
+import * as errore from 'errore'
+
 export type ParseErrorField =
   | 'filename'
   | 'frontmatter'
@@ -7,6 +9,11 @@ export type ParseErrorField =
   | 'claude_args'
   | 'env'
   | 'enabled'
+
+export type FieldError = {
+  field: ParseErrorField
+  message: string
+}
 
 export type TaskDefinition = {
   name: string
@@ -19,27 +26,22 @@ export type TaskDefinition = {
   prompt: string
 }
 
-export type ParseError = {
-  field: ParseErrorField
-  message: string
-}
+export class TaskFileReadError extends errore.createTaggedError({
+  name: 'TaskFileReadError',
+  message: 'Failed to read task file $path',
+}) {}
 
-export type ParseSuccess = {
-  ok: true
-  task: TaskDefinition
-}
-
-export type ParseFailure = {
-  ok: false
-  errors: ParseError[]
-}
-
-export type ParseResult = ParseSuccess | ParseFailure
-
-export function isParseSuccess(result: ParseResult): result is ParseSuccess {
-  return result.ok
-}
-
-export function isParseFailure(result: ParseResult): result is ParseFailure {
-  return !result.ok
+export class TaskParseError extends errore.createTaggedError({
+  name: 'TaskParseError',
+  message: 'Task "$taskName" has validation errors',
+}) {
+  readonly fieldErrors: FieldError[]
+  constructor(args: {
+    taskName: string
+    fieldErrors: FieldError[]
+    cause?: unknown
+  }) {
+    super(args)
+    this.fieldErrors = args.fieldErrors
+  }
 }
