@@ -1,7 +1,7 @@
 ---
 # tm-51fy
 title: Project scaffolding & task parser
-status: in-progress
+status: completed
 type: feature
 priority: high
 created_at: 2026-04-04T19:53:09Z
@@ -16,16 +16,17 @@ See PRD Slice 0 for full specification.
 
 ## Acceptance criteria
 
-- [ ] Bun project initialised with TypeScript, oxlint, oxfmt, and test runner configured (S0.1)
-- [ ] oxfmt configured as formatter; Claude Code hook runs `oxfmt` on `.ts` files after every write (S0.1a)
-- [ ] oxlint configured as linter (S0.1b)
-- [ ] tsgo configured for type checking (S0.1c)
-- [ ] Task file parser reads YAML frontmatter (schedule, timezone, cwd, claude_args, env, enabled) and markdown body from a .md file (S0.2)
-- [ ] Parser validates schedule as a syntactically correct 5-field cron expression (S0.3)
-- [ ] Parser validates timezone as a valid IANA identifier when present (S0.4)
-- [ ] Parser validates task name (derived from filename) matches [a-z0-9-]+ (S0.5)
-- [ ] Parser returns typed TaskDefinition object on success, structured error on failure (S0.6)
-- [ ] Unit tests cover valid files, missing required fields, malformed cron, invalid timezone, bad filenames (S0.7)
+- [x] Bun project initialised with TypeScript, oxlint, oxfmt, and test runner configured (S0.1)
+- [x] oxfmt configured as formatter; Claude Code hook runs `oxfmt` on `.ts` files after every write (S0.1a)
+- [x] oxlint configured as linter (S0.1b)
+- [x] tsgo configured for type checking (S0.1c)
+- [x] Task file parser reads YAML frontmatter (schedule, timezone, cwd, claude_args, env, enabled) and markdown body from a .md file (S0.2)
+- [x] Parser validates schedule as a syntactically correct 5-field cron expression (S0.3)
+- [x] Parser validates timezone as a valid IANA identifier when present (S0.4)
+- [x] Parser validates task name (derived from filename) matches [a-z0-9-]+ (S0.5)
+- [x] Parser returns typed TaskDefinition object on success, structured error on failure (S0.6)
+- [x] Unit tests cover valid files, missing required fields, malformed cron, invalid timezone, bad filenames (S0.7)
+- [x] Build script produces single-file executable via `bun build --compile` (S0.8)
 
 ## User stories addressed
 

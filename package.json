@@ -1,0 +1,31 @@
+{
+  "name": "taskmaster",
+  "version": "0.0.1",
+  "type": "module",
+  "private": true,
+  "bin": {
+    "tm": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "oxlint src/",
+    "fmt": "oxfmt src/",
+    "fmt:check": "oxfmt --check src/",
+    "typecheck": "tsgo --noEmit",
+    "test": "bun test",
+    "check": "bun run fmt:check && bun run lint && bun run typecheck && bun test",
+    "build": "bun build src/index.ts --compile --outfile tm"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@typescript/native-preview": "^7.0.0-dev.20260404.1",
+    "oxfmt": "^0.43.0",
+    "oxlint": "^1.58.0"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "cron-parser": "^5.5.0",
+    "gray-matter": "^4.0.3"
+  }
+}
