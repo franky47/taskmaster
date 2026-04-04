@@ -48,6 +48,14 @@ export function parseTaskContent(
     }
   }
 
+  // Validated values accumulated during checks
+  let schedule: string | undefined
+  let timezone: string | undefined
+  let cwd: string | undefined
+  let claudeArgs: string[] | undefined
+  let env: Record<string, string> | undefined
+  let enabled: boolean | undefined
+
   // Validate schedule (required)
   if (data.schedule === undefined || data.schedule === null) {
     errors.push({ field: 'schedule', message: 'schedule is required' })
@@ -63,6 +71,7 @@ export function parseTaskContent(
     } else {
       try {
         CronExpressionParser.parse(data.schedule)
+        schedule = data.schedule
       } catch (err) {
         errors.push({
           field: 'schedule',
@@ -81,12 +90,18 @@ export function parseTaskContent(
         field: 'timezone',
         message: `"${data.timezone}" is not a valid IANA timezone`,
       })
+    } else {
+      timezone = data.timezone
     }
   }
 
   // Validate cwd (optional)
-  if (data.cwd !== undefined && typeof data.cwd !== 'string') {
-    errors.push({ field: 'cwd', message: 'cwd must be a string' })
+  if (data.cwd !== undefined) {
+    if (typeof data.cwd !== 'string') {
+      errors.push({ field: 'cwd', message: 'cwd must be a string' })
+    } else {
+      cwd = data.cwd
+    }
   }
 
   // Validate claude_args (optional)
@@ -101,6 +116,8 @@ export function parseTaskContent(
         field: 'claude_args',
         message: 'All claude_args values must be strings',
       })
+    } else {
+      claudeArgs = data.claude_args
     }
   }
 
@@ -116,13 +133,19 @@ export function parseTaskContent(
       const envObj = data.env as Record<string, unknown>
       if (!Object.values(envObj).every((v) => typeof v === 'string')) {
         errors.push({ field: 'env', message: 'All env values must be strings' })
+      } else {
+        env = envObj as Record<string, string>
       }
     }
   }
 
   // Validate enabled (optional)
-  if (data.enabled !== undefined && typeof data.enabled !== 'boolean') {
-    errors.push({ field: 'enabled', message: 'enabled must be a boolean' })
+  if (data.enabled !== undefined) {
+    if (typeof data.enabled !== 'boolean') {
+      errors.push({ field: 'enabled', message: 'enabled must be a boolean' })
+    } else {
+      enabled = data.enabled
+    }
   }
 
   if (errors.length > 0) {
@@ -133,12 +156,12 @@ export function parseTaskContent(
     ok: true,
     task: {
       name,
-      schedule: data.schedule as string,
-      timezone: (data.timezone as string) ?? undefined,
-      cwd: (data.cwd as string) ?? undefined,
-      claudeArgs: (data.claude_args as string[]) ?? [],
-      env: (data.env as Record<string, string>) ?? {},
-      enabled: (data.enabled as boolean) ?? true,
+      schedule: schedule!,
+      timezone,
+      cwd,
+      claudeArgs: claudeArgs ?? [],
+      env: env ?? {},
+      enabled: enabled ?? true,
       prompt: body,
     },
   }

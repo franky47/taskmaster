@@ -1,4 +1,14 @@
-export interface TaskDefinition {
+export type ParseErrorField =
+  | 'filename'
+  | 'frontmatter'
+  | 'schedule'
+  | 'timezone'
+  | 'cwd'
+  | 'claude_args'
+  | 'env'
+  | 'enabled'
+
+export type TaskDefinition = {
   name: string
   schedule: string
   timezone: string | undefined
@@ -9,19 +19,27 @@ export interface TaskDefinition {
   prompt: string
 }
 
-export interface ParseError {
-  field: string
+export type ParseError = {
+  field: ParseErrorField
   message: string
 }
 
-export interface ParseSuccess {
+export type ParseSuccess = {
   ok: true
   task: TaskDefinition
 }
 
-export interface ParseFailure {
+export type ParseFailure = {
   ok: false
   errors: ParseError[]
 }
 
 export type ParseResult = ParseSuccess | ParseFailure
+
+export function isParseSuccess(result: ParseResult): result is ParseSuccess {
+  return result.ok
+}
+
+export function isParseFailure(result: ParseResult): result is ParseFailure {
+  return !result.ok
+}
