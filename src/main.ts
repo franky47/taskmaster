@@ -7,6 +7,7 @@ import {
   parseTimestampFlag,
   recordHistory,
 } from './history'
+import { listTasks } from './list'
 import { runTask } from './run'
 import { validateTasks } from './validate'
 
@@ -66,6 +67,28 @@ async function main(): Promise<void> {
         process.stderr.write(result.stderr)
       }
       process.exit(result.exitCode)
+    })
+
+  program
+    .command('list')
+    .description('List all tasks')
+    .option('--json', 'Output as JSON')
+    .action(async (opts: { json?: boolean }) => {
+      const tasks = await listTasks(tasksDir)
+      if (tasks instanceof Error) {
+        console.error(tasks.message)
+        process.exit(1)
+      }
+
+      if (opts.json) {
+        console.log(JSON.stringify(tasks))
+      } else {
+        for (const task of tasks) {
+          console.log(
+            `${task.name} ${task.schedule} ${task.enabled ? 'enabled' : 'disabled'}`,
+          )
+        }
+      }
     })
 
   program
