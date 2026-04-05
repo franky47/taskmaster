@@ -11,6 +11,7 @@ Rules enforced:
 - Narrow `string` fields to literal unions where the set of values is known (see `ParseErrorField`).
 - Use `const` assertions for literal objects/arrays that should not widen.
 - Use `infer` in conditional types when extracting nested types.
+- Always use Zod to parse & validate external data coming into the program, and infer from schemas.
 
 ## Conventions
 
