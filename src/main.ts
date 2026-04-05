@@ -1,5 +1,6 @@
 import { Command, Option } from 'commander'
 
+import { tasksDir } from './config'
 import {
   formatTimestamp,
   manualTimestamp,
@@ -7,6 +8,7 @@ import {
   recordHistory,
 } from './history'
 import { runTask } from './run'
+import { validateTasks } from './validate'
 
 async function main(): Promise<void> {
   const program = new Command()
@@ -64,6 +66,36 @@ async function main(): Promise<void> {
         process.stderr.write(result.stderr)
       }
       process.exit(result.exitCode)
+    })
+
+  program
+    .command('validate')
+    .description('Validate all task files')
+    .option('--json', 'Output results as JSON')
+    .action(async (opts: { json?: boolean }) => {
+      const results = await validateTasks(tasksDir)
+      if (results instanceof Error) {
+        console.error(results.message)
+        process.exit(1)
+      }
+
+      if (opts.json) {
+        console.log(JSON.stringify(results, null, 2))
+      } else {
+        for (const result of results) {
+          if (result.valid) {
+            console.log(`ok  ${result.name}`)
+          } else {
+            console.error(`err ${result.name}`)
+            for (const error of result.errors) {
+              console.error(`    ${error}`)
+            }
+          }
+        }
+      }
+
+      const hasErrors = results.some((r) => !r.valid)
+      process.exit(hasErrors ? 1 : 0)
     })
 
   await program.parseAsync()
