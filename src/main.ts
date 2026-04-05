@@ -10,6 +10,7 @@ import {
   recordHistory,
 } from './history'
 import { listTasks } from './list'
+import { TaskContentionError } from './lock'
 import { runTask } from './run'
 import { getTaskStatuses } from './status'
 import { validateTasks } from './validate'
@@ -21,56 +22,80 @@ async function main(): Promise<void> {
   program
     .command('run <name>')
     .description('Execute a task immediately')
+    .option('--json', 'Output as JSON')
     .addOption(
       new Option(
         '--timestamp <value>',
         'UTC timestamp for this run',
       ).hideHelp(),
     )
-    .action(async (name: string, opts: { timestamp?: string }) => {
-      // Resolve timestamp
-      let timestamp: string
-      if (opts.timestamp) {
-        const parsed = parseTimestampFlag(opts.timestamp)
-        if (parsed instanceof Error) {
-          console.error(parsed.message)
+    .action(
+      async (name: string, opts: { json?: boolean; timestamp?: string }) => {
+        // Resolve timestamp
+        let timestamp: string
+        if (opts.timestamp) {
+          const parsed = parseTimestampFlag(opts.timestamp)
+          if (parsed instanceof Error) {
+            console.error(parsed.message)
+            process.exit(1)
+          }
+          timestamp = formatTimestamp(parsed)
+        } else {
+          timestamp = manualTimestamp()
+        }
+
+        const result = await runTask(name)
+
+        if (result instanceof Error) {
+          // S5.2: Lock contention — skip gracefully
+          if (result instanceof TaskContentionError) {
+            if (opts.json) {
+              console.log(JSON.stringify({ skipped: true, taskName: name }))
+            } else {
+              console.error(result.message)
+            }
+            process.exit(0)
+          }
+          console.error(result.message)
           process.exit(1)
         }
-        timestamp = formatTimestamp(parsed)
-      } else {
-        timestamp = manualTimestamp()
-      }
 
-      const result = await runTask(name)
-      if (result instanceof Error) {
-        console.error(result.message)
-        process.exit(1)
-      }
+        // Record history (non-fatal)
+        const recordErr = await recordHistory({
+          taskName: name,
+          timestamp,
+          startedAt: result.startedAt,
+          finishedAt: result.finishedAt,
+          exitCode: result.exitCode,
+          stdout: result.stdout,
+          stderr: result.stderr,
+          prompt: result.prompt,
+          cwd: result.cwd,
+        })
+        if (recordErr instanceof Error) {
+          console.error(recordErr.message)
+        }
 
-      // Record history (non-fatal)
-      const recordErr = await recordHistory({
-        taskName: name,
-        timestamp,
-        startedAt: result.startedAt,
-        finishedAt: result.finishedAt,
-        exitCode: result.exitCode,
-        stdout: result.stdout,
-        stderr: result.stderr,
-        prompt: result.prompt,
-        cwd: result.cwd,
-      })
-      if (recordErr instanceof Error) {
-        console.error(recordErr.message)
-      }
-
-      if (result.stdout) {
-        process.stdout.write(result.stdout)
-      }
-      if (result.stderr) {
-        process.stderr.write(result.stderr)
-      }
-      process.exit(result.exitCode)
-    })
+        if (opts.json) {
+          console.log(
+            JSON.stringify({
+              skipped: false,
+              exitCode: result.exitCode,
+              duration_ms:
+                result.finishedAt.getTime() - result.startedAt.getTime(),
+            }),
+          )
+        } else {
+          if (result.stdout) {
+            process.stdout.write(result.stdout)
+          }
+          if (result.stderr) {
+            process.stderr.write(result.stderr)
+          }
+        }
+        process.exit(result.exitCode)
+      },
+    )
 
   program
     .command('list')

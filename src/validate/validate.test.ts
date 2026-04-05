@@ -61,11 +61,12 @@ describe('validateTasks', () => {
     const tasksDir = await makeTmpTasksDir()
     await writeTask(tasksDir, 'bad-task', INVALID_TASK)
     const result = await validateTasks(tasksDir)
+    if (result instanceof Error) throw result
     expect(result).toHaveLength(1)
-    expect(result[0].name).toBe('bad-task')
-    expect(result[0].valid).toBe(false)
-    if (result[0].valid === false) {
-      expect(result[0].errors.length).toBeGreaterThan(0)
+    expect(result[0]!.name).toBe('bad-task')
+    expect(result[0]!.valid).toBe(false)
+    if (result[0]!.valid === false) {
+      expect(result[0]!.errors.length).toBeGreaterThan(0)
     }
   })
 
@@ -75,6 +76,7 @@ describe('validateTasks', () => {
     await writeTask(tasksDir, 'aa-first', VALID_TASK)
     await writeTask(tasksDir, 'mm-middle', VALID_TASK)
     const result = await validateTasks(tasksDir)
+    if (result instanceof Error) throw result
     expect(result.map((r) => r.name)).toEqual([
       'aa-first',
       'mm-middle',
@@ -87,6 +89,7 @@ describe('validateTasks', () => {
     await writeTask(tasksDir, 'good-task', VALID_TASK)
     await writeTask(tasksDir, 'bad-task', INVALID_TASK)
     const result = await validateTasks(tasksDir)
+    if (result instanceof Error) throw result
     expect(result).toHaveLength(2)
     const good = result.find((r) => r.name === 'good-task')
     const bad = result.find((r) => r.name === 'bad-task')
@@ -98,10 +101,11 @@ describe('validateTasks', () => {
     const tasksDir = await makeTmpTasksDir()
     await writeTask(tasksDir, 'Bad_Name', VALID_TASK)
     const result = await validateTasks(tasksDir)
+    if (result instanceof Error) throw result
     expect(result).toHaveLength(1)
-    expect(result[0].valid).toBe(false)
-    if (result[0].valid === false) {
-      expect(result[0].errors[0]).toContain('Bad_Name')
+    expect(result[0]!.valid).toBe(false)
+    if (result[0]!.valid === false) {
+      expect(result[0]!.errors[0]).toContain('Bad_Name')
     }
   })
 })

@@ -3,7 +3,7 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 
-import { HistoryReadError, TaskNotFoundError, queryHistory } from './query'
+import { TaskNotFoundError, queryHistory } from './query'
 
 async function makeConfigDir(): Promise<string> {
   return fs.mkdtemp(path.join(os.tmpdir(), 'tm-query-'))
@@ -119,8 +119,8 @@ describe('queryHistory', () => {
     if (result instanceof Error) return
 
     expect(result).toHaveLength(1)
-    expect(result[0].timestamp).toBe('2026-04-02T08.00.00Z')
-    expect(result[0].success).toBe(false)
+    expect(result[0]!.timestamp).toBe('2026-04-02T08.00.00Z')
+    expect(result[0]!.success).toBe(false)
   })
 
   test('--last N limits to N most recent entries', async () => {
@@ -135,8 +135,8 @@ describe('queryHistory', () => {
     if (result instanceof Error) return
 
     expect(result).toHaveLength(2)
-    expect(result[0].timestamp).toBe('2026-04-03T08.00.00Z')
-    expect(result[1].timestamp).toBe('2026-04-02T08.00.00Z')
+    expect(result[0]!.timestamp).toBe('2026-04-03T08.00.00Z')
+    expect(result[1]!.timestamp).toBe('2026-04-02T08.00.00Z')
   })
 
   test('--failures + --last combines correctly', async () => {
@@ -164,7 +164,7 @@ describe('queryHistory', () => {
     if (result instanceof Error) return
 
     expect(result).toHaveLength(2)
-    expect(result[0].timestamp).toBe('2026-04-03T08.00.00Z')
+    expect(result[0]!.timestamp).toBe('2026-04-03T08.00.00Z')
   })
 
   test('includes stderrPath when stderr file exists', async () => {
@@ -185,7 +185,7 @@ describe('queryHistory', () => {
     expect(result).not.toBeInstanceOf(Error)
     if (result instanceof Error) return
 
-    expect(result[0].stderrPath).toBe(
+    expect(result[0]!.stderrPath).toBe(
       path.join(
         configDir,
         'history',
@@ -204,7 +204,7 @@ describe('queryHistory', () => {
     expect(result).not.toBeInstanceOf(Error)
     if (result instanceof Error) return
 
-    expect(result[0].stderrPath).toBeUndefined()
+    expect(result[0]!.stderrPath).toBeUndefined()
   })
 
   test('skips malformed meta.json files', async () => {
@@ -224,7 +224,7 @@ describe('queryHistory', () => {
     if (result instanceof Error) return
 
     expect(result).toHaveLength(1)
-    expect(result[0].timestamp).toBe('2026-04-01T08.00.00Z')
+    expect(result[0]!.timestamp).toBe('2026-04-01T08.00.00Z')
   })
 
   test('parses all meta.json fields correctly', async () => {
@@ -242,7 +242,7 @@ describe('queryHistory', () => {
     expect(result).not.toBeInstanceOf(Error)
     if (result instanceof Error) return
 
-    expect(result[0]).toEqual({
+    expect(result[0]!).toEqual({
       timestamp: '2026-04-04T08.30.00Z',
       started_at: '2026-04-04T08:30:00.000Z',
       finished_at: '2026-04-04T08:30:15.456Z',

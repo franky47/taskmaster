@@ -2,9 +2,19 @@ import path from 'node:path'
 
 import * as errore from 'errore'
 
-import { envFilePath, taskFilePath } from '../config'
+import {
+  envFilePath,
+  locksDir as defaultLocksDir,
+  taskFilePath,
+} from '../config'
 import type { EnvFileParseError, EnvFileReadError } from '../env'
 import { buildEnv, loadEnvFile } from '../env'
+import {
+  LockAcquireError,
+  TaskContentionError,
+  acquireTaskLock,
+  releaseLock,
+} from '../lock'
 import type {
   FrontmatterParseError,
   FrontmatterValidationError,
@@ -50,15 +60,15 @@ type SpawnClaudeResult = {
   stderr: string
 }
 
-export type RunDeps = {
+export type ExecuteDeps = {
   spawnClaude: (
     opts: SpawnClaudeOpts,
   ) => Promise<ClaudeNotFoundError | SpawnClaudeResult>
 }
 
-type RunOptions = {
+type ExecuteOptions = {
   configDir?: string
-  deps?: Partial<RunDeps>
+  deps?: Partial<ExecuteDeps>
 }
 
 // Default implementation --
@@ -91,7 +101,7 @@ async function defaultSpawnClaude(
 
 // Public API --
 
-export type RunError =
+export type ExecuteError =
   | TaskFileNameError
   | TaskNotFoundError
   | TaskFileReadError
@@ -103,30 +113,28 @@ export type RunError =
   | EnvFileReadError
   | EnvFileParseError
 
-export async function runTask(
+export type RunError = ExecuteError | LockAcquireError | TaskContentionError
+
+export async function executeTask(
   name: string,
-  options?: RunOptions,
-): Promise<RunError | RunResult> {
+  options?: ExecuteOptions,
+): Promise<ExecuteError | RunResult> {
   const configRoot = options?.configDir
   const filePath = configRoot
     ? path.join(configRoot, 'tasks', `${name}.md`)
     : taskFilePath(name)
 
-  // S3.1: Parse task file
   const task = await parseTaskFile(filePath)
   if (task instanceof Error) return task
 
-  // S3.6: Load and merge environment
   const envPath = configRoot ? path.join(configRoot, '.env') : envFilePath
   const globalEnv = await loadEnvFile(envPath)
   if (globalEnv instanceof Error) return globalEnv
   const env = buildEnv(globalEnv, task.env)
 
-  // S3.4, S3.5: Resolve working directory
   const cwd = await resolveCwd(task.cwd)
   if (cwd instanceof Error) return cwd
 
-  // S3.2, S3.3: Spawn claude
   const spawnClaude = options?.deps?.spawnClaude ?? defaultSpawnClaude
   const startedAt = new Date()
   const result = await spawnClaude({
@@ -145,4 +153,21 @@ export async function runTask(
     startedAt,
     finishedAt,
   }
+}
+
+export async function runTask(
+  name: string,
+  options?: ExecuteOptions,
+): Promise<RunError | RunResult> {
+  const configRoot = options?.configDir
+  const lockDir = configRoot ? path.join(configRoot, 'locks') : defaultLocksDir
+
+  const lock = acquireTaskLock(name, lockDir)
+  if (lock instanceof Error) return lock
+  if ('contended' in lock) return new TaskContentionError({ taskName: name })
+
+  using cleanup = new errore.DisposableStack()
+  cleanup.defer(() => releaseLock(lock.fd))
+
+  return executeTask(name, options)
 }

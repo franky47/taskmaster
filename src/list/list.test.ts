@@ -96,6 +96,7 @@ describe('listTasks', () => {
     await writeTask(tasksDir, 'aa-first', ENABLED_TASK)
     await writeTask(tasksDir, 'mm-middle', ENABLED_TASK)
     const result = await listTasks(tasksDir)
+    if (result instanceof Error) throw result
     expect(result.map((t) => t.name)).toEqual([
       'aa-first',
       'mm-middle',
