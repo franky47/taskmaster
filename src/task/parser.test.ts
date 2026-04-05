@@ -2,7 +2,11 @@ import { describe, expect, test } from 'bun:test'
 import { join } from 'node:path'
 
 import { FrontmatterValidationError } from './frontmatter.ts'
-import { parseTaskFile, TaskFileNameError } from './parser.ts'
+import {
+  parseTaskFile,
+  TaskFileNameError,
+  TaskNotFoundError,
+} from './parser.ts'
 
 const FIXTURES = join(import.meta.dir, 'fixtures')
 
@@ -95,6 +99,13 @@ describe('parseTaskFile', () => {
     test('rejects underscores in filename', async () => {
       const result = await parseTaskFile('/tmp/bad_name.md')
       expect(result).toBeInstanceOf(TaskFileNameError)
+    })
+  })
+
+  describe('missing file', () => {
+    test('returns TaskNotFoundError for non-existent file', async () => {
+      const result = await parseTaskFile('/tmp/no-such-task.md')
+      expect(result).toBeInstanceOf(TaskNotFoundError)
     })
   })
 

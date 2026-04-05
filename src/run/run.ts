@@ -10,6 +10,7 @@ import type {
   FrontmatterValidationError,
   TaskFileNameError,
   TaskFileReadError,
+  TaskNotFoundError,
 } from '../task'
 import { parseTaskFile } from '../task'
 import type { CwdNotDirectoryError, CwdNotFoundError } from './cwd'
@@ -80,6 +81,7 @@ async function defaultSpawnClaude(
 
 export type RunError =
   | TaskFileNameError
+  | TaskNotFoundError
   | TaskFileReadError
   | FrontmatterParseError
   | FrontmatterValidationError

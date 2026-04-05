@@ -1,6 +1,10 @@
 import { describe, expect, test } from 'bun:test'
 
-import { FrontmatterValidationError, parseMarkdown } from './frontmatter.ts'
+import {
+  FrontmatterParseError,
+  FrontmatterValidationError,
+  parseMarkdown,
+} from './frontmatter.ts'
 
 function md(yaml: string, body = ''): string {
   return `---\n${yaml}\n---\n${body}`
@@ -18,6 +22,13 @@ describe('parseMarkdown', () => {
     test('accepts every-minute cron', () => {
       const result = parseMarkdown(md("schedule: '* * * * *'"))
       expect(result).not.toBeInstanceOf(Error)
+    })
+
+    test('gives actionable error for unquoted stars in schedule', () => {
+      const result = parseMarkdown(md('schedule: * * * * *'))
+      expect(result).toBeInstanceOf(FrontmatterParseError)
+      if (!(result instanceof FrontmatterParseError)) return
+      expect(result.message).toContain('must be quoted')
     })
 
     test('rejects missing schedule', () => {

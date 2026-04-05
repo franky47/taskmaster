@@ -24,6 +24,12 @@ export class TaskFileNameError extends errore.createTaggedError({
   message: 'Task file name "$filename" is invalid',
 }) {}
 
+export class TaskNotFoundError extends errore.createTaggedError({
+  name: 'TaskNotFoundError',
+  message:
+    'No task found at $path, create it or list available tasks with `tm list`.',
+}) {}
+
 export class TaskFileReadError extends errore.createTaggedError({
   name: 'TaskFileReadError',
   message: 'Failed to read task file $path',
@@ -40,6 +46,7 @@ export async function parseTaskFile(
   filePath: string,
 ): Promise<
   | TaskFileNameError
+  | TaskNotFoundError
   | TaskFileReadError
   | FrontmatterParseError
   | FrontmatterValidationError
@@ -51,9 +58,12 @@ export async function parseTaskFile(
     return new TaskFileNameError({ filename })
   }
 
-  const content = await fs
-    .readFile(filePath, 'utf-8')
-    .catch((e) => new TaskFileReadError({ path: filePath, cause: e }))
+  const content = await fs.readFile(filePath, 'utf-8').catch((e) => {
+    if (e instanceof Error && 'code' in e && e.code === 'ENOENT') {
+      return new TaskNotFoundError({ path: filePath, cause: e })
+    }
+    return new TaskFileReadError({ path: filePath, cause: e })
+  })
   if (content instanceof Error) return content
 
   return parseMarkdown(content)

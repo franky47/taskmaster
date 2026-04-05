@@ -6,7 +6,7 @@ import path from 'node:path'
 import {
   FrontmatterValidationError,
   TaskFileNameError,
-  TaskFileReadError,
+  TaskNotFoundError,
 } from '../task'
 import { CwdNotFoundError } from './cwd'
 import { runTask } from './run'
@@ -46,13 +46,13 @@ const validTask = [
 ].join('\n')
 
 describe('runTask', () => {
-  test('returns TaskFileReadError for non-existent task', async () => {
+  test('returns TaskNotFoundError for non-existent task', async () => {
     const configDir = await makeConfigDir()
     const result = await runTask('no-such-task', {
       configDir,
       deps: { spawnClaude: fakeSpawn() },
     })
-    expect(result).toBeInstanceOf(TaskFileReadError)
+    expect(result).toBeInstanceOf(TaskNotFoundError)
   })
 
   test('returns TaskFileNameError for invalid task name', async () => {

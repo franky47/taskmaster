@@ -7,5 +7,6 @@ export {
   parseTaskFile,
   TaskFileNameError,
   TaskFileReadError,
+  TaskNotFoundError,
   TaskParseError,
 } from './parser'

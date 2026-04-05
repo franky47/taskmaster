@@ -20,21 +20,31 @@ type FrontmatterError = {
 
 export class FrontmatterParseError extends errore.createTaggedError({
   name: 'FrontmatterParseError',
-  message: 'Invalid frontmatter format',
+  message: 'Invalid frontmatter: $reason',
 }) {}
 
 export class FrontmatterValidationError extends errore.createTaggedError({
   name: 'FrontmatterValidationError',
-  message: 'Failed to validate frontmatter contents',
+  message: '$summary',
 }) {
   readonly errors: FrontmatterError[]
   constructor(args: { errors: FrontmatterError[]; cause?: unknown }) {
-    super(args)
+    const lines = args.errors.map((e) => `  - ${e.key}: ${e.message}`)
+    super({
+      ...args,
+      summary: `Invalid frontmatter:\n${lines.join('\n')}`,
+    })
     this.errors = args.errors
   }
 }
 
 // --
+
+const UNQUOTED_STAR_RE = /^schedule:\s*[^"']*\*/m
+
+function hasUnquotedStar(content: string): boolean {
+  return UNQUOTED_STAR_RE.test(content)
+}
 
 function isFrontmatterField(key: string): key is keyof Frontmatter {
   return frontmatterSchema.shape.hasOwnProperty(key)
@@ -45,7 +55,19 @@ export function parseMarkdown(
 ): FrontmatterParseError | FrontmatterValidationError | TaskDefinition {
   const fm = errore.try({
     try: () => matter(content),
-    catch: (cause) => new FrontmatterParseError({ cause }),
+    catch: (cause) => {
+      if (hasUnquotedStar(content)) {
+        return new FrontmatterParseError({
+          reason:
+            'Cron expressions containing * must be quoted in YAML, e.g. schedule: "0 * * * *"',
+          cause,
+        })
+      }
+      return new FrontmatterParseError({
+        reason: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      })
+    },
   })
   if (fm instanceof Error) return fm
 
