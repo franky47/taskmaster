@@ -1,10 +1,12 @@
 import { Command, Option } from 'commander'
+import { z } from 'zod'
 
 import { tasksDir } from './config'
 import {
   formatTimestamp,
   manualTimestamp,
   parseTimestampFlag,
+  queryHistory,
   recordHistory,
 } from './history'
 import { listTasks } from './list'
@@ -120,6 +122,53 @@ async function main(): Promise<void> {
       const hasErrors = results.some((r) => !r.valid)
       process.exit(hasErrors ? 1 : 0)
     })
+
+  program
+    .command('history <name>')
+    .description('Show run history for a task')
+    .option('--json', 'Output as JSON')
+    .option('--failures', 'Show only failed runs')
+    .option('--last <n>', 'Limit to N most recent entries')
+    .action(
+      async (
+        name: string,
+        opts: { json?: boolean; failures?: boolean; last?: string },
+      ) => {
+        let last: number | undefined
+        if (opts.last !== undefined) {
+          const parsed = z.coerce.number().int().positive().safeParse(opts.last)
+          if (!parsed.success) {
+            console.error('--last must be a positive integer')
+            process.exit(1)
+          }
+          last = parsed.data
+        }
+
+        const result = await queryHistory(name, {
+          failures: opts.failures,
+          last,
+        })
+        if (result instanceof Error) {
+          console.error(result.message)
+          process.exit(1)
+        }
+
+        if (opts.json) {
+          const jsonEntries = result.map(({ stderrPath: _, ...entry }) => entry)
+          console.log(JSON.stringify(jsonEntries))
+        } else {
+          for (const entry of result) {
+            console.log(entry.timestamp)
+            console.log(`  duration  ${entry.duration_ms}ms`)
+            console.log(`  exit_code ${entry.exit_code}`)
+            console.log(`  status    ${entry.success ? 'ok' : 'err'}`)
+            if (entry.stderrPath) {
+              console.log(`  stderr    ${entry.stderrPath}`)
+            }
+          }
+        }
+      },
+    )
 
   await program.parseAsync()
 }

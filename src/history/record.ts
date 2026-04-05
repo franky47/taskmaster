@@ -4,6 +4,7 @@ import path from 'node:path'
 import * as errore from 'errore'
 
 import { configDir as defaultConfigDir } from '../config'
+import type { HistoryMeta } from './schema'
 
 // Errors --
 
@@ -11,17 +12,6 @@ export class HistoryWriteError extends errore.createTaggedError({
   name: 'HistoryWriteError',
   message: 'Failed to write history for task "$taskName": $reason',
 }) {}
-
-// Types --
-
-type HistoryMeta = {
-  timestamp: string
-  started_at: string
-  finished_at: string
-  duration_ms: number
-  exit_code: number
-  success: boolean
-}
 
 export type RecordHistoryInput = {
   taskName: string

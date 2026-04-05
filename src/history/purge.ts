@@ -2,9 +2,9 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 
 import * as errore from 'errore'
-import { z } from 'zod'
 
 import { historyDir as defaultHistoryDir } from '../config'
+import { historyMetaSchema } from './schema'
 
 // Errors --
 
@@ -20,11 +20,6 @@ type PurgeDeps = {
   now?: Date
   maxAgeDays?: number
 }
-
-const historyMetaSchema = z.object({
-  finished_at: z.string(),
-  success: z.boolean(),
-})
 
 // Implementation --
 
