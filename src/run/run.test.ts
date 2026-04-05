@@ -360,6 +360,30 @@ describe('runTask', () => {
     releaseLock(lock.fd)
   })
 
+  test('holds lock during execution, not just at start', async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(configDir, 'hold-lock', validTask)
+    const locksDir = path.join(configDir, 'locks')
+
+    // spawnClaude that checks the lock is held mid-execution
+    let lockHeldDuringExecution = false
+    const result = await runTask('hold-lock', {
+      configDir,
+      deps: {
+        spawnClaude: async () => {
+          // While claude is "running", try to acquire the same lock
+          const probe = acquireTaskLock('hold-lock', locksDir)
+          lockHeldDuringExecution = 'contended' in probe
+          if ('fd' in probe) releaseLock(probe.fd)
+          return { exitCode: 0, stdout: '', stderr: '' }
+        },
+      },
+    })
+
+    if (result instanceof Error) throw result
+    expect(lockHeldDuringExecution).toBe(true)
+  })
+
   test('releases lock after successful run (re-acquire succeeds)', async () => {
     const configDir = await makeConfigDir()
     await writeTask(configDir, 'release-ok', validTask)

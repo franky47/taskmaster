@@ -169,5 +169,5 @@ export async function runTask(
   using cleanup = new errore.DisposableStack()
   cleanup.defer(() => releaseLock(lock.fd))
 
-  return executeTask(name, options)
+  return await executeTask(name, options)
 }
