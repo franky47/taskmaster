@@ -4,7 +4,7 @@
   "type": "module",
   "private": true,
   "bin": {
-    "tm": "./src/index.ts"
+    "tm": "./src/main.ts"
   },
   "scripts": {
     "lint": "oxlint src/",
@@ -13,7 +13,7 @@
     "typecheck": "tsgo --noEmit",
     "test": "bun test",
     "check": "bun run fmt:check && bun run lint && bun run typecheck && bun test",
-    "build": "bun build src/index.ts --compile --outfile tm"
+    "build": "bun build src/main.ts --compile --outfile tm"
   },
   "devDependencies": {
     "@types/bun": "latest",
@@ -26,6 +26,7 @@
     "typescript": "^5"
   },
   "dependencies": {
+    "commander": "^14.0.3",
     "cron-parser": "^5.5.0",
     "errore": "^0.14.1",
     "gray-matter": "^4.0.3",
