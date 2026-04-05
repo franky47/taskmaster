@@ -13,7 +13,7 @@ import type {
   TaskNotFoundError,
 } from '../task'
 import { parseTaskFile } from '../task'
-import type { CwdNotDirectoryError, CwdNotFoundError } from './cwd'
+import type { CwdNotDirectoryError, CwdNotFoundError, ResolvedCwd } from './cwd'
 import { resolveCwd } from './cwd'
 
 // Errors --
@@ -25,10 +25,16 @@ export class ClaudeNotFoundError extends errore.createTaggedError({
 
 // Types --
 
+export type { ResolvedCwd }
+
 export type RunResult = {
   exitCode: number
   stdout: string
   stderr: string
+  cwd: ResolvedCwd
+  prompt: string
+  startedAt: Date
+  finishedAt: Date
 }
 
 export type SpawnClaudeOpts = {
@@ -38,10 +44,16 @@ export type SpawnClaudeOpts = {
   env: Record<string, string>
 }
 
+type SpawnClaudeResult = {
+  exitCode: number
+  stdout: string
+  stderr: string
+}
+
 export type RunDeps = {
   spawnClaude: (
     opts: SpawnClaudeOpts,
-  ) => Promise<ClaudeNotFoundError | RunResult>
+  ) => Promise<ClaudeNotFoundError | SpawnClaudeResult>
 }
 
 type RunOptions = {
@@ -53,7 +65,7 @@ type RunOptions = {
 
 async function defaultSpawnClaude(
   opts: SpawnClaudeOpts,
-): Promise<ClaudeNotFoundError | RunResult> {
+): Promise<ClaudeNotFoundError | SpawnClaudeResult> {
   const claudePath = Bun.which('claude')
   if (!claudePath) {
     return new ClaudeNotFoundError()
@@ -116,13 +128,21 @@ export async function runTask(
 
   // S3.2, S3.3: Spawn claude
   const spawnClaude = options?.deps?.spawnClaude ?? defaultSpawnClaude
+  const startedAt = new Date()
   const result = await spawnClaude({
     prompt: task.prompt,
     args: task.args,
     cwd: cwd.path,
     env,
   })
+  const finishedAt = new Date()
   if (result instanceof Error) return result
 
-  return result
+  return {
+    ...result,
+    cwd,
+    prompt: task.prompt,
+    startedAt,
+    finishedAt,
+  }
 }

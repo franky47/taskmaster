@@ -20,7 +20,7 @@ export function expandTilde(p: string): string {
   return p
 }
 
-type ResolvedCwd = {
+export type ResolvedCwd = {
   path: string
   isTemp: boolean
 }

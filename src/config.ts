@@ -3,6 +3,8 @@ import path from 'node:path'
 
 export const configDir = path.join(os.homedir(), '.config', 'taskmaster')
 export const tasksDir = path.join(configDir, 'tasks')
+export const historyDir = path.join(configDir, 'history')
+export const runsDir = path.join(configDir, 'runs')
 export const envFilePath = path.join(configDir, '.env')
 
 export function taskFilePath(name: string): string {

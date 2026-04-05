@@ -10,9 +10,15 @@ import {
 } from '../task'
 import { CwdNotFoundError } from './cwd'
 import { runTask } from './run'
-import type { RunDeps, RunResult } from './run'
+import type { RunDeps } from './run'
 
-function fakeSpawn(result: Partial<RunResult> = {}): RunDeps['spawnClaude'] {
+type SpawnResult = {
+  exitCode: number
+  stdout: string
+  stderr: string
+}
+
+function fakeSpawn(result: Partial<SpawnResult> = {}): RunDeps['spawnClaude'] {
   return async () => ({
     exitCode: 0,
     stdout: '',
@@ -260,5 +266,75 @@ describe('runTask', () => {
     if (result instanceof Error) throw result
     expect(result.stdout).toBe('hello out')
     expect(result.stderr).toBe('hello err')
+  })
+
+  test('includes startedAt and finishedAt timestamps', async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(configDir, 'timing', '---\nschedule: "0 * * * *"\n---\nGo')
+
+    const before = new Date()
+    const result = await runTask('timing', {
+      configDir,
+      deps: { spawnClaude: fakeSpawn() },
+    })
+    const after = new Date()
+
+    if (result instanceof Error) throw result
+    expect(result.startedAt.getTime()).toBeGreaterThanOrEqual(before.getTime())
+    expect(result.finishedAt.getTime()).toBeLessThanOrEqual(after.getTime())
+    expect(result.finishedAt.getTime()).toBeGreaterThanOrEqual(
+      result.startedAt.getTime(),
+    )
+  })
+
+  test('includes cwd with isTemp when cwd omitted', async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(
+      configDir,
+      'temp-cwd',
+      '---\nschedule: "0 * * * *"\n---\nGo',
+    )
+
+    const result = await runTask('temp-cwd', {
+      configDir,
+      deps: { spawnClaude: fakeSpawn() },
+    })
+
+    if (result instanceof Error) throw result
+    expect(result.cwd.isTemp).toBe(true)
+    expect(result.cwd.path).toContain('taskmaster-')
+  })
+
+  test('includes cwd with isTemp=false when cwd specified', async () => {
+    const cwdDir = await fs.mkdtemp(path.join(os.tmpdir(), 'tm-cwd-'))
+    const configDir = await makeConfigDir()
+    const task = `---\nschedule: "0 * * * *"\ncwd: "${cwdDir}"\n---\nGo`
+    await writeTask(configDir, 'explicit-cwd', task)
+
+    const result = await runTask('explicit-cwd', {
+      configDir,
+      deps: { spawnClaude: fakeSpawn() },
+    })
+
+    if (result instanceof Error) throw result
+    expect(result.cwd.isTemp).toBe(false)
+    expect(result.cwd.path).toBe(cwdDir)
+  })
+
+  test('includes prompt body in result', async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(
+      configDir,
+      'prompt-check',
+      '---\nschedule: "0 * * * *"\n---\nDo the thing.',
+    )
+
+    const result = await runTask('prompt-check', {
+      configDir,
+      deps: { spawnClaude: fakeSpawn() },
+    })
+
+    if (result instanceof Error) throw result
+    expect(result.prompt).toBe('Do the thing.')
   })
 })
