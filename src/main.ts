@@ -80,7 +80,7 @@ async function main(): Promise<void> {
       }
 
       if (opts.json) {
-        console.log(JSON.stringify(results, null, 2))
+        console.log(JSON.stringify(results))
       } else {
         for (const result of results) {
           if (result.valid) {
