@@ -1,0 +1,249 @@
+import { describe, expect, test } from 'bun:test'
+import fs from 'node:fs/promises'
+import os from 'node:os'
+import path from 'node:path'
+
+import { getTaskStatuses } from './status'
+
+async function makeConfigDir(): Promise<string> {
+  const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'tm-status-'))
+  await fs.mkdir(path.join(tmp, 'tasks'), { recursive: true })
+  return tmp
+}
+
+async function writeTask(
+  configDir: string,
+  name: string,
+  content: string,
+): Promise<void> {
+  await fs.writeFile(path.join(configDir, 'tasks', `${name}.md`), content)
+}
+
+async function writeMeta(
+  configDir: string,
+  taskName: string,
+  timestamp: string,
+  overrides: Partial<{
+    started_at: string
+    finished_at: string
+    duration_ms: number
+    exit_code: number
+    success: boolean
+  }> = {},
+): Promise<void> {
+  const histDir = path.join(configDir, 'history', taskName)
+  await fs.mkdir(histDir, { recursive: true })
+
+  const meta = {
+    timestamp,
+    started_at: timestamp.replace(/\./g, ':').replace(/Z$/, '.000Z'),
+    finished_at: timestamp.replace(/\./g, ':').replace(/Z$/, '.000Z'),
+    duration_ms: 1000,
+    exit_code: 0,
+    success: true,
+    ...overrides,
+  }
+
+  await fs.writeFile(
+    path.join(histDir, `${timestamp}.meta.json`),
+    JSON.stringify(meta),
+  )
+}
+
+const ENABLED_TASK = `---
+schedule: '0 8 * * 1-5'
+---
+
+Do something useful.
+`
+
+const DISABLED_TASK = `---
+schedule: '30 6 * * *'
+enabled: false
+---
+
+Disabled task.
+`
+
+const TIMEZONE_TASK = `---
+schedule: '0 9 * * 1'
+timezone: 'America/New_York'
+---
+
+Weekly task.
+`
+
+// Fixed "now" for deterministic next_run calculations.
+// 2026-04-05 is a Sunday.
+const NOW = new Date('2026-04-05T12:00:00.000Z')
+
+describe('getTaskStatuses', () => {
+  test('returns empty array when no tasks exist', async () => {
+    const configDir = await makeConfigDir()
+    const result = await getTaskStatuses({ configDir, now: NOW })
+    expect(result).toEqual([])
+  })
+
+  test('returns status for enabled task with no history', async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(configDir, 'my-task', ENABLED_TASK)
+
+    const result = await getTaskStatuses({ configDir, now: NOW })
+    expect(result).not.toBeInstanceOf(Error)
+    if (result instanceof Error) return
+
+    expect(result).toHaveLength(1)
+    const first = result[0]
+    expect(first).toBeDefined()
+    if (!first) return
+    expect(first).toEqual({
+      name: 'my-task',
+      schedule: '0 8 * * 1-5',
+      enabled: true,
+      // Next weekday after Sunday 2026-04-05 is Monday 2026-04-06 at 08:00 UTC
+      next_run: '2026-04-06T08:00:00.000Z',
+    })
+  })
+
+  test('omits last_run when task has no history', async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(configDir, 'my-task', ENABLED_TASK)
+
+    const result = await getTaskStatuses({ configDir, now: NOW })
+    expect(result).not.toBeInstanceOf(Error)
+    if (result instanceof Error) return
+
+    const first = result[0]
+    expect(first).toBeDefined()
+    if (!first) return
+    expect(first).not.toHaveProperty('last_run')
+  })
+
+  test('omits timezone when not set on task', async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(configDir, 'my-task', ENABLED_TASK)
+
+    const result = await getTaskStatuses({ configDir, now: NOW })
+    expect(result).not.toBeInstanceOf(Error)
+    if (result instanceof Error) return
+
+    const first = result[0]
+    expect(first).toBeDefined()
+    if (!first) return
+    expect(first).not.toHaveProperty('timezone')
+  })
+
+  test('includes last_run with ok status for successful history', async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(configDir, 'my-task', ENABLED_TASK)
+    await writeMeta(configDir, 'my-task', '2026-04-04T08.00.00Z', {
+      duration_ms: 1500,
+      exit_code: 0,
+      success: true,
+    })
+
+    const result = await getTaskStatuses({ configDir, now: NOW })
+    expect(result).not.toBeInstanceOf(Error)
+    if (result instanceof Error) return
+
+    const first = result[0]
+    expect(first).toBeDefined()
+    if (!first) return
+    expect(first.last_run).toEqual({
+      timestamp: '2026-04-04T08:00:00.000Z',
+      status: 'ok',
+      exit_code: 0,
+      duration_ms: 1500,
+    })
+  })
+
+  test('includes last_run with err status for failed history', async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(configDir, 'my-task', ENABLED_TASK)
+    await writeMeta(configDir, 'my-task', '2026-04-04T08.00.00Z', {
+      duration_ms: 500,
+      exit_code: 1,
+      success: false,
+    })
+
+    const result = await getTaskStatuses({ configDir, now: NOW })
+    expect(result).not.toBeInstanceOf(Error)
+    if (result instanceof Error) return
+
+    const first = result[0]
+    expect(first).toBeDefined()
+    if (!first) return
+    expect(first.last_run).toEqual({
+      timestamp: '2026-04-04T08:00:00.000Z',
+      status: 'err',
+      exit_code: 1,
+      duration_ms: 500,
+    })
+  })
+
+  test('uses most recent history entry for last_run', async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(configDir, 'my-task', ENABLED_TASK)
+    await writeMeta(configDir, 'my-task', '2026-04-01T08.00.00Z', {
+      exit_code: 1,
+      success: false,
+    })
+    await writeMeta(configDir, 'my-task', '2026-04-04T08.00.00Z', {
+      exit_code: 0,
+      success: true,
+    })
+
+    const result = await getTaskStatuses({ configDir, now: NOW })
+    expect(result).not.toBeInstanceOf(Error)
+    if (result instanceof Error) return
+
+    const first = result[0]
+    expect(first).toBeDefined()
+    if (!first) return
+    expect(first.last_run?.status).toBe('ok')
+    expect(first.last_run?.timestamp).toBe('2026-04-04T08:00:00.000Z')
+  })
+
+  test('disabled task omits next_run', async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(configDir, 'off-task', DISABLED_TASK)
+
+    const result = await getTaskStatuses({ configDir, now: NOW })
+    expect(result).not.toBeInstanceOf(Error)
+    if (result instanceof Error) return
+
+    const first = result[0]
+    expect(first).toBeDefined()
+    if (!first) return
+    expect(first.enabled).toBe(false)
+    expect(first).not.toHaveProperty('next_run')
+  })
+
+  test('respects timezone for next_run computation', async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(configDir, 'weekly', TIMEZONE_TASK)
+
+    const result = await getTaskStatuses({ configDir, now: NOW })
+    expect(result).not.toBeInstanceOf(Error)
+    if (result instanceof Error) return
+
+    const first = result[0]
+    expect(first).toBeDefined()
+    if (!first) return
+    expect(first.timezone).toBe('America/New_York')
+    // Monday 9am EDT (UTC-4 in April) = 13:00 UTC
+    expect(first.next_run).toBe('2026-04-06T13:00:00.000Z')
+  })
+
+  test('returns multiple tasks sorted by name', async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(configDir, 'zz-last', ENABLED_TASK)
+    await writeTask(configDir, 'aa-first', ENABLED_TASK)
+
+    const result = await getTaskStatuses({ configDir, now: NOW })
+    expect(result).not.toBeInstanceOf(Error)
+    if (result instanceof Error) return
+
+    expect(result.map((t) => t.name)).toEqual(['aa-first', 'zz-last'])
+  })
+})

@@ -11,6 +11,7 @@ import {
 } from './history'
 import { listTasks } from './list'
 import { runTask } from './run'
+import { getTaskStatuses } from './status'
 import { validateTasks } from './validate'
 
 async function main(): Promise<void> {
@@ -169,6 +170,36 @@ async function main(): Promise<void> {
         }
       },
     )
+
+  program
+    .command('status')
+    .description('Show status of all tasks')
+    .option('--json', 'Output as JSON')
+    .action(async (opts: { json?: boolean }) => {
+      const statuses = await getTaskStatuses()
+      if (statuses instanceof Error) {
+        console.error(statuses.message)
+        process.exit(1)
+      }
+
+      if (opts.json) {
+        console.log(JSON.stringify(statuses))
+      } else {
+        for (const task of statuses) {
+          console.log(task.name)
+          console.log(`  schedule  ${task.schedule}`)
+          console.log(`  enabled   ${task.enabled}`)
+          if (task.last_run) {
+            console.log(
+              `  last_run  ${task.last_run.timestamp} ${task.last_run.status} ${task.last_run.duration_ms}ms`,
+            )
+          }
+          if (task.next_run) {
+            console.log(`  next      ${task.next_run}`)
+          }
+        }
+      }
+    })
 
   await program.parseAsync()
 }
