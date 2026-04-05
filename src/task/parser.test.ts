@@ -1,10 +1,10 @@
 import { describe, expect, test } from 'bun:test'
 import { join } from 'node:path'
 
-import { FrontmatterValidationError, parseMarkdown } from './frontmatter.ts'
+import { FrontmatterValidationError } from './frontmatter.ts'
 import { parseTaskFile, TaskFileNameError } from './parser.ts'
 
-const FIXTURES = join(import.meta.dir, '..', 'fixtures')
+const FIXTURES = join(import.meta.dir, 'fixtures')
 
 function fixture(name: string): string {
   return join(FIXTURES, name)
@@ -98,109 +98,8 @@ describe('parseTaskFile', () => {
     })
   })
 
-  describe('schedule validation', () => {
-    test('rejects missing schedule field', async () => {
-      const result = await parseTaskFile(fixture('missing-schedule.md'))
-      expect(result).toBeInstanceOf(FrontmatterValidationError)
-      if (!(result instanceof FrontmatterValidationError)) return
-      expect(result.errors.some((e) => e.key === 'schedule')).toBe(true)
-    })
-
-    test('rejects malformed cron expression', async () => {
-      const result = await parseTaskFile(fixture('malformed-cron.md'))
-      expect(result).toBeInstanceOf(FrontmatterValidationError)
-      if (!(result instanceof FrontmatterValidationError)) return
-      expect(result.errors.some((e) => e.key === 'schedule')).toBe(true)
-    })
-
-    test('rejects 6-field cron expression', async () => {
-      const result = await parseTaskFile(fixture('six-field-cron.md'))
-      expect(result).toBeInstanceOf(FrontmatterValidationError)
-      if (!(result instanceof FrontmatterValidationError)) return
-      expect(result.errors.some((e) => e.key === 'schedule')).toBe(true)
-    })
-
-    test('rejects non-string schedule', () => {
-      const result = parseMarkdown('---\nschedule: 12345\n---\nhi')
-      expect(result).toBeInstanceOf(FrontmatterValidationError)
-      if (!(result instanceof FrontmatterValidationError)) return
-      expect(result.errors.some((e) => e.key === 'schedule')).toBe(true)
-    })
-
-    test('rejects empty frontmatter (no schedule)', async () => {
-      const result = await parseTaskFile(fixture('empty-frontmatter.md'))
-      expect(result).toBeInstanceOf(FrontmatterValidationError)
-      if (!(result instanceof FrontmatterValidationError)) return
-      expect(result.errors.some((e) => e.key === 'schedule')).toBe(true)
-    })
-  })
-
-  describe('timezone validation', () => {
-    test('accepts valid IANA timezone', async () => {
-      const result = await parseTaskFile(fixture('valid-all-fields.md'))
-      expect(result).not.toBeInstanceOf(Error)
-      if (result instanceof Error) return
-      expect(result.timezone).toBe('Europe/Paris')
-    })
-
-    test('rejects invalid timezone string', async () => {
-      const result = await parseTaskFile(fixture('invalid-timezone.md'))
-      expect(result).toBeInstanceOf(FrontmatterValidationError)
-      if (!(result instanceof FrontmatterValidationError)) return
-      expect(result.errors.some((e) => e.key === 'timezone')).toBe(true)
-    })
-
-    test('allows missing timezone', async () => {
-      const result = await parseTaskFile(fixture('valid-basic.md'))
-      expect(result).not.toBeInstanceOf(Error)
-      if (result instanceof Error) return
-      expect(result.timezone).toBeUndefined()
-    })
-  })
-
-  describe('type validation', () => {
-    test('rejects non-array args', async () => {
-      const result = await parseTaskFile(fixture('invalid-claude-args.md'))
-      expect(result).toBeInstanceOf(FrontmatterValidationError)
-      if (!(result instanceof FrontmatterValidationError)) return
-      expect(result.errors.some((e) => e.key === 'args')).toBe(true)
-    })
-
-    test('rejects non-string values in args array', () => {
-      const result = parseMarkdown(
-        '---\nschedule: "0 8 * * *"\nargs:\n  - "--model"\n  - 42\n---\nhi',
-      )
-      expect(result).toBeInstanceOf(FrontmatterValidationError)
-      if (!(result instanceof FrontmatterValidationError)) return
-      expect(result.errors.some((e) => e.key === 'args')).toBe(true)
-    })
-
-    test('rejects non-string env values', async () => {
-      const result = await parseTaskFile(fixture('invalid-env-values.md'))
-      expect(result).toBeInstanceOf(FrontmatterValidationError)
-      if (!(result instanceof FrontmatterValidationError)) return
-      expect(result.errors.some((e) => e.key === 'env')).toBe(true)
-    })
-
-    test('rejects non-boolean enabled', async () => {
-      const result = await parseTaskFile(fixture('invalid-enabled.md'))
-      expect(result).toBeInstanceOf(FrontmatterValidationError)
-      if (!(result instanceof FrontmatterValidationError)) return
-      expect(result.errors.some((e) => e.key === 'enabled')).toBe(true)
-    })
-
-    test('rejects non-object env', () => {
-      const result = parseMarkdown(
-        '---\nschedule: "0 8 * * *"\nenv: "not-an-object"\n---\nhi',
-      )
-      expect(result).toBeInstanceOf(FrontmatterValidationError)
-      if (!(result instanceof FrontmatterValidationError)) return
-      expect(result.errors.some((e) => e.key === 'env')).toBe(true)
-    })
-  })
-
-  describe('error accumulation', () => {
-    test('returns multiple errors for file with multiple problems', async () => {
+  describe('validation error propagation', () => {
+    test('returns FrontmatterValidationError for invalid files', async () => {
       const result = await parseTaskFile(fixture('multiple-errors.md'))
       expect(result).toBeInstanceOf(FrontmatterValidationError)
       if (!(result instanceof FrontmatterValidationError)) return

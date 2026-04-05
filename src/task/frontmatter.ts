@@ -7,6 +7,10 @@ const VALID_TIMEZONES = new Set(Intl.supportedValuesOf('timeZone'))
 
 export type Frontmatter = z.output<typeof frontmatterSchema>
 
+export type TaskDefinition = Frontmatter & {
+  prompt: string
+}
+
 export type ParseMarkdownOutput = {
   frontmatter: Frontmatter
   body: string

@@ -7,7 +7,7 @@ Rules enforced:
 - Use `type` for object shapes. Use `interface` only when declaration merging is needed.
 - Use `unknown`, never use `any`.
 - Prefer type guards (`value is Type`) and assertion functions (`asserts value is Type`) over `as` casts.
-- Use discriminated unions for result types (see `ParseResult` pattern in `src/types.ts`).
+- Use discriminated unions for result types (see `parseTaskFile` return type in `src/task/parser.ts`).
 - Narrow `string` fields to literal unions where the set of values is known (see `ParseErrorField`).
 - Use `const` assertions for literal objects/arrays that should not widen.
 - Use `infer` in conditional types when extracting nested types.
@@ -15,4 +15,4 @@ Rules enforced:
 ## Conventions
 
 - Tests are co-located with source files (`foo.test.ts` next to `foo.ts`).
-- Test fixtures live in `src/fixtures/`.
+- Test fixtures are colocated in a `fixtures/` directory next to the tests that use them.

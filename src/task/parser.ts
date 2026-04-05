@@ -2,14 +2,20 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 
 import * as errore from 'errore'
+import { z } from 'zod'
 
-import { filenameSchema } from './file-name'
 import {
   FrontmatterParseError,
   FrontmatterValidationError,
   parseMarkdown,
 } from './frontmatter'
-import type { TaskDefinition } from './types'
+import type { TaskDefinition } from './frontmatter'
+
+const TASK_NAME_RE = /^[a-z0-9-]+$/
+
+const filenameSchema = z.string().refine((v) => TASK_NAME_RE.test(v), {
+  error: (issue) => `Task name "${String(issue.input)}" must match [a-z0-9-]+`,
+})
 
 // Errors --
 
