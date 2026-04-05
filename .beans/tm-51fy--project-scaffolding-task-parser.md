@@ -20,7 +20,7 @@ See PRD Slice 0 for full specification.
 - [x] oxfmt configured as formatter; Claude Code hook runs `oxfmt` on `.ts` files after every write (S0.1a)
 - [x] oxlint configured as linter (S0.1b)
 - [x] tsgo configured for type checking (S0.1c)
-- [x] Task file parser reads YAML frontmatter (schedule, timezone, cwd, claude_args, env, enabled) and markdown body from a .md file (S0.2)
+- [x] Task file parser reads YAML frontmatter (schedule, timezone, cwd, args, env, enabled) and markdown body from a .md file (S0.2)
 - [x] Parser validates schedule as a syntactically correct 5-field cron expression (S0.3)
 - [x] Parser validates timezone as a valid IANA identifier when present (S0.4)
 - [x] Parser validates task name (derived from filename) matches [a-z0-9-]+ (S0.5)

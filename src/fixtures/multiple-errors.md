@@ -1,7 +1,7 @@
 ---
 schedule: 'bad cron'
 timezone: 'Fake/Zone'
-claude_args: 42
+args: 42
 enabled: 'nope'
 ---
 

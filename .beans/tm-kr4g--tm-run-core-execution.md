@@ -7,12 +7,12 @@ priority: high
 created_at: 2026-04-04T19:53:36Z
 updated_at: 2026-04-04T19:53:36Z
 blocked_by:
-    - tm-51fy
+  - tm-51fy
 ---
 
 ## What to build
 
-The `tm run <name>` subcommand — the critical execution path. Parses the task file, strips frontmatter, sets up the environment (global .env + per-task env), resolves cwd (expanding ~, creating temp dir if omitted), writes the prompt to a temp file, pipes it to `claude -p` via stdin with claude_args, and captures stdout/stderr/exit code. Ignores the enabled flag entirely.
+The `tm run <name>` subcommand — the critical execution path. Parses the task file, strips frontmatter, sets up the environment (global .env + per-task env), resolves cwd (expanding ~, creating temp dir if omitted), writes the prompt to a temp file, pipes it to `claude -p` via stdin with args, and captures stdout/stderr/exit code. Ignores the enabled flag entirely.
 
 See PRD Slice 3 for full specification.
 
@@ -20,7 +20,7 @@ See PRD Slice 3 for full specification.
 
 - [ ] `tm run <name>` reads the task file, strips YAML frontmatter, extracts the prompt body (S3.1)
 - [ ] Prompt body is written to a temp file and redirected to claude -p via stdin; fails with clear error if claude not on PATH (S3.2)
-- [ ] claude_args from frontmatter are appended to the claude invocation (S3.3)
+- [ ] args from frontmatter are appended to the claude invocation (S3.3)
 - [ ] When cwd is specified, ~ is expanded to $HOME; fail early if directory does not exist (S3.4)
 - [ ] When cwd is omitted, a temp directory is created and used as cwd (S3.5)
 - [ ] Global .env is loaded, then per-task env is merged on top; result is passed to the claude process (S3.6)

@@ -4,7 +4,7 @@
 **Bundle ID:** `com.47ng.taskmaster`  
 **Runtime:** Bun  
 **Version:** 1.0  
-**Date:** 2026-04-04  
+**Date:** 2026-04-04
 
 ---
 
@@ -45,7 +45,7 @@ Each task is a single markdown file in the `tasks/` directory. The filename (min
 - `schedule` (required): Classic 5-field cron expression string (minute, hour, day-of-month, month, day-of-week). No extensions like `@daily` or 6-field seconds
 - `timezone` (optional): IANA timezone string. Defaults to system local time
 - `cwd` (optional): Working directory for Claude. If omitted, a temp dir is created
-- `claude_args` (optional): Array of CLI flags passed to claude. Defaults to `[]`
+- `args` (optional): Array of CLI flags passed to claude. Defaults to `[]`
 - `env` (optional): Dictionary of environment variables merged on top of global `.env`
 - `enabled` (optional): Boolean. Defaults to `true`. Controls scheduling only, not manual execution
 
@@ -53,15 +53,16 @@ Each task is a single markdown file in the `tasks/` directory. The filename (min
 
 ```markdown
 ---
-schedule: "0 8 * * 1-5"
-timezone: "Europe/Paris"
-cwd: "~/projects/saas-app"
-claude_args: ["--model", "sonnet"]
+schedule: '0 8 * * 1-5'
+timezone: 'Europe/Paris'
+cwd: '~/projects/saas-app'
+args: ['--model', 'sonnet']
 env:
-  GITHUB_TOKEN_SCOPE: "read"
+  GITHUB_TOKEN_SCOPE: 'read'
 ---
 
 Review package.json and look for:
+
 - Dependencies with known CVEs (run `npm audit`)
 - Dependencies more than 2 major versions behind
 - Unused dependencies (cross-reference with imports in src/)
@@ -129,15 +130,15 @@ Bootstrap the Bun project, establish directory conventions, define the task file
 
 **Acceptance Criteria:**
 
-| ID | Criterion |
-|----|-----------|
-| S0.1 | Bun project initialised with TypeScript, linting, and test runner configured |
-| S0.2 | Task file parser reads YAML frontmatter (schedule, timezone, cwd, claude_args, env, enabled) and markdown body from a .md file |
-| S0.3 | Parser validates schedule as a syntactically correct cron expression |
-| S0.4 | Parser validates timezone as a valid IANA identifier when present |
-| S0.5 | Parser validates task name (derived from filename) matches `[a-z0-9-]+` |
-| S0.6 | Parser returns typed `TaskDefinition` object on success, structured error on failure |
-| S0.7 | Unit tests cover valid files, missing required fields, malformed cron, invalid timezone, bad filenames |
+| ID   | Criterion                                                                                                               |
+| ---- | ----------------------------------------------------------------------------------------------------------------------- |
+| S0.1 | Bun project initialised with TypeScript, linting, and test runner configured                                            |
+| S0.2 | Task file parser reads YAML frontmatter (schedule, timezone, cwd, args, env, enabled) and markdown body from a .md file |
+| S0.3 | Parser validates schedule as a syntactically correct cron expression                                                    |
+| S0.4 | Parser validates timezone as a valid IANA identifier when present                                                       |
+| S0.5 | Parser validates task name (derived from filename) matches `[a-z0-9-]+`                                                 |
+| S0.6 | Parser returns typed `TaskDefinition` object on success, structured error on failure                                    |
+| S0.7 | Unit tests cover valid files, missing required fields, malformed cron, invalid timezone, bad filenames                  |
 
 ---
 
@@ -154,13 +155,13 @@ CLI entry point with the validate subcommand. Scans all task files and reports e
 
 **Acceptance Criteria:**
 
-| ID | Criterion |
-|----|-----------|
-| S1.1 | `tm validate` scans `~/.config/taskmaster/tasks/*.md` and runs the parser on each |
+| ID   | Criterion                                                                             |
+| ---- | ------------------------------------------------------------------------------------- |
+| S1.1 | `tm validate` scans `~/.config/taskmaster/tasks/*.md` and runs the parser on each     |
 | S1.2 | Valid files produce a success line; invalid files produce error details with filename |
-| S1.3 | Exit code 0 if all valid, exit code 1 if any invalid |
-| S1.4 | `--json` flag outputs a JSON array of `{name, valid, errors?}` objects |
-| S1.5 | Gracefully handles empty `tasks/` directory and missing `tasks/` directory |
+| S1.3 | Exit code 0 if all valid, exit code 1 if any invalid                                  |
+| S1.4 | `--json` flag outputs a JSON array of `{name, valid, errors?}` objects                |
+| S1.5 | Gracefully handles empty `tasks/` directory and missing `tasks/` directory            |
 
 ---
 
@@ -177,12 +178,12 @@ Lists all tasks with minimal output.
 
 **Acceptance Criteria:**
 
-| ID | Criterion |
-|----|-----------|
+| ID   | Criterion                                                                              |
+| ---- | -------------------------------------------------------------------------------------- |
 | S2.1 | `tm list` outputs one line per task: name, schedule, enabled/disabled, space-separated |
-| S2.2 | Output has no headers, no borders, no decoration |
-| S2.3 | `--json` flag outputs a JSON array of `{name, schedule, timezone?, enabled}` objects |
-| S2.4 | Tasks are sorted alphabetically by name |
+| S2.2 | Output has no headers, no borders, no decoration                                       |
+| S2.3 | `--json` flag outputs a JSON array of `{name, schedule, timezone?, enabled}` objects   |
+| S2.4 | Tasks are sorted alphabetically by name                                                |
 
 ---
 
@@ -201,18 +202,18 @@ Execute a single task: parse the file, set up the environment, invoke Claude Cod
 
 **Acceptance Criteria:**
 
-| ID | Criterion |
-|----|-----------|
-| S3.1 | `tm run <name>` reads the task file, strips YAML frontmatter, extracts the prompt body |
-| S3.2 | Prompt body is written to a temp file and redirected to `claude -p` via stdin. `claude` binary must be on PATH; fail with a clear error if not found |
-| S3.3 | `claude_args` from frontmatter are appended to the claude invocation (no validation) |
-| S3.4 | When `cwd` is specified, `~` is expanded to `$HOME`. If the resolved directory does not exist, `tm run` fails with a clear error before invoking Claude (recorded as a failed run in history) |
-| S3.5 | When `cwd` is omitted, a temp directory is created and used as cwd |
-| S3.6 | Global `.env` is loaded, then per-task `env` is merged on top; result is passed to the claude process |
-| S3.7 | Claude's stdout is captured and printed to tm's stdout |
-| S3.8 | Claude's stderr and exit code are captured |
-| S3.9 | `tm run` ignores the `enabled` flag entirely |
-| S3.10 | Exit code reflects claude's exit code |
+| ID    | Criterion                                                                                                                                                                                     |
+| ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| S3.1  | `tm run <name>` reads the task file, strips YAML frontmatter, extracts the prompt body                                                                                                        |
+| S3.2  | Prompt body is written to a temp file and redirected to `claude -p` via stdin. `claude` binary must be on PATH; fail with a clear error if not found                                          |
+| S3.3  | `args` from frontmatter are appended to the claude invocation (no validation)                                                                                                                 |
+| S3.4  | When `cwd` is specified, `~` is expanded to `$HOME`. If the resolved directory does not exist, `tm run` fails with a clear error before invoking Claude (recorded as a failed run in history) |
+| S3.5  | When `cwd` is omitted, a temp directory is created and used as cwd                                                                                                                            |
+| S3.6  | Global `.env` is loaded, then per-task `env` is merged on top; result is passed to the claude process                                                                                         |
+| S3.7  | Claude's stdout is captured and printed to tm's stdout                                                                                                                                        |
+| S3.8  | Claude's stderr and exit code are captured                                                                                                                                                    |
+| S3.9  | `tm run` ignores the `enabled` flag entirely                                                                                                                                                  |
+| S3.10 | Exit code reflects claude's exit code                                                                                                                                                         |
 
 ---
 
@@ -230,18 +231,18 @@ After `tm run` completes, persist run metadata and output for later querying.
 
 **Acceptance Criteria:**
 
-| ID | Criterion |
-|----|-----------|
-| S4.1 | On completion, `tm run` writes `<timestamp>.meta.json` to `~/.config/taskmaster/history/<task-name>/` |
-| S4.2 | meta.json contains: `timestamp`, `started_at`, `finished_at`, `duration_ms`, `exit_code`, `success` |
-| S4.3 | On completion, `tm run` writes `<timestamp>.stdout.txt` with raw claude output |
-| S4.3a | On completion, `tm run` writes `<timestamp>.stderr.txt` with claude's stderr, only when non-empty |
-| S4.4 | The timestamp used in filenames is UTC in `YYYY-MM-DDTHH.MM.SSZ` format. Tick-initiated runs use the floored minute (passed via `--timestamp`); manual runs use current time at second precision |
-| S4.5 | On success with a temp dir: temp dir is deleted |
-| S4.6 | On failure with a temp dir: temp dir is moved to `~/.config/taskmaster/runs/<task-name>/<timestamp>/` with prompt, stdout, stderr preserved |
-| S4.7 | On success or failure with explicit cwd: no directory operations beyond history writes |
-| S4.8 | A purge routine (run inside `tm tick` on every invocation) deletes successful history entries (`.meta.json`, `.stdout.txt`, `.stderr.txt`) older than 30 days |
-| S4.9 | Failed run entries in `history/` are never auto-purged |
+| ID    | Criterion                                                                                                                                                                                        |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| S4.1  | On completion, `tm run` writes `<timestamp>.meta.json` to `~/.config/taskmaster/history/<task-name>/`                                                                                            |
+| S4.2  | meta.json contains: `timestamp`, `started_at`, `finished_at`, `duration_ms`, `exit_code`, `success`                                                                                              |
+| S4.3  | On completion, `tm run` writes `<timestamp>.stdout.txt` with raw claude output                                                                                                                   |
+| S4.3a | On completion, `tm run` writes `<timestamp>.stderr.txt` with claude's stderr, only when non-empty                                                                                                |
+| S4.4  | The timestamp used in filenames is UTC in `YYYY-MM-DDTHH.MM.SSZ` format. Tick-initiated runs use the floored minute (passed via `--timestamp`); manual runs use current time at second precision |
+| S4.5  | On success with a temp dir: temp dir is deleted                                                                                                                                                  |
+| S4.6  | On failure with a temp dir: temp dir is moved to `~/.config/taskmaster/runs/<task-name>/<timestamp>/` with prompt, stdout, stderr preserved                                                      |
+| S4.7  | On success or failure with explicit cwd: no directory operations beyond history writes                                                                                                           |
+| S4.8  | A purge routine (run inside `tm tick` on every invocation) deletes successful history entries (`.meta.json`, `.stdout.txt`, `.stderr.txt`) older than 30 days                                    |
+| S4.9  | Failed run entries in `history/` are never auto-purged                                                                                                                                           |
 
 ---
 
@@ -258,13 +259,13 @@ Prevent concurrent execution of the same task using per-task lock files.
 
 **Acceptance Criteria:**
 
-| ID | Criterion |
-|----|-----------|
-| S5.1 | `tm run` acquires a file lock at `~/.config/taskmaster/locks/<task-name>.lock` before execution |
-| S5.2 | If the lock is already held, `tm run` exits with code 0 and prints a skip warning to stderr |
-| S5.3 | The lock is released after execution completes, whether success or failure |
+| ID   | Criterion                                                                                                                                                                                                                    |
+| ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| S5.1 | `tm run` acquires a file lock at `~/.config/taskmaster/locks/<task-name>.lock` before execution                                                                                                                              |
+| S5.2 | If the lock is already held, `tm run` exits with code 0 and prints a skip warning to stderr                                                                                                                                  |
+| S5.3 | The lock is released after execution completes, whether success or failure                                                                                                                                                   |
 | S5.4 | If `tm run` crashes, the OS-level lock is released. Implementation: `flock(2)` called through `bun:ffi` on libc (not PID files). The kernel releases the lock when the file descriptor closes, including on crash or SIGKILL |
-| S5.5 | `--json` output includes a `"skipped": true` field when lock contention occurs |
+| S5.5 | `--json` output includes a `"skipped": true` field when lock contention occurs                                                                                                                                               |
 
 ---
 
@@ -281,14 +282,14 @@ Query and display run history for a task.
 
 **Acceptance Criteria:**
 
-| ID | Criterion |
-|----|-----------|
-| S6.1 | `tm history <name>` lists runs from history directory, most recent first |
+| ID   | Criterion                                                                                                                                                     |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| S6.1 | `tm history <name>` lists runs from history directory, most recent first                                                                                      |
 | S6.2 | Each run is displayed as an indented block: timestamp as header, followed by indented duration, exit code, status (ok/err), and stderr file path when present |
-| S6.3 | `--failures` flag filters to only failed runs |
-| S6.4 | `--last N` limits output to the N most recent entries |
-| S6.5 | `--json` outputs a JSON array of meta.json objects |
-| S6.6 | Exit code 1 if the task name does not exist |
+| S6.3 | `--failures` flag filters to only failed runs                                                                                                                 |
+| S6.4 | `--last N` limits output to the N most recent entries                                                                                                         |
+| S6.5 | `--json` outputs a JSON array of meta.json objects                                                                                                            |
+| S6.6 | Exit code 1 if the task name does not exist                                                                                                                   |
 
 ---
 
@@ -305,13 +306,13 @@ Rich status view combining task metadata with history data and next-run computat
 
 **Acceptance Criteria:**
 
-| ID | Criterion |
-|----|-----------|
+| ID   | Criterion                                                                                                                                                                 |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | S7.1 | `tm status` outputs an indented block per task: task name as header, followed by indented key-value fields (schedule, enabled, last run with ok/err, next scheduled time) |
-| S7.2 | Fields with no value are omitted (e.g., no `last_run` line if the task has never run) |
-| S7.3 | Disabled tasks omit the `next` field |
-| S7.4 | Next scheduled time is computed from the cron expression relative to now, respecting the task's timezone |
-| S7.5 | `--json` outputs a JSON array with all fields including `last_run` and `next_run` as ISO8601 strings |
+| S7.2 | Fields with no value are omitted (e.g., no `last_run` line if the task has never run)                                                                                     |
+| S7.3 | Disabled tasks omit the `next` field                                                                                                                                      |
+| S7.4 | Next scheduled time is computed from the cron expression relative to now, respecting the task's timezone                                                                  |
+| S7.5 | `--json` outputs a JSON array with all fields including `last_run` and `next_run` as ISO8601 strings                                                                      |
 
 ---
 
@@ -328,17 +329,17 @@ The heartbeat that ties scheduling to execution. Evaluates which tasks are due a
 
 **Acceptance Criteria:**
 
-| ID | Criterion |
-|----|-----------|
-| S8.1 | `tm tick` reads all task files and filters to enabled tasks |
-| S8.2 | Current wall-clock time is floored to the current minute |
-| S8.3 | Each enabled task's cron expression is evaluated against the floored time, in the task's timezone (or system local) |
-| S8.4 | For each matching task, `tm tick` checks the most recent history entry to prevent double-firing for the same floored minute |
+| ID   | Criterion                                                                                                                          |
+| ---- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| S8.1 | `tm tick` reads all task files and filters to enabled tasks                                                                        |
+| S8.2 | Current wall-clock time is floored to the current minute                                                                           |
+| S8.3 | Each enabled task's cron expression is evaluated against the floored time, in the task's timezone (or system local)                |
+| S8.4 | For each matching task, `tm tick` checks the most recent history entry to prevent double-firing for the same floored minute        |
 | S8.5 | For each due, non-duplicate task, `tm tick` spawns `tm run <name> --timestamp <floored-ISO8601>` as a fully detached child process |
-| S8.6 | Locked tasks (already running) are skipped by `tm run`'s own lock mechanism; tick does not pre-check |
-| S8.7 | `tm tick` writes the current ISO8601 timestamp to `~/.config/taskmaster/heartbeat` |
-| S8.8 | `tm tick` completes quickly (dispatched runs are fully detached; tick does not wait for them) |
-| S8.9 | `tm tick` runs the history purge routine (defined in S4.8) on every invocation |
+| S8.6 | Locked tasks (already running) are skipped by `tm run`'s own lock mechanism; tick does not pre-check                               |
+| S8.7 | `tm tick` writes the current ISO8601 timestamp to `~/.config/taskmaster/heartbeat`                                                 |
+| S8.8 | `tm tick` completes quickly (dispatched runs are fully detached; tick does not wait for them)                                      |
+| S8.9 | `tm tick` runs the history purge routine (defined in S4.8) on every invocation                                                     |
 
 ---
 
@@ -356,16 +357,16 @@ Install and remove the system-level scheduler entry that powers the heartbeat.
 
 **Acceptance Criteria:**
 
-| ID | Criterion |
-|----|-----------|
+| ID   | Criterion                                                                                                                                                                               |
+| ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | S9.1 | `tm setup` on macOS creates `~/Library/LaunchAgents/com.47ng.taskmaster.tick.plist` with `StartCalendarInterval` firing every minute (aligned to `:00` boundaries) and `RunAtLoad=true` |
-| S9.2 | `tm setup` on macOS loads the plist via `launchctl` |
-| S9.3 | `tm setup` on Linux adds a `* * * * * <path-to-tm> tick` crontab entry |
-| S9.4 | `tm setup` is idempotent: running twice does not duplicate entries |
-| S9.5 | `tm teardown` on macOS unloads and removes the plist |
-| S9.6 | `tm teardown` on Linux removes the crontab entry |
-| S9.7 | `tm teardown` is idempotent: running on an already-removed setup is a no-op |
-| S9.8 | `tm setup` resolves the absolute path to the tm binary for the scheduler entry |
+| S9.2 | `tm setup` on macOS loads the plist via `launchctl`                                                                                                                                     |
+| S9.3 | `tm setup` on Linux adds a `* * * * * <path-to-tm> tick` crontab entry                                                                                                                  |
+| S9.4 | `tm setup` is idempotent: running twice does not duplicate entries                                                                                                                      |
+| S9.5 | `tm teardown` on macOS unloads and removes the plist                                                                                                                                    |
+| S9.6 | `tm teardown` on Linux removes the crontab entry                                                                                                                                        |
+| S9.7 | `tm teardown` is idempotent: running on an already-removed setup is a no-op                                                                                                             |
+| S9.8 | `tm setup` resolves the absolute path to the tm binary for the scheduler entry                                                                                                          |
 
 ---
 
