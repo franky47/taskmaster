@@ -11,11 +11,6 @@ export type TaskDefinition = Frontmatter & {
   prompt: string
 }
 
-export type ParseMarkdownOutput = {
-  frontmatter: Frontmatter
-  body: string
-}
-
 // Errors --
 
 type FrontmatterError = {
@@ -47,7 +42,7 @@ function isFrontmatterField(key: string): key is keyof Frontmatter {
 
 export function parseMarkdown(
   content: string,
-): FrontmatterParseError | FrontmatterValidationError | ParseMarkdownOutput {
+): FrontmatterParseError | FrontmatterValidationError | TaskDefinition {
   const fm = errore.try({
     try: () => matter(content),
     catch: (cause) => new FrontmatterParseError({ cause }),
@@ -57,8 +52,8 @@ export function parseMarkdown(
   const result = frontmatterSchema.safeParse(fm.data)
   if (result.success) {
     return {
-      frontmatter: result.data,
-      body: fm.content,
+      ...result.data,
+      prompt: fm.content.trim(),
     }
   }
 

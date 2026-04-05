@@ -56,11 +56,5 @@ export async function parseTaskFile(
     .catch((e) => new TaskFileReadError({ path: filePath, cause: e }))
   if (content instanceof Error) return content
 
-  const md = parseMarkdown(content)
-  if (md instanceof Error) return md
-
-  return {
-    ...md.frontmatter,
-    prompt: md.body.trim(),
-  }
+  return parseMarkdown(content)
 }

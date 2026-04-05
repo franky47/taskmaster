@@ -12,7 +12,7 @@ describe('parseMarkdown', () => {
       const result = parseMarkdown(md("schedule: '0 8 * * 1-5'"))
       expect(result).not.toBeInstanceOf(Error)
       if (result instanceof Error) return
-      expect(result.frontmatter.schedule).toBe('0 8 * * 1-5')
+      expect(result.schedule).toBe('0 8 * * 1-5')
     })
 
     test('accepts every-minute cron', () => {
@@ -85,7 +85,7 @@ describe('parseMarkdown', () => {
       )
       expect(result).not.toBeInstanceOf(Error)
       if (result instanceof Error) return
-      expect(result.frontmatter.timezone).toBe('Europe/Paris')
+      expect(result.timezone).toBe('Europe/Paris')
     })
 
     test('accepts UTC', () => {
@@ -97,7 +97,7 @@ describe('parseMarkdown', () => {
       const result = parseMarkdown(md("schedule: '0 8 * * *'"))
       expect(result).not.toBeInstanceOf(Error)
       if (result instanceof Error) return
-      expect(result.frontmatter.timezone).toBeUndefined()
+      expect(result.timezone).toBeUndefined()
     })
 
     test('rejects non-string timezone', () => {
@@ -130,7 +130,7 @@ describe('parseMarkdown', () => {
       const result = parseMarkdown(md("schedule: '0 8 * * *'"))
       expect(result).not.toBeInstanceOf(Error)
       if (result instanceof Error) return
-      expect(result.frontmatter.cwd).toBeUndefined()
+      expect(result.cwd).toBeUndefined()
     })
 
     test('accepts string cwd', () => {
@@ -139,7 +139,7 @@ describe('parseMarkdown', () => {
       )
       expect(result).not.toBeInstanceOf(Error)
       if (result instanceof Error) return
-      expect(result.frontmatter.cwd).toBe('~/projects/app')
+      expect(result.cwd).toBe('~/projects/app')
     })
 
     test('rejects non-string cwd', () => {
@@ -159,7 +159,7 @@ describe('parseMarkdown', () => {
       const result = parseMarkdown(md("schedule: '0 8 * * *'"))
       expect(result).not.toBeInstanceOf(Error)
       if (result instanceof Error) return
-      expect(result.frontmatter.args).toEqual([])
+      expect(result.args).toEqual([])
     })
 
     test('accepts string array', () => {
@@ -168,7 +168,7 @@ describe('parseMarkdown', () => {
       )
       expect(result).not.toBeInstanceOf(Error)
       if (result instanceof Error) return
-      expect(result.frontmatter.args).toEqual(['--model', 'sonnet'])
+      expect(result.args).toEqual(['--model', 'sonnet'])
     })
 
     test('accepts empty array', () => {
@@ -208,7 +208,7 @@ describe('parseMarkdown', () => {
       const result = parseMarkdown(md("schedule: '0 8 * * *'"))
       expect(result).not.toBeInstanceOf(Error)
       if (result instanceof Error) return
-      expect(result.frontmatter.env).toEqual({})
+      expect(result.env).toEqual({})
     })
 
     test('accepts string-valued object', () => {
@@ -217,7 +217,7 @@ describe('parseMarkdown', () => {
       )
       expect(result).not.toBeInstanceOf(Error)
       if (result instanceof Error) return
-      expect(result.frontmatter.env).toEqual({ KEY: 'value' })
+      expect(result.env).toEqual({ KEY: 'value' })
     })
 
     test('accepts empty object', () => {
@@ -257,21 +257,21 @@ describe('parseMarkdown', () => {
       const result = parseMarkdown(md("schedule: '0 8 * * *'"))
       expect(result).not.toBeInstanceOf(Error)
       if (result instanceof Error) return
-      expect(result.frontmatter.enabled).toBe(true)
+      expect(result.enabled).toBe(true)
     })
 
     test('accepts true', () => {
       const result = parseMarkdown(md("schedule: '0 8 * * *'\nenabled: true"))
       expect(result).not.toBeInstanceOf(Error)
       if (result instanceof Error) return
-      expect(result.frontmatter.enabled).toBe(true)
+      expect(result.enabled).toBe(true)
     })
 
     test('accepts false', () => {
       const result = parseMarkdown(md("schedule: '0 8 * * *'\nenabled: false"))
       expect(result).not.toBeInstanceOf(Error)
       if (result instanceof Error) return
-      expect(result.frontmatter.enabled).toBe(false)
+      expect(result.enabled).toBe(false)
     })
 
     test('rejects non-boolean', () => {
