@@ -1,11 +1,11 @@
 ---
 # tm-mw4j
 title: Prompt file management
-status: todo
+status: completed
 type: task
 priority: high
 created_at: 2026-04-05T22:41:32Z
-updated_at: 2026-04-05T22:41:32Z
+updated_at: 2026-04-06T19:33:12Z
 parent: tm-eu53
 ---
 
@@ -35,9 +35,13 @@ A new module (`src/run/prompt.ts`) that writes the task prompt body to a temp fi
 
 ## Acceptance criteria
 
-- [ ] Writes prompt content to `/tmp/tm-<timestamp>-<task-name>.prompt.md`
-- [ ] File has `0600` permissions
-- [ ] File content matches the prompt body exactly
-- [ ] `cleanupPromptFile` removes the file
-- [ ] Cleanup of a non-existent file does not throw
-- [ ] Path contains the timestamp and task name as specified
+- [x] Writes prompt content to `/tmp/tm-<timestamp>-<task-name>.prompt.md`
+- [x] File has `0600` permissions
+- [x] File content matches the prompt body exactly
+- [x] `cleanupPromptFile` removes the file
+- [x] Cleanup of a non-existent file does not throw
+- [x] Path contains the timestamp and task name as specified
+
+## Summary of Changes
+
+Added `src/run/prompt.ts` with `writePromptFile` and `cleanupPromptFile` functions, plus colocated tests in `src/run/prompt.test.ts`.
