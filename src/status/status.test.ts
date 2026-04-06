@@ -76,6 +76,14 @@ timezone: 'America/New_York'
 Weekly task.
 `
 
+const RUN_TASK = `---
+schedule: '0 12 * * *'
+run: 'my-cmd $TM_PROMPT_FILE'
+---
+
+Run-based task.
+`
+
 // Fixed "now" for deterministic next_run calculations.
 // 2026-04-05 is a Sunday.
 const NOW = new Date('2026-04-05T12:00:00.000Z')
@@ -248,5 +256,23 @@ describe('getTaskStatuses', () => {
     if (result instanceof Error) return
 
     expect(result.map((t) => t.name)).toEqual(['aa-first', 'zz-last'])
+  })
+
+  test('returns status for run-based task', async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(configDir, 'run-task', RUN_TASK)
+
+    const result = await getTaskStatuses({ configDir, now: NOW })
+    expect(result).not.toBeInstanceOf(Error)
+    if (result instanceof Error) return
+
+    expect(result).toHaveLength(1)
+    const first = result[0]
+    expect(first).toBeDefined()
+    if (!first) return
+    expect(first.name).toBe('run-task')
+    expect(first.schedule).toBe('0 12 * * *')
+    expect(first.enabled).toBe(true)
+    expect(first.next_run).toBe('2026-04-06T12:00:00.000Z')
   })
 })

@@ -1,11 +1,11 @@
 ---
 # tm-pp5f
 title: Update validate, list, and test fixtures
-status: todo
+status: completed
 type: task
 priority: normal
 created_at: 2026-04-05T22:41:58Z
-updated_at: 2026-04-05T22:41:58Z
+updated_at: 2026-04-06T22:41:10Z
 parent: tm-eu53
 blocked_by:
     - tm-g3gd
@@ -39,9 +39,15 @@ All existing test fixtures in `src/task/fixtures/` use the old format (no `agent
 
 ## Acceptance criteria
 
-- [ ] `tm validate` catches all new validation errors (agent/run mutual exclusivity, etc.)
-- [ ] `tm list` works with new frontmatter (no regression)
-- [ ] `tm status` works with new frontmatter (no regression)
-- [ ] All existing test fixtures updated to new format
-- [ ] New fixtures cover all validation edge cases
-- [ ] All tests pass: `bun test`
+- [x] `tm validate` catches all new validation errors (agent/run mutual exclusivity, etc.)
+- [x] `tm list` works with new frontmatter (no regression)
+- [x] `tm status` works with new frontmatter (no regression)
+- [x] All existing test fixtures updated to new format
+- [x] New fixtures cover all validation edge cases
+- [x] All tests pass: `bun test`
+
+## Summary of Changes
+
+Added test coverage for the run-variant code path across validate, list, status,
+and parser tests. Added valid-run.md fixture. Fixed INVALID_TASK in validate
+tests to include agent field so it stays focused on schedule/timezone errors.

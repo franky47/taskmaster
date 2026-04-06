@@ -84,6 +84,16 @@ describe('parseTaskFile', () => {
       if (result instanceof Error) return
       expect(result.cwd).toBeUndefined()
     })
+
+    test('parses run-based task', async () => {
+      const result = await parseTaskFile(fixture('valid-run.md'))
+      expect(result).not.toBeInstanceOf(Error)
+      if (result instanceof Error) return
+      expect(result).toHaveProperty('run', 'my-cmd $TM_PROMPT_FILE')
+      expect(result).not.toHaveProperty('agent')
+      expect(result).not.toHaveProperty('args')
+      expect(result.prompt).toBe('Run a shell command with the prompt file.')
+    })
   })
 
   describe('filename validation', () => {

@@ -26,10 +26,52 @@ Do something useful.
 
 const INVALID_TASK = `---
 schedule: 'bad cron'
+agent: opencode
 timezone: 'Fake/Zone'
 ---
 
 Bad task.
+`
+
+const VALID_RUN_TASK = `---
+schedule: '0 8 * * 1-5'
+run: 'my-cmd $TM_PROMPT_FILE'
+---
+
+Run-based task.
+`
+
+const TASK_MISSING_AGENT_AND_RUN = `---
+schedule: '0 8 * * 1-5'
+---
+
+Missing both agent and run.
+`
+
+const TASK_BOTH_AGENT_AND_RUN = `---
+schedule: '0 8 * * 1-5'
+agent: opencode
+run: 'my-cmd $TM_PROMPT_FILE'
+---
+
+Has both agent and run.
+`
+
+const TASK_ARGS_WITH_RUN = `---
+schedule: '0 8 * * 1-5'
+run: 'my-cmd $TM_PROMPT_FILE'
+args: '--verbose'
+---
+
+Args with run is invalid.
+`
+
+const TASK_RUN_MISSING_MARKER = `---
+schedule: '0 8 * * 1-5'
+run: 'my-cmd --flag'
+---
+
+Run without TM_PROMPT_FILE.
 `
 
 describe('validateTasks', () => {
@@ -107,6 +149,65 @@ describe('validateTasks', () => {
     expect(result[0]!.valid).toBe(false)
     if (result[0]!.valid === false) {
       expect(result[0]!.errors[0]).toContain('Bad_Name')
+    }
+  })
+
+  test('reports valid for run-based task', async () => {
+    const tasksDir = await makeTmpTasksDir()
+    await writeTask(tasksDir, 'run-task', VALID_RUN_TASK)
+    const result = await validateTasks(tasksDir)
+    expect(result).toEqual([{ name: 'run-task', valid: true }])
+  })
+
+  test('catches missing agent and run', async () => {
+    const tasksDir = await makeTmpTasksDir()
+    await writeTask(tasksDir, 'no-executor', TASK_MISSING_AGENT_AND_RUN)
+    const result = await validateTasks(tasksDir)
+    if (result instanceof Error) throw result
+    expect(result).toHaveLength(1)
+    expect(result[0]!.valid).toBe(false)
+    if (result[0]!.valid === false) {
+      expect(result[0]!.errors.join('\n')).toContain(
+        'exactly one of "agent" or "run"',
+      )
+    }
+  })
+
+  test('catches both agent and run', async () => {
+    const tasksDir = await makeTmpTasksDir()
+    await writeTask(tasksDir, 'both', TASK_BOTH_AGENT_AND_RUN)
+    const result = await validateTasks(tasksDir)
+    if (result instanceof Error) throw result
+    expect(result).toHaveLength(1)
+    expect(result[0]!.valid).toBe(false)
+    if (result[0]!.valid === false) {
+      expect(result[0]!.errors.join('\n')).toContain('not both')
+    }
+  })
+
+  test('catches args with run', async () => {
+    const tasksDir = await makeTmpTasksDir()
+    await writeTask(tasksDir, 'args-run', TASK_ARGS_WITH_RUN)
+    const result = await validateTasks(tasksDir)
+    if (result instanceof Error) throw result
+    expect(result).toHaveLength(1)
+    expect(result[0]!.valid).toBe(false)
+    if (result[0]!.valid === false) {
+      expect(result[0]!.errors.join('\n')).toContain(
+        'can only be used with "agent"',
+      )
+    }
+  })
+
+  test('catches run without TM_PROMPT_FILE', async () => {
+    const tasksDir = await makeTmpTasksDir()
+    await writeTask(tasksDir, 'no-marker', TASK_RUN_MISSING_MARKER)
+    const result = await validateTasks(tasksDir)
+    if (result instanceof Error) throw result
+    expect(result).toHaveLength(1)
+    expect(result[0]!.valid).toBe(false)
+    if (result[0]!.valid === false) {
+      expect(result[0]!.errors.join('\n')).toContain('TM_PROMPT_FILE')
     }
   })
 })

@@ -42,6 +42,14 @@ timezone: 'America/New_York'
 Weekly task.
 `
 
+const RUN_TASK = `---
+schedule: '0 12 * * *'
+run: 'my-cmd $TM_PROMPT_FILE'
+---
+
+Run-based task.
+`
+
 describe('listTasks', () => {
   test('returns empty array for missing tasks directory', async () => {
     const result = await listTasks('/tmp/no-such-dir-ever/tasks')
@@ -133,6 +141,15 @@ Bad.
     const result = await listTasks(tasksDir)
     expect(result).toEqual([
       { name: 'good-task', schedule: '0 8 * * 1-5', enabled: true },
+    ])
+  })
+
+  test('returns task entry for run-based task', async () => {
+    const tasksDir = await makeTmpTasksDir()
+    await writeTask(tasksDir, 'run-task', RUN_TASK)
+    const result = await listTasks(tasksDir)
+    expect(result).toEqual([
+      { name: 'run-task', schedule: '0 12 * * *', enabled: true },
     ])
   })
 })
