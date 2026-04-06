@@ -50,14 +50,14 @@ Tasks live in `~/.config/taskmaster/tasks/` as markdown files. The filename (min
 
 ### Frontmatter Fields
 
-| Field      | Required | Default       | Description                                          |
-| ---------- | -------- | ------------- | ---------------------------------------------------- |
-| `schedule` | yes      |               | 5-field cron expression (must be quoted in YAML)     |
-| `timezone` | no       | system local  | IANA timezone string                                 |
-| `cwd`      | no       | temp dir      | Working directory for Claude (`~` is expanded)       |
-| `args`     | no       | `[]`          | Extra CLI flags passed to `claude`                   |
-| `env`      | no       | `{}`          | Environment variables merged on top of global `.env` |
-| `enabled`  | no       | `true`        | Controls scheduling only, not manual execution       |
+| Field      | Required | Default      | Description                                          |
+| ---------- | -------- | ------------ | ---------------------------------------------------- |
+| `schedule` | yes      |              | 5-field cron expression (must be quoted in YAML)     |
+| `timezone` | no       | system local | IANA timezone string                                 |
+| `cwd`      | no       | temp dir     | Working directory for Claude (`~` is expanded)       |
+| `args`     | no       | `[]`         | Extra CLI flags passed to `claude`                   |
+| `env`      | no       | `{}`         | Environment variables merged on top of global `.env` |
+| `enabled`  | no       | `true`       | Controls scheduling only, not manual execution       |
 
 ### Example
 
