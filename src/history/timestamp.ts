@@ -19,7 +19,9 @@ export function manualTimestamp(now?: Date): string {
 }
 
 export function parseTimestampFlag(value: string): TimestampParseError | Date {
-  const date = new Date(value)
+  // formatTimestamp replaces ':' with '.' for safe filenames — reverse it
+  const normalized = value.replace(/T(\d{2})\.(\d{2})\.(\d{2})Z$/, 'T$1:$2:$3Z')
+  const date = new Date(normalized)
   if (Number.isNaN(date.getTime()) || value === '') {
     return new TimestampParseError({ value })
   }

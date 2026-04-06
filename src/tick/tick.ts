@@ -52,13 +52,12 @@ function isCronMatch(
 }
 
 function defaultSpawnRun(name: string, timestamp: string): void {
-  const args = [
-    ...process.argv.slice(0, 2),
-    'run',
-    name,
-    '--timestamp',
-    timestamp,
-  ]
+  // Compiled SFE: argv[0] is bare "bun" which isn't in launchd's minimal $PATH.
+  // process.execPath is always the absolute path to the runtime.
+  const tmCommand = /\.[jt]s$/.test(Bun.main)
+    ? [process.execPath, path.resolve(Bun.main)]
+    : [process.execPath]
+  const args = [...tmCommand, 'run', name, '--timestamp', timestamp]
   const proc = Bun.spawn(args, {
     stdin: 'ignore',
     stdout: 'ignore',

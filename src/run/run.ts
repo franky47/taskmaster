@@ -81,7 +81,7 @@ async function defaultSpawnClaude(
     return new ClaudeNotFoundError()
   }
 
-  const proc = Bun.spawn(['claude', '-p', ...opts.args], {
+  const proc = Bun.spawn([claudePath, '-p', ...opts.args], {
     stdin: new Response(opts.prompt),
     stdout: 'pipe',
     stderr: 'pipe',

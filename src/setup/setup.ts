@@ -91,6 +91,21 @@ function generatePlist(tmCommand: string[]): string {
     .map((arg) => `        <string>${escapeXml(arg)}</string>`)
     .join('\n')
 
+  // launchd provides a minimal environment. Pass through variables that
+  // child processes (like Claude CLI) need to locate config/auth state.
+  const envVars: Record<string, string | undefined> = {
+    HOME: process.env.HOME,
+    USER: process.env.USER,
+    PATH: process.env.PATH,
+  }
+  const envEntries = Object.entries(envVars)
+    .filter((entry): entry is [string, string] => entry[1] !== undefined)
+    .map(
+      ([k, v]) =>
+        `        <key>${escapeXml(k)}</key>\n        <string>${escapeXml(v)}</string>`,
+    )
+    .join('\n')
+
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -101,11 +116,21 @@ function generatePlist(tmCommand: string[]): string {
     <array>
 ${programArgs}
     </array>
+    <key>EnvironmentVariables</key>
+    <dict>
+${envEntries}
+    </dict>
     <key>StartCalendarInterval</key>
     <dict>
         <key>Second</key>
         <integer>0</integer>
     </dict>
+    <key>StandardOutPath</key>
+    <string>/tmp/${PLIST_LABEL}.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/${PLIST_LABEL}.err.log</string>
+    <key>AbandonProcessGroup</key>
+    <true/>
     <key>RunAtLoad</key>
     <true/>
 </dict>
