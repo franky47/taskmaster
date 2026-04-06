@@ -52,6 +52,7 @@ async function writeMeta(
 
 const ENABLED_TASK = `---
 schedule: '0 8 * * 1-5'
+agent: opencode
 ---
 
 Do something useful.
@@ -59,6 +60,7 @@ Do something useful.
 
 const DISABLED_TASK = `---
 schedule: '30 6 * * *'
+agent: opencode
 enabled: false
 ---
 
@@ -67,6 +69,7 @@ Disabled task.
 
 const TIMEZONE_TASK = `---
 schedule: '0 9 * * 1'
+agent: opencode
 timezone: 'America/New_York'
 ---
 

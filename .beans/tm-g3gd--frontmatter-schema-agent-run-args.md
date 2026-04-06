@@ -1,11 +1,11 @@
 ---
 # tm-g3gd
 title: 'Frontmatter schema: agent, run, args'
-status: in-progress
+status: completed
 type: task
 priority: high
 created_at: 2026-04-05T22:41:15Z
-updated_at: 2026-04-06T05:15:33Z
+updated_at: 2026-04-06T21:59:40Z
 parent: tm-eu53
 ---
 
@@ -31,14 +31,27 @@ Update the frontmatter Zod schema to support the new multi-agent fields. This is
 
 ## Acceptance criteria
 
-- [ ] `agent: claude` parses successfully with no `run` field
-- [ ] `run: some-cmd $TM_PROMPT_FILE` parses successfully with no `agent` field
-- [ ] Both `agent` and `run` present → `FrontmatterValidationError` with clear message
-- [ ] Neither `agent` nor `run` present → `FrontmatterValidationError` with clear message
-- [ ] `args: --model sonnet --verbose` parses as a string, not an array
-- [ ] `args` with `run` → `FrontmatterValidationError`
-- [ ] `run` without `TM_PROMPT_FILE` → `FrontmatterValidationError`
-- [ ] `args` defaults to empty string when omitted
-- [ ] All existing frontmatter fields (schedule, timezone, cwd, env, enabled) continue to work
-- [ ] Existing test fixtures updated to include `agent:` or `run:` field
-- [ ] New test fixtures cover all validation edge cases
+- [x] `agent: claude` parses successfully with no `run` field
+- [x] `run: some-cmd $TM_PROMPT_FILE` parses successfully with no `agent` field
+- [x] Both `agent` and `run` present → `FrontmatterValidationError` with clear message
+- [x] Neither `agent` nor `run` present → `FrontmatterValidationError` with clear message
+- [x] `args: --model sonnet --verbose` parses as a string, not an array
+- [x] `args` with `run` → `FrontmatterValidationError`
+- [x] `run` without `TM_PROMPT_FILE` → `FrontmatterValidationError`
+- [x] `args` defaults to empty string when omitted
+- [x] All existing frontmatter fields (schedule, timezone, cwd, env, enabled) continue to work
+- [x] Existing test fixtures updated to include `agent:` or `run:` field
+- [x] New test fixtures cover all validation edge cases
+
+## Summary of Changes
+
+Updated the frontmatter Zod schema to support multi-agent execution. The schema
+now requires exactly one of `agent` (named agent) or `run` (raw shell command),
+with `args` changed from `string[]` to `string` and only valid with `agent`.
+
+The output type is a discriminated union (`AgentFrontmatter | RunFrontmatter`)
+produced via `.superRefine()` + `.transform()`, with all types inferred from the
+schema. Cross-field validation routes errors to specific field keys for clear
+error messages.
+
+Temporary executor adaptations marked with `// AGENT(tm-5nbg):` comments.

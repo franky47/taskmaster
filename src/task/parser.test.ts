@@ -33,7 +33,8 @@ describe('parseTaskFile', () => {
       expect(result.schedule).toBe('30 9 * * *')
       expect(result.timezone).toBe('Europe/Paris')
       expect(result.cwd).toBe('~/projects/saas-app')
-      expect(result.args).toEqual(['--model', 'sonnet'])
+      expect(result).toHaveProperty('agent', 'opencode')
+      expect(result).toHaveProperty('args', '--model sonnet')
       expect(result.env).toEqual({
         GITHUB_TOKEN_SCOPE: 'read',
         LOG_LEVEL: 'debug',
@@ -56,11 +57,11 @@ describe('parseTaskFile', () => {
       expect(result.enabled).toBe(true)
     })
 
-    test('defaults args to [] when omitted', async () => {
+    test('defaults args to empty string when omitted', async () => {
       const result = await parseTaskFile(fixture('valid-basic.md'))
       expect(result).not.toBeInstanceOf(Error)
       if (result instanceof Error) return
-      expect(result.args).toEqual([])
+      expect(result).toHaveProperty('args', '')
     })
 
     test('defaults env to {} when omitted', async () => {

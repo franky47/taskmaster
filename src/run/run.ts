@@ -3,8 +3,8 @@ import path from 'node:path'
 import * as errore from 'errore'
 
 import {
-  envFilePath,
   locksDir as defaultLocksDir,
+  envFilePath,
   taskFilePath,
 } from '../config'
 import type { EnvFileParseError, EnvFileReadError } from '../env'
@@ -47,9 +47,11 @@ export type RunResult = {
   finishedAt: Date
 }
 
+// AGENT(tm-5nbg): SpawnClaudeOpts is temporary; the executor refactor
+// will replace this with agent-resolved command dispatch.
 export type SpawnClaudeOpts = {
   prompt: string
-  args: string[]
+  args: string
   cwd: string
   env: Record<string, string>
 }
@@ -81,7 +83,10 @@ async function defaultSpawnClaude(
     return new ClaudeNotFoundError()
   }
 
-  const proc = Bun.spawn([claudePath, '-p', ...opts.args], {
+  // AGENT(tm-5nbg): split args string for spawn; executor refactor will
+  // replace this with agent-resolved command construction.
+  const extraArgs = opts.args ? opts.args.split(/\s+/).filter(Boolean) : []
+  const proc = Bun.spawn([claudePath, '-p', ...extraArgs], {
     stdin: new Response(opts.prompt),
     stdout: 'pipe',
     stderr: 'pipe',
@@ -135,11 +140,13 @@ export async function executeTask(
   const cwd = await resolveCwd(task.cwd)
   if (cwd instanceof Error) return cwd
 
+  // AGENT(tm-5nbg): executor always calls Claude for now; the executor
+  // refactor will dispatch to the resolved agent command instead.
   const spawnClaude = options?.deps?.spawnClaude ?? defaultSpawnClaude
   const startedAt = new Date()
   const result = await spawnClaude({
     prompt: task.prompt,
-    args: task.args,
+    args: 'agent' in task ? task.args : '',
     cwd: cwd.path,
     env,
   })

@@ -47,7 +47,8 @@ async function writeTask(
 const validTask = [
   '---',
   'schedule: "0 8 * * 1-5"',
-  'args: ["--model", "opus"]',
+  'agent: opencode',
+  'args: "--model opus"',
   'env:',
   '  PROJECT: myproject',
   '---',
@@ -107,7 +108,7 @@ describe('executeTask', () => {
     const configDir = await makeConfigDir()
     await writeTask(configDir, 'my-task', validTask)
 
-    let receivedArgs: string[] = []
+    let receivedArgs = ''
     await executeTask('my-task', {
       configDir,
       deps: {
@@ -118,7 +119,7 @@ describe('executeTask', () => {
       },
     })
 
-    expect(receivedArgs).toEqual(['--model', 'opus'])
+    expect(receivedArgs).toBe('--model opus')
   })
 
   test('passes per-task env merged with global env', async () => {
@@ -150,6 +151,7 @@ describe('executeTask', () => {
     const task = [
       '---',
       'schedule: "0 8 * * 1-5"',
+      'agent: opencode',
       `cwd: "${cwdDir}"`,
       '---',
       'Prompt.',
@@ -172,7 +174,11 @@ describe('executeTask', () => {
 
   test('creates temp dir when cwd omitted', async () => {
     const configDir = await makeConfigDir()
-    await writeTask(configDir, 'no-cwd', '---\nschedule: "0 8 * * *"\n---\nHi')
+    await writeTask(
+      configDir,
+      'no-cwd',
+      '---\nschedule: "0 8 * * *"\nagent: opencode\n---\nHi',
+    )
 
     let receivedCwd = ''
     await executeTask('no-cwd', {
@@ -195,6 +201,7 @@ describe('executeTask', () => {
     const task = [
       '---',
       'schedule: "0 8 * * 1-5"',
+      'agent: opencode',
       'cwd: "/nonexistent/dir/xyz"',
       '---',
       'Prompt.',
@@ -213,6 +220,7 @@ describe('executeTask', () => {
     const task = [
       '---',
       'schedule: "0 8 * * 1-5"',
+      'agent: opencode',
       'enabled: false',
       '---',
       'Disabled prompt.',
@@ -238,7 +246,7 @@ describe('executeTask', () => {
     await writeTask(
       configDir,
       'fail-task',
-      '---\nschedule: "0 * * * *"\n---\nFail',
+      '---\nschedule: "0 * * * *"\nagent: opencode\n---\nFail',
     )
 
     const result = await executeTask('fail-task', {
@@ -252,7 +260,11 @@ describe('executeTask', () => {
 
   test('captures stdout and stderr', async () => {
     const configDir = await makeConfigDir()
-    await writeTask(configDir, 'output', '---\nschedule: "0 * * * *"\n---\nGo')
+    await writeTask(
+      configDir,
+      'output',
+      '---\nschedule: "0 * * * *"\nagent: opencode\n---\nGo',
+    )
 
     const result = await executeTask('output', {
       configDir,
@@ -271,7 +283,11 @@ describe('executeTask', () => {
 
   test('includes startedAt and finishedAt timestamps', async () => {
     const configDir = await makeConfigDir()
-    await writeTask(configDir, 'timing', '---\nschedule: "0 * * * *"\n---\nGo')
+    await writeTask(
+      configDir,
+      'timing',
+      '---\nschedule: "0 * * * *"\nagent: opencode\n---\nGo',
+    )
 
     const before = new Date()
     const result = await executeTask('timing', {
@@ -293,7 +309,7 @@ describe('executeTask', () => {
     await writeTask(
       configDir,
       'temp-cwd',
-      '---\nschedule: "0 * * * *"\n---\nGo',
+      '---\nschedule: "0 * * * *"\nagent: opencode\n---\nGo',
     )
 
     const result = await executeTask('temp-cwd', {
@@ -309,7 +325,7 @@ describe('executeTask', () => {
   test('includes cwd with isTemp=false when cwd specified', async () => {
     const cwdDir = await fs.mkdtemp(path.join(os.tmpdir(), 'tm-cwd-'))
     const configDir = await makeConfigDir()
-    const task = `---\nschedule: "0 * * * *"\ncwd: "${cwdDir}"\n---\nGo`
+    const task = `---\nschedule: "0 * * * *"\nagent: opencode\ncwd: "${cwdDir}"\n---\nGo`
     await writeTask(configDir, 'explicit-cwd', task)
 
     const result = await executeTask('explicit-cwd', {
@@ -327,7 +343,7 @@ describe('executeTask', () => {
     await writeTask(
       configDir,
       'prompt-check',
-      '---\nschedule: "0 * * * *"\n---\nDo the thing.',
+      '---\nschedule: "0 * * * *"\nagent: opencode\n---\nDo the thing.',
     )
 
     const result = await executeTask('prompt-check', {
@@ -407,6 +423,7 @@ describe('runTask', () => {
     const task = [
       '---',
       'schedule: "0 8 * * 1-5"',
+      'agent: opencode',
       'cwd: "/nonexistent/dir/xyz"',
       '---',
       'Prompt.',

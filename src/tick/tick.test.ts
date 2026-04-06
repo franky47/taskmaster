@@ -53,6 +53,7 @@ async function writeMeta(
 // Task at 8am on weekdays
 const WEEKDAY_TASK = `---
 schedule: "0 8 * * 1-5"
+agent: opencode
 ---
 
 Weekday morning task.
@@ -61,6 +62,7 @@ Weekday morning task.
 // Task every minute
 const EVERY_MINUTE_TASK = `---
 schedule: "* * * * *"
+agent: opencode
 ---
 
 Every minute task.
@@ -68,6 +70,7 @@ Every minute task.
 
 const DISABLED_TASK = `---
 schedule: "* * * * *"
+agent: opencode
 enabled: false
 ---
 
@@ -76,6 +79,7 @@ Disabled task.
 
 const TIMEZONE_TASK = `---
 schedule: "0 9 * * *"
+agent: opencode
 timezone: "America/New_York"
 ---
 

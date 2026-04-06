@@ -18,6 +18,7 @@ async function writeTask(tasksDir: string, name: string, content: string) {
 
 const VALID_TASK = `---
 schedule: '0 8 * * 1-5'
+agent: opencode
 ---
 
 Do something useful.

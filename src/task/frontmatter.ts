@@ -14,7 +14,7 @@ export type TaskDefinition = Frontmatter & {
 // Errors --
 
 type FrontmatterError = {
-  key: keyof Frontmatter
+  key: keyof z.input<typeof rawFrontmatter>
   message: string
 }
 
@@ -46,8 +46,10 @@ function hasUnquotedStar(content: string): boolean {
   return UNQUOTED_STAR_RE.test(content)
 }
 
-function isFrontmatterField(key: string): key is keyof Frontmatter {
-  return frontmatterSchema.shape.hasOwnProperty(key)
+function isFrontmatterField(
+  key: string,
+): key is keyof z.input<typeof rawFrontmatter> {
+  return key in rawFrontmatter.shape
 }
 
 export function parseMarkdown(
@@ -94,7 +96,7 @@ export function parseMarkdown(
 
 // --
 
-const frontmatterSchema = z.object({
+const rawFrontmatter = z.object({
   schedule: z
     .string({
       error: (issue) =>
@@ -130,12 +132,11 @@ const frontmatterSchema = z.object({
 
   cwd: z.string({ error: 'cwd must be a string' }).optional(),
 
-  args: z
-    .array(z.string({ error: 'All args values must be strings' }), {
-      error: 'args must be an array',
-    })
-    .optional()
-    .default([]),
+  agent: z.string({ error: 'agent must be a string' }).optional(),
+
+  run: z.string({ error: 'run must be a string' }).optional(),
+
+  args: z.string({ error: 'args must be a string' }).optional().default(''),
 
   env: z
     .record(z.string(), z.string({ error: 'All env values must be strings' }), {
@@ -149,3 +150,55 @@ const frontmatterSchema = z.object({
     .optional()
     .default(true),
 })
+
+const frontmatterSchema = rawFrontmatter
+  .superRefine((data, ctx) => {
+    const hasAgent = data.agent !== undefined
+    const hasRun = data.run !== undefined
+
+    if (hasAgent && hasRun) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['agent'],
+        message: 'exactly one of "agent" or "run" must be set, not both',
+      })
+      return
+    }
+
+    if (!hasAgent && !hasRun) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['agent'],
+        message: 'exactly one of "agent" or "run" must be set',
+      })
+      return
+    }
+
+    if (hasRun && data.args !== '') {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['args'],
+        message: '"args" can only be used with "agent", not "run"',
+      })
+    }
+
+    if (data.run !== undefined && !data.run.includes('TM_PROMPT_FILE')) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['run'],
+        message: '"run" must reference $TM_PROMPT_FILE',
+      })
+    }
+  })
+  .transform((data) => {
+    const { agent, run, args, ...common } = data
+    if (agent !== undefined) {
+      return { ...common, agent, args }
+    }
+    if (run === undefined) {
+      throw new Error(
+        'invariant: superRefine guarantees exactly one of agent/run',
+      )
+    }
+    return { ...common, run }
+  })
