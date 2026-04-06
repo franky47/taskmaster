@@ -1,8 +1,10 @@
 import { describe, expect, test } from 'bun:test'
-import fs from 'node:fs/promises'
+import fs from 'node:fs'
+import fsPromises from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 
+import { AgentNotFoundError } from '../agent'
 import { TaskContentionError, acquireTaskLock, releaseLock } from '../lock'
 import {
   FrontmatterValidationError,
@@ -21,7 +23,7 @@ type SpawnResult = {
 
 function fakeSpawn(
   result: Partial<SpawnResult> = {},
-): ExecuteDeps['spawnClaude'] {
+): ExecuteDeps['spawnAgent'] {
   return async () => ({
     exitCode: 0,
     stdout: '',
@@ -31,8 +33,8 @@ function fakeSpawn(
 }
 
 async function makeConfigDir(): Promise<string> {
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'tm-run-'))
-  await fs.mkdir(path.join(dir, 'tasks'), { recursive: true })
+  const dir = await fsPromises.mkdtemp(path.join(os.tmpdir(), 'tm-run-'))
+  await fsPromises.mkdir(path.join(dir, 'tasks'), { recursive: true })
   return dir
 }
 
@@ -41,10 +43,13 @@ async function writeTask(
   name: string,
   content: string,
 ): Promise<void> {
-  await fs.writeFile(path.join(configDir, 'tasks', `${name}.md`), content)
+  await fsPromises.writeFile(
+    path.join(configDir, 'tasks', `${name}.md`),
+    content,
+  )
 }
 
-const validTask = [
+const agentTask = [
   '---',
   'schedule: "0 8 * * 1-5"',
   'agent: opencode',
@@ -55,12 +60,37 @@ const validTask = [
   'Do the thing.',
 ].join('\n')
 
+const claudeTaskWithArgs = [
+  '---',
+  'schedule: "0 8 * * 1-5"',
+  'agent: claude',
+  'args: "--model sonnet"',
+  '---',
+  'Review PRs.',
+].join('\n')
+
+const runTask_ = [
+  '---',
+  'schedule: "0 8 * * 1-5"',
+  'run: "my-agent $TM_PROMPT_FILE"',
+  '---',
+  'Do the thing.',
+].join('\n')
+
+const unknownAgentTask = [
+  '---',
+  'schedule: "0 8 * * 1-5"',
+  'agent: nonexistent',
+  '---',
+  'Do the thing.',
+].join('\n')
+
 describe('executeTask', () => {
   test('returns TaskNotFoundError for non-existent task', async () => {
     const configDir = await makeConfigDir()
     const result = await executeTask('no-such-task', {
       configDir,
-      deps: { spawnClaude: fakeSpawn() },
+      deps: { spawnAgent: fakeSpawn() },
     })
     expect(result).toBeInstanceOf(TaskNotFoundError)
   })
@@ -69,7 +99,7 @@ describe('executeTask', () => {
     const configDir = await makeConfigDir()
     const result = await executeTask('INVALID_NAME', {
       configDir,
-      deps: { spawnClaude: fakeSpawn() },
+      deps: { spawnAgent: fakeSpawn() },
     })
     expect(result).toBeInstanceOf(TaskFileNameError)
   })
@@ -79,53 +109,129 @@ describe('executeTask', () => {
     await writeTask(configDir, 'bad-task', '---\nschedule: "not cron"\n---\nHi')
     const result = await executeTask('bad-task', {
       configDir,
-      deps: { spawnClaude: fakeSpawn() },
+      deps: { spawnAgent: fakeSpawn() },
     })
     expect(result).toBeInstanceOf(FrontmatterValidationError)
   })
 
-  test('passes prompt body to spawnClaude', async () => {
+  // AC1: agent: claude + args → correct sh -c command
+  test('builds correct command for agent task with args', async () => {
     const configDir = await makeConfigDir()
-    await writeTask(configDir, 'my-task', validTask)
+    await writeTask(configDir, 'claude-task', claudeTaskWithArgs)
 
-    let receivedPrompt = ''
-    const result = await executeTask('my-task', {
+    let receivedCommand = ''
+    await executeTask('claude-task', {
       configDir,
       deps: {
-        spawnClaude: async (opts) => {
-          receivedPrompt = opts.prompt
-          return { exitCode: 0, stdout: 'done', stderr: '' }
-        },
-      },
-    })
-
-    expect(receivedPrompt).toBe('Do the thing.')
-    if (result instanceof Error) throw result
-    expect(result.stdout).toBe('done')
-  })
-
-  test('passes args from frontmatter to spawnClaude', async () => {
-    const configDir = await makeConfigDir()
-    await writeTask(configDir, 'my-task', validTask)
-
-    let receivedArgs = ''
-    await executeTask('my-task', {
-      configDir,
-      deps: {
-        spawnClaude: async (opts) => {
-          receivedArgs = opts.args
+        spawnAgent: async (opts) => {
+          receivedCommand = opts.command
           return { exitCode: 0, stdout: '', stderr: '' }
         },
       },
     })
 
-    expect(receivedArgs).toBe('--model opus')
+    expect(receivedCommand).toBe('claude -p < $TM_PROMPT_FILE --model sonnet')
+  })
+
+  // AC2: run: path → correct sh -c command (no args appended)
+  test('builds correct command for run task', async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(configDir, 'run-task', runTask_)
+
+    let receivedCommand = ''
+    await executeTask('run-task', {
+      configDir,
+      deps: {
+        spawnAgent: async (opts) => {
+          receivedCommand = opts.command
+          return { exitCode: 0, stdout: '', stderr: '' }
+        },
+      },
+    })
+
+    expect(receivedCommand).toBe('my-agent $TM_PROMPT_FILE')
+  })
+
+  // AC3: TM_PROMPT_FILE is set in spawned process env
+  test('sets TM_PROMPT_FILE in spawned env', async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(configDir, 'env-task', agentTask)
+
+    let receivedEnv: Record<string, string> = {}
+    await executeTask('env-task', {
+      configDir,
+      deps: {
+        spawnAgent: async (opts) => {
+          receivedEnv = opts.env
+          return { exitCode: 0, stdout: '', stderr: '' }
+        },
+      },
+    })
+
+    expect(receivedEnv.TM_PROMPT_FILE).toMatch(/^\/tmp\/tm-.*\.prompt\.md$/)
+  })
+
+  // AC4: Prompt file written before spawn, cleaned up after
+  test('prompt file exists during spawn and is cleaned up after', async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(configDir, 'prompt-lifecycle', agentTask)
+
+    let promptPath = ''
+    let existedDuringSpawn = false
+    const result = await executeTask('prompt-lifecycle', {
+      configDir,
+      deps: {
+        spawnAgent: async (opts) => {
+          promptPath = opts.env.TM_PROMPT_FILE ?? ''
+          existedDuringSpawn = fs.existsSync(promptPath)
+          return { exitCode: 0, stdout: '', stderr: '' }
+        },
+      },
+    })
+
+    if (result instanceof Error) throw result
+    expect(existedDuringSpawn).toBe(true)
+    expect(fs.existsSync(promptPath)).toBe(false)
+  })
+
+  // AC5: Prompt file cleaned up on agent failure (non-zero exit)
+  test('prompt file cleaned up even on non-zero exit', async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(configDir, 'fail-cleanup', agentTask)
+
+    let promptPath = ''
+    const result = await executeTask('fail-cleanup', {
+      configDir,
+      deps: {
+        spawnAgent: async (opts) => {
+          promptPath = opts.env.TM_PROMPT_FILE ?? ''
+          return { exitCode: 1, stdout: '', stderr: 'boom' }
+        },
+      },
+    })
+
+    if (result instanceof Error) throw result
+    expect(result.exitCode).toBe(1)
+    expect(fs.existsSync(promptPath)).toBe(false)
+  })
+
+  // AC6: Agent registry errors propagate
+  test('returns AgentNotFoundError for unknown agent', async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(configDir, 'unknown-agent', unknownAgentTask)
+
+    const result = await executeTask('unknown-agent', {
+      configDir,
+      deps: { spawnAgent: fakeSpawn() },
+    })
+
+    expect(result).toBeInstanceOf(AgentNotFoundError)
   })
 
   test('passes per-task env merged with global env', async () => {
     const configDir = await makeConfigDir()
-    await writeTask(configDir, 'my-task', validTask)
-    await fs.writeFile(
+    await writeTask(configDir, 'my-task', agentTask)
+    await fsPromises.writeFile(
       path.join(configDir, '.env'),
       'GLOBAL_KEY=global_val\nPROJECT=overridden\n',
     )
@@ -134,7 +240,7 @@ describe('executeTask', () => {
     await executeTask('my-task', {
       configDir,
       deps: {
-        spawnClaude: async (opts) => {
+        spawnAgent: async (opts) => {
           receivedEnv = opts.env
           return { exitCode: 0, stdout: '', stderr: '' }
         },
@@ -146,7 +252,7 @@ describe('executeTask', () => {
   })
 
   test('resolves cwd from frontmatter', async () => {
-    const cwdDir = await fs.mkdtemp(path.join(os.tmpdir(), 'tm-cwd-'))
+    const cwdDir = await fsPromises.mkdtemp(path.join(os.tmpdir(), 'tm-cwd-'))
     const configDir = await makeConfigDir()
     const task = [
       '---',
@@ -162,7 +268,7 @@ describe('executeTask', () => {
     await executeTask('cwd-task', {
       configDir,
       deps: {
-        spawnClaude: async (opts) => {
+        spawnAgent: async (opts) => {
           receivedCwd = opts.cwd
           return { exitCode: 0, stdout: '', stderr: '' }
         },
@@ -184,7 +290,7 @@ describe('executeTask', () => {
     await executeTask('no-cwd', {
       configDir,
       deps: {
-        spawnClaude: async (opts) => {
+        spawnAgent: async (opts) => {
           receivedCwd = opts.cwd
           return { exitCode: 0, stdout: '', stderr: '' }
         },
@@ -192,7 +298,7 @@ describe('executeTask', () => {
     })
 
     expect(receivedCwd).toContain('taskmaster-')
-    const stat = await fs.stat(receivedCwd)
+    const stat = await fsPromises.stat(receivedCwd)
     expect(stat.isDirectory()).toBe(true)
   })
 
@@ -210,7 +316,7 @@ describe('executeTask', () => {
 
     const result = await executeTask('bad-cwd', {
       configDir,
-      deps: { spawnClaude: fakeSpawn() },
+      deps: { spawnAgent: fakeSpawn() },
     })
     expect(result).toBeInstanceOf(CwdNotFoundError)
   })
@@ -231,7 +337,7 @@ describe('executeTask', () => {
     await executeTask('disabled', {
       configDir,
       deps: {
-        spawnClaude: async () => {
+        spawnAgent: async () => {
           ran = true
           return { exitCode: 0, stdout: '', stderr: '' }
         },
@@ -241,7 +347,7 @@ describe('executeTask', () => {
     expect(ran).toBe(true)
   })
 
-  test('propagates exit code from claude (S3.10)', async () => {
+  test('propagates exit code from agent (S3.10)', async () => {
     const configDir = await makeConfigDir()
     await writeTask(
       configDir,
@@ -251,7 +357,7 @@ describe('executeTask', () => {
 
     const result = await executeTask('fail-task', {
       configDir,
-      deps: { spawnClaude: fakeSpawn({ exitCode: 42 }) },
+      deps: { spawnAgent: fakeSpawn({ exitCode: 42 }) },
     })
 
     if (result instanceof Error) throw result
@@ -269,7 +375,7 @@ describe('executeTask', () => {
     const result = await executeTask('output', {
       configDir,
       deps: {
-        spawnClaude: fakeSpawn({
+        spawnAgent: fakeSpawn({
           stdout: 'hello out',
           stderr: 'hello err',
         }),
@@ -292,7 +398,7 @@ describe('executeTask', () => {
     const before = new Date()
     const result = await executeTask('timing', {
       configDir,
-      deps: { spawnClaude: fakeSpawn() },
+      deps: { spawnAgent: fakeSpawn() },
     })
     const after = new Date()
 
@@ -314,7 +420,7 @@ describe('executeTask', () => {
 
     const result = await executeTask('temp-cwd', {
       configDir,
-      deps: { spawnClaude: fakeSpawn() },
+      deps: { spawnAgent: fakeSpawn() },
     })
 
     if (result instanceof Error) throw result
@@ -323,14 +429,14 @@ describe('executeTask', () => {
   })
 
   test('includes cwd with isTemp=false when cwd specified', async () => {
-    const cwdDir = await fs.mkdtemp(path.join(os.tmpdir(), 'tm-cwd-'))
+    const cwdDir = await fsPromises.mkdtemp(path.join(os.tmpdir(), 'tm-cwd-'))
     const configDir = await makeConfigDir()
     const task = `---\nschedule: "0 * * * *"\nagent: opencode\ncwd: "${cwdDir}"\n---\nGo`
     await writeTask(configDir, 'explicit-cwd', task)
 
     const result = await executeTask('explicit-cwd', {
       configDir,
-      deps: { spawnClaude: fakeSpawn() },
+      deps: { spawnAgent: fakeSpawn() },
     })
 
     if (result instanceof Error) throw result
@@ -348,7 +454,7 @@ describe('executeTask', () => {
 
     const result = await executeTask('prompt-check', {
       configDir,
-      deps: { spawnClaude: fakeSpawn() },
+      deps: { spawnAgent: fakeSpawn() },
     })
 
     if (result instanceof Error) throw result
@@ -359,9 +465,8 @@ describe('executeTask', () => {
 describe('runTask', () => {
   test('returns TaskContentionError when lock is contended', async () => {
     const configDir = await makeConfigDir()
-    await writeTask(configDir, 'locked', validTask)
+    await writeTask(configDir, 'locked', agentTask)
 
-    // Hold the lock externally to simulate contention
     const locksDir = path.join(configDir, 'locks')
     const lock = acquireTaskLock('locked', locksDir)
     if (lock instanceof Error || 'contended' in lock)
@@ -369,7 +474,7 @@ describe('runTask', () => {
 
     const result = await runTask('locked', {
       configDir,
-      deps: { spawnClaude: fakeSpawn() },
+      deps: { spawnAgent: fakeSpawn() },
     })
 
     expect(result).toBeInstanceOf(TaskContentionError)
@@ -378,16 +483,14 @@ describe('runTask', () => {
 
   test('holds lock during execution, not just at start', async () => {
     const configDir = await makeConfigDir()
-    await writeTask(configDir, 'hold-lock', validTask)
+    await writeTask(configDir, 'hold-lock', agentTask)
     const locksDir = path.join(configDir, 'locks')
 
-    // spawnClaude that checks the lock is held mid-execution
     let lockHeldDuringExecution = false
     const result = await runTask('hold-lock', {
       configDir,
       deps: {
-        spawnClaude: async () => {
-          // While claude is "running", try to acquire the same lock
+        spawnAgent: async () => {
           const probe = acquireTaskLock('hold-lock', locksDir)
           lockHeldDuringExecution = 'contended' in probe
           if ('fd' in probe) releaseLock(probe.fd)
@@ -402,16 +505,15 @@ describe('runTask', () => {
 
   test('releases lock after successful run (re-acquire succeeds)', async () => {
     const configDir = await makeConfigDir()
-    await writeTask(configDir, 'release-ok', validTask)
+    await writeTask(configDir, 'release-ok', agentTask)
 
     const result = await runTask('release-ok', {
       configDir,
-      deps: { spawnClaude: fakeSpawn() },
+      deps: { spawnAgent: fakeSpawn() },
     })
 
     if (result instanceof Error) throw result
 
-    // If lock was released, we can acquire it again
     const locksDir = path.join(configDir, 'locks')
     const lock = acquireTaskLock('release-ok', locksDir)
     expect('fd' in lock).toBe(true)
@@ -432,12 +534,11 @@ describe('runTask', () => {
 
     const result = await runTask('fail-lock', {
       configDir,
-      deps: { spawnClaude: fakeSpawn() },
+      deps: { spawnAgent: fakeSpawn() },
     })
 
     expect(result).toBeInstanceOf(CwdNotFoundError)
 
-    // If lock was released, we can acquire it again
     const locksDir = path.join(configDir, 'locks')
     const lock = acquireTaskLock('fail-lock', locksDir)
     expect('fd' in lock).toBe(true)

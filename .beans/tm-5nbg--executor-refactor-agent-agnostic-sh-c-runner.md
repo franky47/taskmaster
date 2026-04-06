@@ -1,11 +1,11 @@
 ---
 # tm-5nbg
 title: 'Executor refactor: agent-agnostic sh -c runner'
-status: todo
+status: completed
 type: task
 priority: high
 created_at: 2026-04-05T22:41:49Z
-updated_at: 2026-04-05T22:41:49Z
+updated_at: 2026-04-06T22:28:54Z
 parent: tm-eu53
 blocked_by:
     - tm-g3gd
@@ -49,12 +49,22 @@ Preserve the dependency injection pattern for testing. The `spawnAgent` function
 
 ## Acceptance criteria
 
-- [ ] `agent: claude` + `args: --model sonnet` produces the correct `sh -c` command
-- [ ] `run: my-agent $TM_PROMPT_FILE` produces the correct `sh -c` command (no args appended)
-- [ ] `TM_PROMPT_FILE` is set in the spawned process environment
-- [ ] Prompt file is written before agent spawns and cleaned up after it exits
-- [ ] Prompt file is cleaned up even when the agent fails (non-zero exit)
-- [ ] Agent registry errors (unknown agent, bad agents.yml) propagate correctly
-- [ ] All existing run tests updated and passing
-- [ ] `RunResult` and `RunError` types updated
-- [ ] History recording continues to work (it consumes `RunResult`, which still has stdout/stderr/exitCode)
+- [x] `agent: claude` + `args: --model sonnet` produces the correct `sh -c` command
+- [x] `run: my-agent $TM_PROMPT_FILE` produces the correct `sh -c` command (no args appended)
+- [x] `TM_PROMPT_FILE` is set in the spawned process environment
+- [x] Prompt file is written before agent spawns and cleaned up after it exits
+- [x] Prompt file is cleaned up even when the agent fails (non-zero exit)
+- [x] Agent registry errors (unknown agent, bad agents.yml) propagate correctly
+- [x] All existing run tests updated and passing
+- [x] `RunResult` and `RunError` types updated
+- [x] History recording continues to work (it consumes `RunResult`, which still has stdout/stderr/exitCode)
+
+
+## Summary of Changes
+
+Refactored executor from Claude-specific to agent-agnostic. Command building
+resolves agent templates via the registry or uses raw `run` values. Prompt files
+are written to /tmp with TM_PROMPT_FILE in the spawned env, cleaned up in a
+finally block. Execution uses `sh -c` instead of direct binary spawn.
+ClaudeNotFoundError removed; agent/prompt errors now surface through ExecuteError.
+24 tests (6 new for AC1-6, 18 updated renames).

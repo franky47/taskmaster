@@ -4,10 +4,10 @@ export {
   expandTilde,
   resolveCwd,
 } from './cwd'
-export { ClaudeNotFoundError, executeTask, runTask } from './run'
-export type {
-  ExecuteDeps,
-  ResolvedCwd,
-  RunResult,
-  SpawnClaudeOpts,
-} from './run'
+export {
+  PromptFileWriteError,
+  cleanupPromptFile,
+  writePromptFile,
+} from './prompt'
+export { executeTask, runTask } from './run'
+export type { ExecuteDeps, ResolvedCwd, RunResult, SpawnAgentOpts } from './run'

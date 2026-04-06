@@ -3,6 +3,13 @@ import path from 'node:path'
 import * as errore from 'errore'
 
 import {
+  type AgentNotFoundError,
+  type AgentsFileReadError,
+  type AgentsFileValidationError,
+  resolveAgent,
+} from '../agent'
+import {
+  agentsFilePath as defaultAgentsFilePath,
   locksDir as defaultLocksDir,
   envFilePath,
   taskFilePath,
@@ -18,6 +25,7 @@ import {
 import type {
   FrontmatterParseError,
   FrontmatterValidationError,
+  TaskDefinition,
   TaskFileNameError,
   TaskFileReadError,
   TaskNotFoundError,
@@ -25,13 +33,8 @@ import type {
 import { parseTaskFile } from '../task'
 import type { CwdNotDirectoryError, CwdNotFoundError, ResolvedCwd } from './cwd'
 import { resolveCwd } from './cwd'
-
-// Errors --
-
-export class ClaudeNotFoundError extends errore.createTaggedError({
-  name: 'ClaudeNotFoundError',
-  message: 'claude binary not found on PATH',
-}) {}
+import type { PromptFileWriteError } from './prompt'
+import { cleanupPromptFile, writePromptFile } from './prompt'
 
 // Types --
 
@@ -47,25 +50,20 @@ export type RunResult = {
   finishedAt: Date
 }
 
-// AGENT(tm-5nbg): SpawnClaudeOpts is temporary; the executor refactor
-// will replace this with agent-resolved command dispatch.
-export type SpawnClaudeOpts = {
-  prompt: string
-  args: string
+export type SpawnAgentOpts = {
+  command: string
   cwd: string
   env: Record<string, string>
 }
 
-type SpawnClaudeResult = {
+type SpawnAgentResult = {
   exitCode: number
   stdout: string
   stderr: string
 }
 
 export type ExecuteDeps = {
-  spawnClaude: (
-    opts: SpawnClaudeOpts,
-  ) => Promise<ClaudeNotFoundError | SpawnClaudeResult>
+  spawnAgent: (opts: SpawnAgentOpts) => Promise<SpawnAgentResult>
 }
 
 type ExecuteOptions = {
@@ -73,21 +71,33 @@ type ExecuteOptions = {
   deps?: Partial<ExecuteDeps>
 }
 
+// Command building --
+
+type BuildCommandError =
+  | AgentNotFoundError
+  | AgentsFileReadError
+  | AgentsFileValidationError
+
+async function buildCommand(
+  task: TaskDefinition,
+  agentsConfigPath: string,
+): Promise<string | BuildCommandError> {
+  if ('agent' in task) {
+    const template = await resolveAgent(task.agent, {
+      configPath: agentsConfigPath,
+    })
+    if (template instanceof Error) return template
+    return task.args ? `${template} ${task.args}` : template
+  }
+  return task.run
+}
+
 // Default implementation --
 
-async function defaultSpawnClaude(
-  opts: SpawnClaudeOpts,
-): Promise<ClaudeNotFoundError | SpawnClaudeResult> {
-  const claudePath = Bun.which('claude')
-  if (!claudePath) {
-    return new ClaudeNotFoundError()
-  }
-
-  // AGENT(tm-5nbg): split args string for spawn; executor refactor will
-  // replace this with agent-resolved command construction.
-  const extraArgs = opts.args ? opts.args.split(/\s+/).filter(Boolean) : []
-  const proc = Bun.spawn([claudePath, '-p', ...extraArgs], {
-    stdin: new Response(opts.prompt),
+async function defaultSpawnAgent(
+  opts: SpawnAgentOpts,
+): Promise<SpawnAgentResult> {
+  const proc = Bun.spawn(['sh', '-c', opts.command], {
     stdout: 'pipe',
     stderr: 'pipe',
     cwd: opts.cwd,
@@ -114,7 +124,10 @@ export type ExecuteError =
   | FrontmatterValidationError
   | CwdNotFoundError
   | CwdNotDirectoryError
-  | ClaudeNotFoundError
+  | AgentNotFoundError
+  | AgentsFileReadError
+  | AgentsFileValidationError
+  | PromptFileWriteError
   | EnvFileReadError
   | EnvFileParseError
 
@@ -140,25 +153,37 @@ export async function executeTask(
   const cwd = await resolveCwd(task.cwd)
   if (cwd instanceof Error) return cwd
 
-  // AGENT(tm-5nbg): executor always calls Claude for now; the executor
-  // refactor will dispatch to the resolved agent command instead.
-  const spawnClaude = options?.deps?.spawnClaude ?? defaultSpawnClaude
-  const startedAt = new Date()
-  const result = await spawnClaude({
-    prompt: task.prompt,
-    args: 'agent' in task ? task.args : '',
-    cwd: cwd.path,
-    env,
-  })
-  const finishedAt = new Date()
-  if (result instanceof Error) return result
+  const agentsConfigPath = configRoot
+    ? path.join(configRoot, 'agents.yml')
+    : defaultAgentsFilePath
 
-  return {
-    ...result,
-    cwd,
-    prompt: task.prompt,
-    startedAt,
-    finishedAt,
+  const command = await buildCommand(task, agentsConfigPath)
+  if (command instanceof Error) return command
+
+  const startedAt = new Date()
+
+  const promptPath = writePromptFile(name, startedAt, task.prompt)
+  if (promptPath instanceof Error) return promptPath
+
+  const spawnAgent = options?.deps?.spawnAgent ?? defaultSpawnAgent
+
+  try {
+    const result = await spawnAgent({
+      command,
+      cwd: cwd.path,
+      env: { ...env, TM_PROMPT_FILE: promptPath },
+    })
+    const finishedAt = new Date()
+
+    return {
+      ...result,
+      cwd,
+      prompt: task.prompt,
+      startedAt,
+      finishedAt,
+    }
+  } finally {
+    cleanupPromptFile(promptPath)
   }
 }
 
