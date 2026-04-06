@@ -11,6 +11,7 @@ import {
 } from './history'
 import { listTasks } from './list'
 import { TaskContentionError } from './lock'
+import { log } from './logger'
 import { runTask } from './run'
 import { setup, teardown } from './setup'
 import { getTaskStatuses } from './status'
@@ -46,11 +47,15 @@ async function main(): Promise<void> {
           timestamp = manualTimestamp()
         }
 
+        const trigger = opts.timestamp ? 'tick' : ('manual' as const)
+        log({ event: 'started', task: name, trigger })
+
         const result = await runTask(name)
 
         if (result instanceof Error) {
           // S5.2: Lock contention — skip gracefully
           if (result instanceof TaskContentionError) {
+            log({ event: 'skipped', task: name, reason: 'contention' })
             if (opts.json) {
               console.log(JSON.stringify({ skipped: true, taskName: name }))
             } else {
@@ -58,6 +63,7 @@ async function main(): Promise<void> {
             }
             process.exit(0)
           }
+          log({ event: 'error', task: name, error: result })
           console.error(result.message)
           process.exit(1)
         }
