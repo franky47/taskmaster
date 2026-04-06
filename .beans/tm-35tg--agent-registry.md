@@ -1,11 +1,11 @@
 ---
 # tm-35tg
 title: Agent registry
-status: todo
+status: completed
 type: task
 priority: high
 created_at: 2026-04-05T22:41:25Z
-updated_at: 2026-04-05T22:41:25Z
+updated_at: 2026-04-06T19:27:23Z
 parent: tm-eu53
 ---
 
@@ -44,12 +44,17 @@ Resolution order: user file > built-in map > error.
 
 ## Acceptance criteria
 
-- [ ] `resolveAgent('claude')` returns `claude -p < $TM_PROMPT_FILE`
-- [ ] `resolveAgent('pi')` returns `pi -p @$TM_PROMPT_FILE`
-- [ ] `resolveAgent('unknown')` returns `AgentNotFoundError` listing available agents
-- [ ] User agents.yml override takes precedence over built-in
-- [ ] Custom agent in agents.yml resolves correctly
-- [ ] Missing agents.yml falls back to built-ins (no error)
-- [ ] Malformed agents.yml returns `AgentsFileValidationError`
-- [ ] Unreadable agents.yml returns `AgentsFileReadError`
-- [ ] `agentsFilePath` added to config module
+- [x] `resolveAgent('claude')` returns `claude -p < $TM_PROMPT_FILE`
+- [x] `resolveAgent('pi')` returns `pi -p @$TM_PROMPT_FILE`
+- [x] `resolveAgent('unknown')` returns `AgentNotFoundError` listing available agents
+- [x] User agents.yml override takes precedence over built-in
+- [x] Custom agent in agents.yml resolves correctly
+- [x] Missing agents.yml falls back to built-ins (no error)
+- [x] Malformed agents.yml returns `AgentsFileValidationError`
+- [x] Unreadable agents.yml returns `AgentsFileReadError`
+- [x] `agentsFilePath` added to config module
+
+
+## Summary of Changes
+
+Added `src/agent/` module with `resolveAgent()` that maps agent names to shell invocation templates. Built-in registry covers claude, codex, opencode, and pi. User overrides loaded from `agents.yml` via gray-matter + Zod validation. Custom agent templates are validated to include `$TM_PROMPT_FILE` reference. Three error types (`AgentNotFoundError`, `AgentsFileReadError`, `AgentsFileValidationError`) follow the project errore pattern. 13 tests.

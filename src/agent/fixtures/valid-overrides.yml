@@ -1,0 +1,2 @@
+claude: claude --model sonnet -p < $TM_PROMPT_FILE
+my-agent: my-agent --prompt-file $TM_PROMPT_FILE
