@@ -34,7 +34,7 @@ type RecordHistoryDeps = {
 async function moveTempDir(src: string, dest: string): Promise<void> {
   try {
     await fs.rename(src, dest)
-  } catch (err: unknown) {
+  } catch (err) {
     if (err instanceof Error && 'code' in err && err.code === 'EXDEV') {
       // Cross-filesystem: copy then remove
       await fs.cp(src, dest, { recursive: true })
@@ -110,7 +110,7 @@ export async function recordHistory(
       }
     }
     // S4.7: explicit cwd — no directory operations
-  } catch (err: unknown) {
+  } catch (err) {
     const reason = err instanceof Error ? err.message : String(err)
     return new HistoryWriteError({ taskName, reason })
   }

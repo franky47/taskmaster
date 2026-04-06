@@ -89,7 +89,7 @@ export async function purgeHistory(
     }
 
     return { deleted }
-  } catch (err: unknown) {
+  } catch (err) {
     const reason = err instanceof Error ? err.message : String(err)
     return new PurgeError({ reason })
   }

@@ -19,7 +19,7 @@ export async function loadEnvFile(
   let content: string
   try {
     content = await fs.readFile(filePath, 'utf-8')
-  } catch (err: unknown) {
+  } catch (err) {
     if (err instanceof Error && 'code' in err && err.code === 'ENOENT') {
       return {}
     }
@@ -34,7 +34,7 @@ export async function loadEnvFile(
       }
     }
     return result
-  } catch (err: unknown) {
+  } catch (err) {
     return new EnvFileParseError({ path: filePath, cause: err })
   }
 }
