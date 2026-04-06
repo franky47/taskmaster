@@ -44,15 +44,13 @@ function defaultLaunchAgentsDir(): string {
 }
 
 function defaultTmCommand(): string[] {
-  // Compiled single-file binary: argv = ['/path/to/tm', 'setup', ...]
-  // Dev mode via bun: argv = ['/path/to/bun', 'src/main.ts', 'setup', ...]
-  // Detect dev mode by checking if argv[1] looks like a source file.
-  const argv0 = path.resolve(process.argv[0]!)
-  const argv1 = process.argv[1]
-  if (argv1 && /\.[jt]sx?$/.test(argv1)) {
-    return [argv0, path.resolve(argv1)]
+  // Compiled SFE: argv = ['bun', '/$bunfs/root/tm', ...], execPath = real path
+  // Dev mode:     argv = ['/path/to/bun', 'src/main.ts', ...], Bun.main = script
+  // In both cases, process.execPath is the reliable absolute path to the runtime.
+  if (/\.[jt]s$/.test(Bun.main)) {
+    return [process.execPath, path.resolve(Bun.main)]
   }
-  return [argv0]
+  return [process.execPath]
 }
 
 async function defaultRunCommand(
