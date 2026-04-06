@@ -12,6 +12,7 @@ import {
 import { listTasks } from './list'
 import { TaskContentionError } from './lock'
 import { runTask } from './run'
+import { setup, teardown } from './setup'
 import { getTaskStatuses } from './status'
 import { tick } from './tick'
 import { validateTasks } from './validate'
@@ -249,6 +250,50 @@ async function main(): Promise<void> {
         }
         if (result.purged > 0) {
           console.log(`purged     ${result.purged} old entries`)
+        }
+      }
+    })
+
+  program
+    .command('setup')
+    .description('Install system scheduler for tm tick')
+    .option('--json', 'Output as JSON')
+    .action(async (opts: { json?: boolean }) => {
+      const result = await setup()
+      if (result instanceof Error) {
+        console.error(result.message)
+        process.exit(1)
+      }
+
+      if (opts.json) {
+        console.log(JSON.stringify(result))
+      } else {
+        if (result.installed) {
+          console.log(`Installed ${result.method} scheduler`)
+        } else {
+          console.log(`Scheduler already installed (${result.method})`)
+        }
+      }
+    })
+
+  program
+    .command('teardown')
+    .description('Remove system scheduler for tm tick')
+    .option('--json', 'Output as JSON')
+    .action(async (opts: { json?: boolean }) => {
+      const result = await teardown()
+      if (result instanceof Error) {
+        console.error(result.message)
+        process.exit(1)
+      }
+
+      if (opts.json) {
+        console.log(JSON.stringify(result))
+      } else {
+        if (result.removed) {
+          console.log(`Removed ${result.method} scheduler`)
+        } else {
+          console.log(`No scheduler to remove (${result.method})`)
         }
       }
     })
