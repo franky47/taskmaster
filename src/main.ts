@@ -13,6 +13,7 @@ import { listTasks } from './list'
 import { TaskContentionError } from './lock'
 import { runTask } from './run'
 import { getTaskStatuses } from './status'
+import { tick } from './tick'
 import { validateTasks } from './validate'
 
 async function main(): Promise<void> {
@@ -222,6 +223,32 @@ async function main(): Promise<void> {
           if (task.next_run) {
             console.log(`  next      ${task.next_run}`)
           }
+        }
+      }
+    })
+
+  program
+    .command('tick')
+    .description('Scheduler heartbeat: dispatch due tasks')
+    .option('--json', 'Output as JSON')
+    .action(async (opts: { json?: boolean }) => {
+      const result = await tick()
+      if (result instanceof Error) {
+        console.error(result.message)
+        process.exit(1)
+      }
+
+      if (opts.json) {
+        console.log(JSON.stringify(result))
+      } else {
+        for (const name of result.dispatched) {
+          console.log(`dispatched ${name}`)
+        }
+        for (const name of result.skipped) {
+          console.log(`skipped    ${name} (already ran)`)
+        }
+        if (result.purged > 0) {
+          console.log(`purged     ${result.purged} old entries`)
         }
       }
     })
