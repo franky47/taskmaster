@@ -1,10 +1,10 @@
 # Taskmaster
 
-A CLI tool for macOS and Linux that manages recurring tasks powered by [Claude Code](https://docs.anthropic.com/en/docs/claude-code). Each task is a markdown file containing a prompt and scheduling metadata. A per-minute heartbeat evaluates which tasks are due and dispatches them to Claude Code in print mode.
+A CLI tool for macOS and Linux that manages recurring tasks powered by AI coding agents. Each task is a markdown file containing a prompt and scheduling metadata. A per-minute heartbeat evaluates which tasks are due and dispatches them to an agent.
 
 ## Install
 
-Requires [Bun](https://bun.sh) and [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (`claude` on PATH).
+Requires [Bun](https://bun.sh) and at least one supported agent on PATH (e.g. [Claude Code](https://docs.anthropic.com/en/docs/claude-code)).
 
 ```sh
 bun install
@@ -100,7 +100,7 @@ tm teardown                      Remove system scheduler
 4. Dispatches `tm run` as a detached process for each due task
 5. Purges successful history entries older than 30 days
 
-`tm run` acquires a per-task file lock (via `flock(2)` through FFI), sets up the environment, strips the YAML frontmatter, and pipes the prompt to `claude -p`. On completion, it records metadata, stdout, and stderr to the history directory.
+`tm run` acquires a per-task file lock (via `flock(2)` through FFI), sets up the environment, strips the YAML frontmatter, and dispatches the prompt to the resolved agent (see [Agents](#agents)). On completion, it records metadata, stdout, and stderr to the history directory.
 
 ### Environment Variable Layering
 
@@ -120,8 +120,33 @@ Variables resolve in order (last wins):
   locks/              Per-task lock files
   runs/               Preserved temp dirs from failed runs
   .env                Global environment variables (optional)
+  agents.yml          Custom agent definitions (optional)
   heartbeat           Timestamp of last tick invocation
 ```
+
+## Agents
+
+Taskmaster ships with built-in support for the following agents:
+
+| Agent      | Command                            |
+| ---------- | ---------------------------------- |
+| `claude`   | `claude -p < $TM_PROMPT_FILE`     |
+| `codex`    | `codex exec - < $TM_PROMPT_FILE`  |
+| `opencode` | `opencode run -f $TM_PROMPT_FILE` |
+| `pi`       | `pi -p @$TM_PROMPT_FILE`          |
+
+The `$TM_PROMPT_FILE` variable is replaced at runtime with the path to a temporary file containing the task prompt (frontmatter stripped).
+
+### Custom Agents
+
+Define custom agents (or override built-in ones) in `~/.config/taskmaster/agents.yml`. Each entry maps a name to a shell command template that must reference `$TM_PROMPT_FILE`:
+
+```yaml
+claude: claude --model sonnet -p < $TM_PROMPT_FILE
+my-agent: my-agent --prompt-file $TM_PROMPT_FILE
+```
+
+Custom entries are merged on top of the built-in registry, so you can override defaults or add new agents.
 
 ## Development
 
