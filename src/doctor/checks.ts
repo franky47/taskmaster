@@ -1,10 +1,10 @@
 import path from 'node:path'
 
-import { CronExpressionParser } from 'cron-parser'
 import ms from 'ms'
 
 import type { HistoryEntry } from '../history'
 import type { LogEntry } from '../logger'
+import { minCronIntervalMs } from '../schedule'
 import type { ValidationResult } from '../validate'
 
 // Finding types --
@@ -235,21 +235,7 @@ export function checkTimeoutContention(
 ): TimeoutContentionFinding | null {
   if (timeoutMs === undefined) return null
 
-  // Find the minimum gap across a full week of cron ticks to handle
-  // non-uniform schedules like "0 9,17 * * *" (8h and 16h gaps).
-  const expr = CronExpressionParser.parse(schedule)
-  let prev = expr.next().toDate().getTime()
-  let minInterval = Infinity
-  const oneWeekMs = 7 * 24 * 60 * 60_000
-  const horizon = prev + oneWeekMs
-  while (true) {
-    const next = expr.next().toDate().getTime()
-    const gap = next - prev
-    if (gap < minInterval) minInterval = gap
-    prev = next
-    if (prev >= horizon) break
-  }
-
+  const minInterval = minCronIntervalMs(schedule)
   if (timeoutMs < minInterval) return null
 
   return {

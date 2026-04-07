@@ -276,6 +276,83 @@ describe('parseMarkdown', () => {
         ),
       ).toBe(true)
     })
+
+    test('accepts timeout shorter than schedule interval', () => {
+      // Schedule: every hour, timeout: 30s — well under
+      const result = parseMarkdown(
+        md(`schedule: '0 * * * *'\n${VALID_AGENT}\ntimeout: '30s'`),
+      )
+      expect(result).not.toBeInstanceOf(Error)
+    })
+
+    test('rejects timeout equal to schedule interval', () => {
+      // Schedule: every 5 minutes, timeout: 5m
+      const result = parseMarkdown(
+        md(`schedule: '*/5 * * * *'\n${VALID_AGENT}\ntimeout: '5m'`),
+      )
+      expect(result).toBeInstanceOf(FrontmatterValidationError)
+      if (!(result instanceof FrontmatterValidationError)) return
+      expect(
+        result.errors.some(
+          (e) =>
+            e.key === 'timeout' &&
+            e.message.includes('less than the schedule interval'),
+        ),
+      ).toBe(true)
+    })
+
+    test('rejects timeout exceeding schedule interval', () => {
+      // Schedule: every 5 minutes, timeout: 10m
+      const result = parseMarkdown(
+        md(`schedule: '*/5 * * * *'\n${VALID_AGENT}\ntimeout: '10m'`),
+      )
+      expect(result).toBeInstanceOf(FrontmatterValidationError)
+      if (!(result instanceof FrontmatterValidationError)) return
+      expect(
+        result.errors.some(
+          (e) =>
+            e.key === 'timeout' &&
+            e.message.includes('less than the schedule interval'),
+        ),
+      ).toBe(true)
+    })
+
+    test('uses minimum gap for non-uniform cron schedules', () => {
+      // Schedule: 9am and 5pm — minimum gap is 8h
+      // Timeout: 10h exceeds the 8h gap
+      const result = parseMarkdown(
+        md(`schedule: '0 9,17 * * *'\n${VALID_AGENT}\ntimeout: '10h'`),
+      )
+      expect(result).toBeInstanceOf(FrontmatterValidationError)
+      if (!(result instanceof FrontmatterValidationError)) return
+      expect(
+        result.errors.some(
+          (e) =>
+            e.key === 'timeout' &&
+            e.message.includes('less than the schedule interval'),
+        ),
+      ).toBe(true)
+    })
+
+    test('does not crash when schedule is invalid and timeout is set', () => {
+      const result = parseMarkdown(
+        md(`schedule: 'bad'\n${VALID_AGENT}\ntimeout: '5m'`),
+      )
+      expect(result).toBeInstanceOf(FrontmatterValidationError)
+      if (!(result instanceof FrontmatterValidationError)) return
+      expect(result.errors.some((e) => e.key === 'schedule')).toBe(true)
+    })
+
+    test('includes both timeout and interval in error message', () => {
+      const result = parseMarkdown(
+        md(`schedule: '*/5 * * * *'\n${VALID_AGENT}\ntimeout: '10m'`),
+      )
+      expect(result).toBeInstanceOf(FrontmatterValidationError)
+      if (!(result instanceof FrontmatterValidationError)) return
+      const err = result.errors.find((e) => e.key === 'timeout')
+      expect(err?.message).toContain('10m')
+      expect(err?.message).toContain('5m')
+    })
   })
 
   describe('args', () => {

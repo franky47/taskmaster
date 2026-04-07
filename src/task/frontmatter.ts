@@ -4,6 +4,8 @@ import matter from 'gray-matter'
 import ms from 'ms'
 import { z } from 'zod'
 
+import { minCronIntervalMs } from '../schedule'
+
 const VALID_TIMEZONES = new Set(Intl.supportedValuesOf('timeZone'))
 
 // Duration string schema — mirrors ms.StringValue in lowercase.
@@ -246,6 +248,22 @@ const frontmatterSchema = rawFrontmatter
         path: ['run'],
         message: '"run" must reference $TM_PROMPT_FILE',
       })
+    }
+
+    if (data.timeout !== undefined) {
+      let minInterval: number
+      try {
+        minInterval = minCronIntervalMs(data.schedule)
+      } catch {
+        return // schedule is already invalid; its own refinement reports the error
+      }
+      if (data.timeout >= minInterval) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['timeout'],
+          message: `timeout (${ms(data.timeout)}) must be less than the schedule interval (${ms(minInterval)})`,
+        })
+      }
     }
   })
   .transform((data) => {
