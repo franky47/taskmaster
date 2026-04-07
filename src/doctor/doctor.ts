@@ -18,7 +18,9 @@ import {
   checkSchedulerInstalled,
   checkTaskFailures,
   checkTaskNeverRan,
+  checkTaskTimeouts,
   checkTaskValidation,
+  checkTimeoutContention,
 } from './checks'
 import type { Finding } from './checks'
 import { renderReport } from './report'
@@ -120,6 +122,21 @@ export async function doctor(options?: DoctorOptions): Promise<DoctorResult> {
 
       const failureFinding = checkTaskFailures(task.name, history, now)
       if (failureFinding) findings.push(failureFinding)
+
+      const timeoutFinding = checkTaskTimeouts(
+        task.name,
+        history,
+        task.timeout,
+        now,
+      )
+      if (timeoutFinding) findings.push(timeoutFinding)
+
+      const timeoutContentionFinding = checkTimeoutContention(
+        task.name,
+        task.timeout,
+        task.schedule,
+      )
+      if (timeoutContentionFinding) findings.push(timeoutContentionFinding)
 
       const neverRanFinding = checkTaskNeverRan(
         task.name,

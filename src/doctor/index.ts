@@ -5,7 +5,9 @@ export {
   checkSchedulerInstalled,
   checkTaskFailures,
   checkTaskNeverRan,
+  checkTaskTimeouts,
   checkTaskValidation,
+  checkTimeoutContention,
   formatRelativeTime,
 } from './checks'
 export type { Finding } from './checks'

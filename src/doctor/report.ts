@@ -111,6 +111,37 @@ function renderFinding(finding: Finding, platform: Platform): string {
         `  tm history ${finding.task}`,
       ].join('\n')
 
+    case 'task-timeout': {
+      const lines = [
+        `## Task timing out: ${finding.task} [${finding.severity}]`,
+        '',
+        `${finding.consecutiveTimeouts} consecutive timeout${finding.consecutiveTimeouts === 1 ? '' : 's'}`,
+        `Last timeout: ${finding.lastTimeoutTimestamp} (${finding.relativeTime})`,
+      ]
+      if (finding.timeout) {
+        lines.push(`Configured timeout: ${finding.timeout}`)
+      }
+      lines.push(
+        '',
+        'Consider increasing the timeout or investigating why the task is slow.',
+        '',
+        'Investigate:',
+        `  tm history ${finding.task} --failures --last 5`,
+      )
+      return lines.join('\n')
+    }
+
+    case 'timeout-contention':
+      return [
+        `## Timeout exceeds schedule: ${finding.task} [${finding.severity}]`,
+        '',
+        `Timeout (${finding.timeout}) meets or exceeds the schedule interval (${finding.schedule}).`,
+        'A timed-out run is guaranteed to cause contention with the next scheduled run.',
+        '',
+        'Fix:',
+        '  Increase the schedule interval or decrease the timeout.',
+      ].join('\n')
+
     case 'log-error': {
       const name =
         typeof finding.error['name'] === 'string'

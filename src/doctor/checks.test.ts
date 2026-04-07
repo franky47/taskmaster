@@ -10,7 +10,9 @@ import {
   checkSchedulerInstalled,
   checkTaskFailures,
   checkTaskNeverRan,
+  checkTaskTimeouts,
   checkTaskValidation,
+  checkTimeoutContention,
   formatRelativeTime,
 } from './checks'
 
@@ -385,6 +387,230 @@ describe('checkTaskFailures', () => {
     ]
 
     expect(checkTaskFailures('backup', history, now)).toBeNull()
+  })
+
+  test('returns null when most recent failure is a timeout', () => {
+    const history: HistoryEntry[] = [
+      makeEntry({ success: false, timed_out: true, exit_code: 124 }),
+      makeEntry({ success: false }),
+    ]
+
+    expect(checkTaskFailures('backup', history, now)).toBeNull()
+  })
+
+  test('skips timeout entries when counting consecutive failures', () => {
+    const history: HistoryEntry[] = [
+      makeEntry({
+        success: false,
+        timed_out: false,
+        exit_code: 1,
+        finished_at: '2026-04-07T11:50:00.000Z',
+      }),
+      makeEntry({ success: false, timed_out: true, exit_code: 124 }),
+      makeEntry({ success: false, timed_out: false }),
+      makeEntry({ success: true }),
+    ]
+
+    const finding = checkTaskFailures('backup', history, now)
+
+    expect(finding).toMatchObject({
+      kind: 'task-failures',
+      consecutiveFailures: 1,
+      severity: 'warning',
+    })
+  })
+})
+
+// ------------------------------------------------------------------
+// checkTaskTimeouts
+// ------------------------------------------------------------------
+
+describe('checkTaskTimeouts', () => {
+  const now = new Date('2026-04-07T12:00:00.000Z')
+
+  function makeEntry(
+    overrides: Partial<HistoryEntry> & { success: boolean },
+  ): HistoryEntry {
+    return {
+      timestamp: '2026-04-07T11-00-00',
+      started_at: '2026-04-07T11:00:00.000Z',
+      finished_at: '2026-04-07T11:00:05.000Z',
+      duration_ms: 5000,
+      exit_code: overrides.success ? 0 : 1,
+      timed_out: false,
+      stderrPath: undefined,
+      ...overrides,
+    }
+  }
+
+  test('returns null for empty history', () => {
+    expect(checkTaskTimeouts('backup', [], 30_000, now)).toBeNull()
+  })
+
+  test('returns null when most recent run succeeded', () => {
+    const history = [
+      makeEntry({ success: true }),
+      makeEntry({ success: false, timed_out: true, exit_code: 124 }),
+    ]
+    expect(checkTaskTimeouts('backup', history, 30_000, now)).toBeNull()
+  })
+
+  test('returns null when most recent failure is not a timeout', () => {
+    const history = [makeEntry({ success: false, timed_out: false })]
+    expect(checkTaskTimeouts('backup', history, 30_000, now)).toBeNull()
+  })
+
+  test('returns warning for a single timeout', () => {
+    const history = [
+      makeEntry({
+        success: false,
+        timed_out: true,
+        exit_code: 124,
+        finished_at: '2026-04-07T11:30:00.000Z',
+      }),
+      makeEntry({ success: true }),
+    ]
+
+    const finding = checkTaskTimeouts('backup', history, 30_000, now)
+
+    expect(finding).toMatchObject({
+      kind: 'task-timeout',
+      severity: 'warning',
+      task: 'backup',
+      consecutiveTimeouts: 1,
+      lastTimeoutTimestamp: '2026-04-07T11:30:00.000Z',
+      timeout: '30s',
+    })
+    expect(finding!.relativeTime).toBe('30m ago')
+  })
+
+  test('returns critical when 3+ consecutive timeouts', () => {
+    const history = [
+      makeEntry({
+        success: false,
+        timed_out: true,
+        exit_code: 124,
+        finished_at: '2026-04-07T11:55:00.000Z',
+      }),
+      makeEntry({ success: false, timed_out: true, exit_code: 124 }),
+      makeEntry({ success: false, timed_out: true, exit_code: 124 }),
+      makeEntry({ success: true }),
+    ]
+
+    const finding = checkTaskTimeouts('backup', history, 300_000, now)
+
+    expect(finding).toMatchObject({
+      kind: 'task-timeout',
+      severity: 'critical',
+      task: 'backup',
+      consecutiveTimeouts: 3,
+      timeout: '5m',
+    })
+  })
+
+  test('stops counting at non-timeout entry', () => {
+    const history = [
+      makeEntry({ success: false, timed_out: true, exit_code: 124 }),
+      makeEntry({ success: false, timed_out: true, exit_code: 124 }),
+      makeEntry({ success: false, timed_out: false, exit_code: 1 }),
+      makeEntry({ success: false, timed_out: true, exit_code: 124 }),
+    ]
+
+    const finding = checkTaskTimeouts('backup', history, 30_000, now)
+
+    expect(finding).toMatchObject({
+      consecutiveTimeouts: 2,
+      severity: 'warning',
+    })
+  })
+
+  test('includes undefined timeout display when timeoutMs not provided', () => {
+    const history = [
+      makeEntry({
+        success: false,
+        timed_out: true,
+        exit_code: 124,
+        finished_at: '2026-04-07T11:55:00.000Z',
+      }),
+    ]
+
+    const finding = checkTaskTimeouts('backup', history, undefined, now)
+
+    expect(finding).toMatchObject({
+      kind: 'task-timeout',
+      severity: 'warning',
+      timeout: undefined,
+    })
+  })
+})
+
+// ------------------------------------------------------------------
+// checkTimeoutContention
+// ------------------------------------------------------------------
+
+describe('checkTimeoutContention', () => {
+  test('returns null when timeout is undefined', () => {
+    expect(checkTimeoutContention('backup', undefined, '0 * * * *')).toBeNull()
+  })
+
+  test('returns null when timeout is less than schedule interval', () => {
+    // Schedule: every hour (3_600_000ms), timeout: 30s
+    expect(checkTimeoutContention('backup', 30_000, '0 * * * *')).toBeNull()
+  })
+
+  test('returns warning when timeout equals schedule interval', () => {
+    // Schedule: every 5 minutes (300_000ms), timeout: 5m (300_000ms)
+    const finding = checkTimeoutContention('backup', 300_000, '*/5 * * * *')
+
+    expect(finding).toMatchObject({
+      kind: 'timeout-contention',
+      severity: 'warning',
+      task: 'backup',
+      timeout: '5m',
+      schedule: '*/5 * * * *',
+    })
+  })
+
+  test('returns warning when timeout exceeds schedule interval', () => {
+    // Schedule: every 5 minutes, timeout: 10m
+    const finding = checkTimeoutContention('backup', 600_000, '*/5 * * * *')
+
+    expect(finding).toMatchObject({
+      kind: 'timeout-contention',
+      severity: 'warning',
+      task: 'backup',
+      timeout: '10m',
+      schedule: '*/5 * * * *',
+    })
+  })
+
+  test('returns null when timeout is well under interval', () => {
+    // Schedule: daily at midnight, timeout: 1h
+    expect(checkTimeoutContention('backup', 3_600_000, '0 0 * * *')).toBeNull()
+  })
+
+  test('uses minimum gap for non-uniform schedules', () => {
+    // Schedule: 9am and 5pm daily — minimum gap is 8h (9am→5pm)
+    // Timeout: 10h exceeds the 8h minimum gap
+    const finding = checkTimeoutContention(
+      'backup',
+      10 * 3_600_000,
+      '0 9,17 * * *',
+    )
+
+    expect(finding).toMatchObject({
+      kind: 'timeout-contention',
+      severity: 'warning',
+      task: 'backup',
+    })
+  })
+
+  test('returns null for non-uniform schedule when timeout under minimum gap', () => {
+    // Schedule: 9am and 5pm daily — minimum gap is 8h
+    // Timeout: 7h is under the 8h minimum gap
+    expect(
+      checkTimeoutContention('backup', 7 * 3_600_000, '0 9,17 * * *'),
+    ).toBeNull()
   })
 })
 

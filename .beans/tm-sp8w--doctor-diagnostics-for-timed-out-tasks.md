@@ -1,10 +1,11 @@
 ---
 # tm-sp8w
 title: Doctor diagnostics for timed-out tasks
-status: todo
+status: completed
 type: task
+priority: normal
 created_at: 2026-04-07T12:29:38Z
-updated_at: 2026-04-07T12:29:38Z
+updated_at: 2026-04-07T19:30:40Z
 parent: tm-7fv4
 blocked_by:
     - tm-lzk7
@@ -27,11 +28,11 @@ This issue depends on both the timeout feature (for the `timed_out` history fiel
 
 ## Acceptance criteria
 
-- [ ] Doctor's failure checks distinguish timeout failures from regular failures
-- [ ] Timeout-specific findings include the configured timeout value and actionable advice
-- [ ] Timeout + contention correlation is detected when timeout >= schedule interval
-- [ ] Tests: doctor reports timeout-specific findings for timed-out task history
-- [ ] Tests: doctor correlates timeout with contention when intervals overlap
+- [x] Doctor's failure checks distinguish timeout failures from regular failures
+- [x] Timeout-specific findings include the configured timeout value and actionable advice
+- [x] Timeout + contention correlation is detected when timeout >= schedule interval
+- [x] Tests: doctor reports timeout-specific findings for timed-out task history
+- [x] Tests: doctor correlates timeout with contention when intervals overlap
 
 ## User stories addressed
 

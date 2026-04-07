@@ -226,6 +226,85 @@ describe('renderReport', () => {
     expect(report).not.toContain('executions')
   })
 
+  // -- Task timeout findings --
+
+  test('renders task-timeout finding with consecutive count and timeout value', () => {
+    const findings: Finding[] = [
+      {
+        kind: 'task-timeout',
+        severity: 'critical',
+        task: 'backup',
+        consecutiveTimeouts: 3,
+        lastTimeoutTimestamp: '2026-04-07T11:55:00.000Z',
+        relativeTime: '5m ago',
+        timeout: '30s',
+      },
+    ]
+
+    const report = renderReport(findings, checkedAt, 'darwin')
+    expect(report).toContain('## Task timing out: backup [critical]')
+    expect(report).toContain('3 consecutive timeouts')
+    expect(report).toContain('2026-04-07T11:55:00.000Z')
+    expect(report).toContain('5m ago')
+    expect(report).toContain('Configured timeout: 30s')
+    expect(report).toContain('tm history backup --failures --last 5')
+  })
+
+  test('renders task-timeout with singular form for 1 timeout', () => {
+    const findings: Finding[] = [
+      {
+        kind: 'task-timeout',
+        severity: 'warning',
+        task: 'sync',
+        consecutiveTimeouts: 1,
+        lastTimeoutTimestamp: '2026-04-07T11:30:00.000Z',
+        relativeTime: '30m ago',
+        timeout: '5m',
+      },
+    ]
+
+    const report = renderReport(findings, checkedAt, 'darwin')
+    expect(report).toContain('1 consecutive timeout')
+    expect(report).not.toContain('timeouts')
+  })
+
+  test('renders task-timeout without configured timeout when undefined', () => {
+    const findings: Finding[] = [
+      {
+        kind: 'task-timeout',
+        severity: 'warning',
+        task: 'sync',
+        consecutiveTimeouts: 1,
+        lastTimeoutTimestamp: '2026-04-07T11:30:00.000Z',
+        relativeTime: '30m ago',
+        timeout: undefined,
+      },
+    ]
+
+    const report = renderReport(findings, checkedAt, 'darwin')
+    expect(report).not.toContain('Configured timeout')
+  })
+
+  // -- Timeout contention findings --
+
+  test('renders timeout-contention finding', () => {
+    const findings: Finding[] = [
+      {
+        kind: 'timeout-contention',
+        severity: 'warning',
+        task: 'backup',
+        timeout: '10m',
+        schedule: '*/5 * * * *',
+      },
+    ]
+
+    const report = renderReport(findings, checkedAt, 'darwin')
+    expect(report).toContain('## Timeout exceeds schedule: backup [warning]')
+    expect(report).toContain('10m')
+    expect(report).toContain('*/5 * * * *')
+    expect(report).toContain('guaranteed to cause contention')
+  })
+
   // -- Log error findings --
 
   test('renders log-error finding with timestamp and error details', () => {

@@ -232,4 +232,60 @@ describe('doctor', () => {
     const result = await doctor({ now, deps })
     expect(result.ok).toBe(true)
   })
+
+  test('reports task timeouts separately from regular failures', async () => {
+    const deps = healthyDeps()
+    deps.queryHistory = async () => [
+      {
+        timestamp: '2026-04-07T11.00.00Z',
+        started_at: '2026-04-07T11:00:00.000Z',
+        finished_at: '2026-04-07T11:00:30.000Z',
+        duration_ms: 30_000,
+        exit_code: 124,
+        success: false,
+        timed_out: true,
+        stderrPath: undefined,
+      },
+    ]
+    deps.listTasks = async () => [
+      { name: 'backup', schedule: '0 * * * *', enabled: true, timeout: 30_000 },
+    ]
+    const result = await doctor({ now, deps })
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.report).toContain('Task timing out: backup')
+      expect(result.report).not.toContain('Task failing: backup')
+    }
+  })
+
+  test('reports timeout contention when timeout >= schedule interval', async () => {
+    const deps = healthyDeps()
+    deps.listTasks = async () => [
+      {
+        name: 'backup',
+        schedule: '*/5 * * * *',
+        enabled: true,
+        timeout: 600_000,
+      },
+    ]
+    const result = await doctor({ now, deps })
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.report).toContain('Timeout exceeds schedule: backup')
+    }
+  })
+
+  test('does not report timeout contention when timeout < schedule interval', async () => {
+    const deps = healthyDeps()
+    deps.listTasks = async () => [
+      {
+        name: 'backup',
+        schedule: '0 * * * *',
+        enabled: true,
+        timeout: 30_000,
+      },
+    ]
+    const result = await doctor({ now, deps })
+    expect(result.ok).toBe(true)
+  })
 })

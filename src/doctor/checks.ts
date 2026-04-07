@@ -1,5 +1,8 @@
 import path from 'node:path'
 
+import { CronExpressionParser } from 'cron-parser'
+import ms from 'ms'
+
 import type { HistoryEntry } from '../history'
 import type { LogEntry } from '../logger'
 import type { ValidationResult } from '../validate'
@@ -64,6 +67,24 @@ type ContentionFinding = {
   eventCount: number
 }
 
+type TaskTimeoutFinding = {
+  kind: 'task-timeout'
+  severity: 'critical' | 'warning'
+  task: string
+  consecutiveTimeouts: number
+  lastTimeoutTimestamp: string
+  relativeTime: string
+  timeout: string | undefined
+}
+
+type TimeoutContentionFinding = {
+  kind: 'timeout-contention'
+  severity: 'warning'
+  task: string
+  timeout: string
+  schedule: string
+}
+
 export type Finding =
   | LogErrorFinding
   | HeartbeatStaleFinding
@@ -73,6 +94,8 @@ export type Finding =
   | TaskValidationFinding
   | TaskNeverRanFinding
   | ContentionFinding
+  | TaskTimeoutFinding
+  | TimeoutContentionFinding
 
 // Helpers --
 
@@ -148,11 +171,11 @@ export function checkTaskFailures(
   now: Date,
 ): TaskFailureFinding | null {
   const first = history[0]
-  if (first === undefined || first.success) return null
+  if (first === undefined || first.success || first.timed_out) return null
 
   let consecutiveFailures = 0
   for (const entry of history) {
-    if (entry.success) break
+    if (entry.success || entry.timed_out) break
     consecutiveFailures++
   }
 
@@ -171,6 +194,70 @@ export function checkTaskFailures(
     exitCode: first.exit_code,
     stderrPath: first.stderrPath,
     runDir: first.stderrPath ? path.dirname(first.stderrPath) : undefined,
+  }
+}
+
+export function checkTaskTimeouts(
+  taskName: string,
+  history: HistoryEntry[],
+  timeoutMs: number | undefined,
+  now: Date,
+): TaskTimeoutFinding | null {
+  const first = history[0]
+  if (first === undefined || first.success || !first.timed_out) return null
+
+  let consecutiveTimeouts = 0
+  for (const entry of history) {
+    if (!entry.timed_out) break
+    consecutiveTimeouts++
+  }
+
+  const lastTimeoutTime = new Date(first.finished_at)
+
+  return {
+    kind: 'task-timeout',
+    severity:
+      consecutiveTimeouts >= CRITICAL_FAILURE_THRESHOLD
+        ? 'critical'
+        : 'warning',
+    task: taskName,
+    consecutiveTimeouts,
+    lastTimeoutTimestamp: first.finished_at,
+    relativeTime: formatRelativeTime(lastTimeoutTime, now),
+    timeout: timeoutMs !== undefined ? ms(timeoutMs) : undefined,
+  }
+}
+
+export function checkTimeoutContention(
+  taskName: string,
+  timeoutMs: number | undefined,
+  schedule: string,
+): TimeoutContentionFinding | null {
+  if (timeoutMs === undefined) return null
+
+  // Find the minimum gap across a full week of cron ticks to handle
+  // non-uniform schedules like "0 9,17 * * *" (8h and 16h gaps).
+  const expr = CronExpressionParser.parse(schedule)
+  let prev = expr.next().toDate().getTime()
+  let minInterval = Infinity
+  const oneWeekMs = 7 * 24 * 60 * 60_000
+  const horizon = prev + oneWeekMs
+  while (true) {
+    const next = expr.next().toDate().getTime()
+    const gap = next - prev
+    if (gap < minInterval) minInterval = gap
+    prev = next
+    if (prev >= horizon) break
+  }
+
+  if (timeoutMs < minInterval) return null
+
+  return {
+    kind: 'timeout-contention',
+    severity: 'warning',
+    task: taskName,
+    timeout: ms(timeoutMs),
+    schedule,
   }
 }
 
