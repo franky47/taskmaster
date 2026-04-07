@@ -1,11 +1,11 @@
 ---
 # tm-g12o
 title: Task validation, never-ran, and contention checks
-status: todo
+status: completed
 type: task
 priority: high
 created_at: 2026-04-07T12:13:55Z
-updated_at: 2026-04-07T12:13:55Z
+updated_at: 2026-04-07T13:15:42Z
 parent: tm-py4h
 ---
 
@@ -23,14 +23,14 @@ All three are pure functions in `doctor/checks.ts` — no I/O. They extend the `
 
 ## Acceptance criteria
 
-- [ ] `checkTaskValidation` returns error finding per invalid task with error messages
-- [ ] `checkTaskValidation` returns empty array for all-valid tasks
-- [ ] `checkTaskNeverRan` returns warning for enabled task with zero history
-- [ ] `checkTaskNeverRan` returns null for disabled tasks
-- [ ] `checkTaskNeverRan` returns null for tasks with history
-- [ ] `checkContention` returns warning with event count when contention events exist
-- [ ] `checkContention` returns null when no contention events for that task
-- [ ] All tested with synthetic inputs
+- [x] `checkTaskValidation` returns error finding per invalid task with error messages
+- [x] `checkTaskValidation` returns empty array for all-valid tasks
+- [x] `checkTaskNeverRan` returns warning for enabled task with zero history
+- [x] `checkTaskNeverRan` returns null for disabled tasks
+- [x] `checkTaskNeverRan` returns null for tasks with history
+- [x] `checkContention` returns warning with event count when contention events exist
+- [x] `checkContention` returns null when no contention events for that task
+- [x] All tested with synthetic inputs
 
 ## User stories addressed
 

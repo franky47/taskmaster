@@ -2,11 +2,15 @@ import { describe, expect, test } from 'bun:test'
 
 import type { HistoryEntry } from '../history'
 import type { LogEntry } from '../logger'
+import type { ValidationResult } from '../validate'
 import {
+  checkContention,
   checkHeartbeat,
   checkLogErrors,
   checkSchedulerInstalled,
   checkTaskFailures,
+  checkTaskNeverRan,
+  checkTaskValidation,
   formatRelativeTime,
 } from './checks'
 
@@ -380,5 +384,176 @@ describe('checkTaskFailures', () => {
     ]
 
     expect(checkTaskFailures('backup', history, now)).toBeNull()
+  })
+})
+
+// ------------------------------------------------------------------
+// checkTaskValidation
+// ------------------------------------------------------------------
+
+describe('checkTaskValidation', () => {
+  test('returns error finding per invalid task with error messages', () => {
+    const results: ValidationResult[] = [
+      { name: 'backup', valid: false, errors: ['schedule: invalid cron'] },
+      {
+        name: 'sync',
+        valid: false,
+        errors: ['agent: required', 'schedule: required'],
+      },
+    ]
+
+    const findings = checkTaskValidation(results)
+
+    expect(findings).toHaveLength(2)
+    expect(findings[0]).toMatchObject({
+      kind: 'task-validation',
+      severity: 'error',
+      task: 'backup',
+      errors: ['schedule: invalid cron'],
+    })
+    expect(findings[1]).toMatchObject({
+      kind: 'task-validation',
+      severity: 'error',
+      task: 'sync',
+      errors: ['agent: required', 'schedule: required'],
+    })
+  })
+
+  test('returns empty array for all-valid tasks', () => {
+    const results: ValidationResult[] = [
+      { name: 'backup', valid: true },
+      { name: 'sync', valid: true },
+    ]
+
+    expect(checkTaskValidation(results)).toHaveLength(0)
+  })
+
+  test('returns empty array for empty input', () => {
+    expect(checkTaskValidation([])).toHaveLength(0)
+  })
+
+  test('filters to only invalid tasks in mixed input', () => {
+    const results: ValidationResult[] = [
+      { name: 'backup', valid: true },
+      { name: 'sync', valid: false, errors: ['schedule: required'] },
+      { name: 'deploy', valid: true },
+    ]
+
+    const findings = checkTaskValidation(results)
+
+    expect(findings).toHaveLength(1)
+    expect(findings[0]).toMatchObject({
+      kind: 'task-validation',
+      task: 'sync',
+    })
+  })
+})
+
+// ------------------------------------------------------------------
+// checkTaskNeverRan
+// ------------------------------------------------------------------
+
+describe('checkTaskNeverRan', () => {
+  test('returns warning for enabled task with zero history', () => {
+    const finding = checkTaskNeverRan('backup', true, 0)
+
+    expect(finding).toMatchObject({
+      kind: 'task-never-ran',
+      severity: 'warning',
+      task: 'backup',
+    })
+  })
+
+  test('returns null for disabled tasks', () => {
+    expect(checkTaskNeverRan('backup', false, 0)).toBeNull()
+  })
+
+  test('returns null for tasks with history', () => {
+    expect(checkTaskNeverRan('backup', true, 3)).toBeNull()
+  })
+
+  test('returns null for disabled tasks even with zero history', () => {
+    expect(checkTaskNeverRan('backup', false, 0)).toBeNull()
+  })
+})
+
+// ------------------------------------------------------------------
+// checkContention
+// ------------------------------------------------------------------
+
+describe('checkContention', () => {
+  test('returns warning with event count when contention events exist', () => {
+    const entries: LogEntry[] = [
+      {
+        ts: '2026-04-07T10:00:00.000Z',
+        event: 'skipped',
+        task: 'backup',
+        reason: 'contention',
+      },
+      {
+        ts: '2026-04-07T10:05:00.000Z',
+        event: 'skipped',
+        task: 'backup',
+        reason: 'contention',
+      },
+      {
+        ts: '2026-04-07T10:10:00.000Z',
+        event: 'skipped',
+        task: 'backup',
+        reason: 'contention',
+      },
+    ]
+
+    const finding = checkContention('backup', entries)
+
+    expect(finding).toMatchObject({
+      kind: 'contention',
+      severity: 'warning',
+      task: 'backup',
+      eventCount: 3,
+    })
+  })
+
+  test('returns null when entries contain no contention events', () => {
+    const entries: LogEntry[] = [
+      {
+        ts: '2026-04-07T10:00:00.000Z',
+        event: 'started',
+        task: 'backup',
+        trigger: 'tick',
+      },
+      {
+        ts: '2026-04-07T10:05:00.000Z',
+        event: 'error',
+        task: 'backup',
+        error: { name: 'RunError', message: 'failed' },
+      },
+    ]
+
+    expect(checkContention('backup', entries)).toBeNull()
+  })
+
+  test('returns null for empty entries', () => {
+    expect(checkContention('backup', [])).toBeNull()
+  })
+
+  test('returns warning with count of 1 for single contention event', () => {
+    const entries: LogEntry[] = [
+      {
+        ts: '2026-04-07T10:00:00.000Z',
+        event: 'skipped',
+        task: 'backup',
+        reason: 'contention',
+      },
+    ]
+
+    const finding = checkContention('backup', entries)
+
+    expect(finding).toMatchObject({
+      kind: 'contention',
+      severity: 'warning',
+      task: 'backup',
+      eventCount: 1,
+    })
   })
 })

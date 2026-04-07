@@ -2,6 +2,7 @@ import path from 'node:path'
 
 import type { HistoryEntry } from '../history'
 import type { LogEntry } from '../logger'
+import type { ValidationResult } from '../validate'
 
 // Finding types --
 
@@ -43,12 +44,35 @@ type TaskFailureFinding = {
   runDir: string | undefined
 }
 
+type TaskValidationFinding = {
+  kind: 'task-validation'
+  severity: 'error'
+  task: string
+  errors: string[]
+}
+
+type TaskNeverRanFinding = {
+  kind: 'task-never-ran'
+  severity: 'warning'
+  task: string
+}
+
+type ContentionFinding = {
+  kind: 'contention'
+  severity: 'warning'
+  task: string
+  eventCount: number
+}
+
 export type Finding =
   | LogErrorFinding
   | HeartbeatStaleFinding
   | HeartbeatMissingFinding
   | SchedulerNotInstalledFinding
   | TaskFailureFinding
+  | TaskValidationFinding
+  | TaskNeverRanFinding
+  | ContentionFinding
 
 // Helpers --
 
@@ -147,5 +171,50 @@ export function checkTaskFailures(
     exitCode: first.exit_code,
     stderrPath: first.stderrPath,
     runDir: first.stderrPath ? path.dirname(first.stderrPath) : undefined,
+  }
+}
+
+export function checkTaskValidation(
+  results: ValidationResult[],
+): TaskValidationFinding[] {
+  const findings: TaskValidationFinding[] = []
+  for (const result of results) {
+    if (!result.valid) {
+      findings.push({
+        kind: 'task-validation',
+        severity: 'error',
+        task: result.name,
+        errors: result.errors,
+      })
+    }
+  }
+  return findings
+}
+
+export function checkTaskNeverRan(
+  taskName: string,
+  enabled: boolean,
+  historyLength: number,
+): TaskNeverRanFinding | null {
+  if (!enabled || historyLength > 0) return null
+  return { kind: 'task-never-ran', severity: 'warning', task: taskName }
+}
+
+export function checkContention(
+  taskName: string,
+  entries: LogEntry[],
+): ContentionFinding | null {
+  let count = 0
+  for (const entry of entries) {
+    if (entry.event === 'skipped' && entry.reason === 'contention') {
+      count++
+    }
+  }
+  if (count === 0) return null
+  return {
+    kind: 'contention',
+    severity: 'warning',
+    task: taskName,
+    eventCount: count,
   }
 }
