@@ -76,9 +76,9 @@ describe('checkLogErrors', () => {
 describe('formatRelativeTime', () => {
   const base = new Date('2026-04-07T12:00:00.000Z')
 
-  test('returns "just now" for < 1 minute', () => {
+  test('returns "now" for < 1 minute', () => {
     const from = new Date(base.getTime() - 30_000) // 30s ago
-    expect(formatRelativeTime(from, base)).toBe('just now')
+    expect(formatRelativeTime(from, base)).toBe('now')
   })
 
   test('returns minutes for < 1 hour', () => {
@@ -86,19 +86,19 @@ describe('formatRelativeTime', () => {
     expect(formatRelativeTime(from, base)).toBe('25m ago')
   })
 
-  test('returns hours and minutes for < 1 day', () => {
+  test('uses largest unit for hours range', () => {
     const from = new Date(base.getTime() - (3 * 3600_000 + 37 * 60_000)) // 3h 37m
-    expect(formatRelativeTime(from, base)).toBe('3h 37m ago')
+    expect(formatRelativeTime(from, base)).toBe('3h ago')
   })
 
-  test('returns hours without minutes when minutes are 0', () => {
+  test('returns exact hours', () => {
     const from = new Date(base.getTime() - 2 * 3600_000) // exactly 2h
-    expect(formatRelativeTime(from, base)).toBe('2h 0m ago')
+    expect(formatRelativeTime(from, base)).toBe('2h ago')
   })
 
-  test('returns days and hours for >= 1 day', () => {
+  test('uses largest unit for days range', () => {
     const from = new Date(base.getTime() - (2 * 86400_000 + 5 * 3600_000)) // 2d 5h
-    expect(formatRelativeTime(from, base)).toBe('2d 5h ago')
+    expect(formatRelativeTime(from, base)).toBe('2d ago')
   })
 
   test('returns "1m ago" at exactly 1 minute', () => {
@@ -106,14 +106,14 @@ describe('formatRelativeTime', () => {
     expect(formatRelativeTime(from, base)).toBe('1m ago')
   })
 
-  test('returns "1h 0m ago" at exactly 1 hour', () => {
+  test('returns "1h ago" at exactly 1 hour', () => {
     const from = new Date(base.getTime() - 3600_000)
-    expect(formatRelativeTime(from, base)).toBe('1h 0m ago')
+    expect(formatRelativeTime(from, base)).toBe('1h ago')
   })
 
-  test('returns "1d 0h ago" at exactly 1 day', () => {
+  test('returns "yesterday" at exactly 1 day', () => {
     const from = new Date(base.getTime() - 86400_000)
-    expect(formatRelativeTime(from, base)).toBe('1d 0h ago')
+    expect(formatRelativeTime(from, base)).toBe('yesterday')
   })
 })
 
@@ -142,7 +142,7 @@ describe('checkHeartbeat', () => {
       kind: 'heartbeat-stale',
       severity: 'critical',
       heartbeatTime: heartbeat.toISOString(),
-      relativeTime: '6m ago',
+      relativeTime: '6m ago', // Intl narrow format
     })
   })
 
@@ -154,7 +154,7 @@ describe('checkHeartbeat', () => {
       kind: 'heartbeat-stale',
       severity: 'critical',
       heartbeatTime: heartbeat.toISOString(),
-      relativeTime: '3h 37m ago',
+      relativeTime: '3h ago',
     })
   })
 

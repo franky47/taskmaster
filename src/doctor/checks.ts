@@ -36,16 +36,21 @@ export type Finding =
 
 // Helpers --
 
+const rtf = new Intl.RelativeTimeFormat('en', {
+  style: 'narrow',
+  numeric: 'auto',
+})
+
 export function formatRelativeTime(from: Date, to: Date): string {
   const diffMs = to.getTime() - from.getTime()
   const totalMinutes = Math.floor(diffMs / 60_000)
   const totalHours = Math.floor(totalMinutes / 60)
   const totalDays = Math.floor(totalHours / 24)
 
-  if (totalMinutes < 1) return 'just now'
-  if (totalHours < 1) return `${totalMinutes}m ago`
-  if (totalDays < 1) return `${totalHours}h ${totalMinutes % 60}m ago`
-  return `${totalDays}d ${totalHours % 24}h ago`
+  if (totalDays >= 1) return rtf.format(-totalDays, 'day')
+  if (totalHours >= 1) return rtf.format(-totalHours, 'hour')
+  if (totalMinutes >= 1) return rtf.format(-totalMinutes, 'minute')
+  return rtf.format(0, 'second')
 }
 
 // Check functions --
