@@ -275,4 +275,43 @@ describe('getTaskStatuses', () => {
     expect(first.enabled).toBe(true)
     expect(first.next_run).toBe('2026-04-06T12:00:00.000Z')
   })
+
+  test('includes timeout when task has one set', async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(
+      configDir,
+      'timed-task',
+      `---
+schedule: '0 8 * * *'
+agent: opencode
+timeout: '5m'
+---
+
+Task with timeout.
+`,
+    )
+
+    const result = await getTaskStatuses({ configDir, now: NOW })
+    expect(result).not.toBeInstanceOf(Error)
+    if (result instanceof Error) return
+
+    const first = result[0]
+    expect(first).toBeDefined()
+    if (!first) return
+    expect(first.timeout).toBe('5m')
+  })
+
+  test('omits timeout when task does not have one', async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(configDir, 'no-timeout', ENABLED_TASK)
+
+    const result = await getTaskStatuses({ configDir, now: NOW })
+    expect(result).not.toBeInstanceOf(Error)
+    if (result instanceof Error) return
+
+    const first = result[0]
+    expect(first).toBeDefined()
+    if (!first) return
+    expect(first).not.toHaveProperty('timeout')
+  })
 })

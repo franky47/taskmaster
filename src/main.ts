@@ -223,6 +223,9 @@ async function main(): Promise<void> {
           console.log(task.name)
           console.log(`  schedule  ${task.schedule}`)
           console.log(`  enabled   ${task.enabled}`)
+          if (task.timeout) {
+            console.log(`  timeout   ${task.timeout}`)
+          }
           if (task.last_run) {
             console.log(
               `  last_run  ${task.last_run.timestamp} ${task.last_run.status} ${task.last_run.duration_ms}ms`,

@@ -1,6 +1,7 @@
 import path from 'node:path'
 
 import { CronExpressionParser } from 'cron-parser'
+import ms from 'ms'
 
 import { configDir as defaultConfigDir } from '../config'
 import { queryHistory } from '../history'
@@ -21,6 +22,7 @@ export type TaskStatus = {
   schedule: string
   enabled: boolean
   timezone?: string
+  timeout?: string
   last_run?: LastRun
   next_run?: string
 }
@@ -53,6 +55,10 @@ export async function getTaskStatuses(
 
     if (task.timezone) {
       status.timezone = task.timezone
+    }
+
+    if (task.timeout) {
+      status.timeout = ms(task.timeout)
     }
 
     // Last run
