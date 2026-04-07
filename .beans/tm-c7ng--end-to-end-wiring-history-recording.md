@@ -1,11 +1,11 @@
 ---
 # tm-c7ng
 title: End-to-end wiring + history recording
-status: in-progress
+status: completed
 type: task
 priority: normal
 created_at: 2026-04-07T12:29:19Z
-updated_at: 2026-04-07T17:25:52Z
+updated_at: 2026-04-07T19:14:29Z
 parent: tm-7fv4
 blocked_by:
     - tm-lzk7
