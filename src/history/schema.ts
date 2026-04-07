@@ -7,6 +7,7 @@ export const historyMetaSchema = z.object({
   duration_ms: z.number(),
   exit_code: z.number(),
   success: z.boolean(),
+  timed_out: z.boolean().default(false),
 })
 
 export type HistoryMeta = z.infer<typeof historyMetaSchema>

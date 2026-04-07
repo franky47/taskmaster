@@ -24,6 +24,7 @@ function makeInput(
     stderr: '',
     prompt: 'Run the audit.',
     cwd: { path: '/tmp/fake', isTemp: false },
+    timedOut: false,
     ...overrides,
   }
 }
@@ -210,6 +211,42 @@ describe('recordHistory', () => {
     expect(await fs.readFile(path.join(cwdDir, 'keep.txt'), 'utf-8')).toBe(
       'keep me',
     )
+  })
+
+  test('timed-out run records timed_out: true and exit_code: 124', async () => {
+    const configDir = await makeConfigDir()
+    const input = makeInput(configDir, { exitCode: 124, timedOut: true })
+
+    await recordHistory(input, { configDir })
+
+    const metaPath = path.join(
+      configDir,
+      'history',
+      'daily-audit',
+      '2026-04-04T08.30.00Z.meta.json',
+    )
+    const meta = JSON.parse(await fs.readFile(metaPath, 'utf-8'))
+    expect(meta.timed_out).toBe(true)
+    expect(meta.exit_code).toBe(124)
+    expect(meta.success).toBe(false)
+  })
+
+  test('non-timed-out run records timed_out: false', async () => {
+    const configDir = await makeConfigDir()
+    const input = makeInput(configDir, { exitCode: 0 })
+
+    await recordHistory(input, { configDir })
+
+    const metaPath = path.join(
+      configDir,
+      'history',
+      'daily-audit',
+      '2026-04-04T08.30.00Z.meta.json',
+    )
+    const meta = JSON.parse(await fs.readFile(metaPath, 'utf-8'))
+    expect(meta.timed_out).toBe(false)
+    expect(meta.exit_code).toBe(0)
+    expect(meta.success).toBe(true)
   })
 
   test('returns HistoryWriteError on filesystem failure', async () => {

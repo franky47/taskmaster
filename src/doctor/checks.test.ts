@@ -221,6 +221,7 @@ describe('checkTaskFailures', () => {
       finished_at: '2026-04-07T11:00:05.000Z',
       duration_ms: 5000,
       exit_code: overrides.success ? 0 : 1,
+      timed_out: false,
       stderrPath: '/history/backup/2026-04-07T11-00-00.stderr.txt',
       ...overrides,
     }

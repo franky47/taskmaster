@@ -503,6 +503,84 @@ describe('executeTask', () => {
     if (result instanceof Error) throw result
     expect(result.prompt).toBe('Do the thing.')
   })
+
+  test('passes timeout from frontmatter to spawnAgent', async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(
+      configDir,
+      'timeout-task',
+      '---\nschedule: "0 * * * *"\nagent: opencode\ntimeout: "30s"\n---\nGo',
+    )
+
+    let receivedTimeoutMs: number | undefined
+    await executeTask('timeout-task', {
+      configDir,
+      deps: {
+        spawnAgent: async (opts) => {
+          receivedTimeoutMs = opts.timeoutMs
+          return { exitCode: 0, stdout: '', stderr: '', timedOut: false }
+        },
+      },
+    })
+
+    expect(receivedTimeoutMs).toBe(30_000)
+  })
+
+  test('does not pass timeout when frontmatter omits it', async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(
+      configDir,
+      'no-timeout',
+      '---\nschedule: "0 * * * *"\nagent: opencode\n---\nGo',
+    )
+
+    let receivedTimeoutMs: number | undefined = 999
+    await executeTask('no-timeout', {
+      configDir,
+      deps: {
+        spawnAgent: async (opts) => {
+          receivedTimeoutMs = opts.timeoutMs
+          return { exitCode: 0, stdout: '', stderr: '', timedOut: false }
+        },
+      },
+    })
+
+    expect(receivedTimeoutMs).toBeUndefined()
+  })
+
+  test('threads timedOut from spawnAgent into RunResult', async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(
+      configDir,
+      'timed-out',
+      '---\nschedule: "0 * * * *"\nagent: opencode\ntimeout: "5s"\n---\nGo',
+    )
+
+    const result = await executeTask('timed-out', {
+      configDir,
+      deps: { spawnAgent: fakeSpawn({ timedOut: true, exitCode: 1 }) },
+    })
+
+    if (result instanceof Error) throw result
+    expect(result.timedOut).toBe(true)
+  })
+
+  test('timedOut is false for normal completion', async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(
+      configDir,
+      'normal',
+      '---\nschedule: "0 * * * *"\nagent: opencode\n---\nGo',
+    )
+
+    const result = await executeTask('normal', {
+      configDir,
+      deps: { spawnAgent: fakeSpawn() },
+    })
+
+    if (result instanceof Error) throw result
+    expect(result.timedOut).toBe(false)
+  })
 })
 
 describe('runTask', () => {

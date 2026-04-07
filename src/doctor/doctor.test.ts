@@ -22,6 +22,7 @@ function healthyDeps(): DoctorDeps {
         duration_ms: 5000,
         exit_code: 0,
         success: true,
+        timed_out: false,
         stderrPath: undefined,
       },
     ],
@@ -76,6 +77,7 @@ describe('doctor', () => {
         duration_ms: 5000,
         exit_code: 1,
         success: false,
+        timed_out: false,
         stderrPath: '/tmp/stderr.txt',
       },
     ]

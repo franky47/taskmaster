@@ -23,6 +23,7 @@ export type RecordHistoryInput = {
   stderr: string
   prompt: string
   cwd: { path: string; isTemp: boolean }
+  timedOut: boolean
 }
 
 type RecordHistoryDeps = {
@@ -61,6 +62,7 @@ export async function recordHistory(
     stderr,
     prompt,
     cwd,
+    timedOut,
   } = input
   const success = exitCode === 0
   const cfgDir = deps?.configDir ?? defaultConfigDir
@@ -77,6 +79,7 @@ export async function recordHistory(
       duration_ms: finishedAt.getTime() - startedAt.getTime(),
       exit_code: exitCode,
       success,
+      timed_out: timedOut,
     }
 
     await fs.writeFile(

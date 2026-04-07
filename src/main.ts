@@ -69,17 +69,20 @@ async function main(): Promise<void> {
           process.exit(1)
         }
 
+        const exitCode = result.timedOut ? 124 : result.exitCode
+
         // Record history (non-fatal)
         const recordErr = await recordHistory({
           taskName: name,
           timestamp,
           startedAt: result.startedAt,
           finishedAt: result.finishedAt,
-          exitCode: result.exitCode,
+          exitCode,
           stdout: result.stdout,
           stderr: result.stderr,
           prompt: result.prompt,
           cwd: result.cwd,
+          timedOut: result.timedOut,
         })
         if (recordErr instanceof Error) {
           console.error(recordErr.message)
@@ -89,7 +92,8 @@ async function main(): Promise<void> {
           console.log(
             JSON.stringify({
               skipped: false,
-              exitCode: result.exitCode,
+              exitCode,
+              timedOut: result.timedOut,
               duration_ms:
                 result.finishedAt.getTime() - result.startedAt.getTime(),
             }),
@@ -102,7 +106,7 @@ async function main(): Promise<void> {
             process.stderr.write(result.stderr)
           }
         }
-        process.exit(result.exitCode)
+        process.exit(exitCode)
       },
     )
 
@@ -196,7 +200,12 @@ async function main(): Promise<void> {
             console.log(entry.timestamp)
             console.log(`  duration  ${entry.duration_ms}ms`)
             console.log(`  exit_code ${entry.exit_code}`)
-            console.log(`  status    ${entry.success ? 'ok' : 'err'}`)
+            const status = entry.success
+              ? 'ok'
+              : entry.timed_out
+                ? 'timeout'
+                : 'err'
+            console.log(`  status    ${status}`)
             if (entry.stderrPath) {
               console.log(`  stderr    ${entry.stderrPath}`)
             }

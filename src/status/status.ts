@@ -12,7 +12,7 @@ import type { TasksDirReadError } from '../validate'
 
 type LastRun = {
   timestamp: string
-  status: 'ok' | 'err'
+  status: 'ok' | 'timeout' | 'err'
   exit_code: number
   duration_ms: number
 }
@@ -71,7 +71,7 @@ export async function getTaskStatuses(
       if (latest) {
         status.last_run = {
           timestamp: latest.started_at,
-          status: latest.success ? 'ok' : 'err',
+          status: latest.success ? 'ok' : latest.timed_out ? 'timeout' : 'err',
           exit_code: latest.exit_code,
           duration_ms: latest.duration_ms,
         }

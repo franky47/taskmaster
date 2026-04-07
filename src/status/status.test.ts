@@ -29,6 +29,7 @@ async function writeMeta(
     duration_ms: number
     exit_code: number
     success: boolean
+    timed_out: boolean
   }> = {},
 ): Promise<void> {
   const histDir = path.join(configDir, 'history', taskName)
@@ -299,6 +300,31 @@ Task with timeout.
     expect(first).toBeDefined()
     if (!first) return
     expect(first.timeout).toBe('5m')
+  })
+
+  test('includes last_run with timeout status for timed-out history', async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(configDir, 'my-task', ENABLED_TASK)
+    await writeMeta(configDir, 'my-task', '2026-04-04T08.00.00Z', {
+      duration_ms: 30000,
+      exit_code: 124,
+      success: false,
+      timed_out: true,
+    })
+
+    const result = await getTaskStatuses({ configDir, now: NOW })
+    expect(result).not.toBeInstanceOf(Error)
+    if (result instanceof Error) return
+
+    const first = result[0]
+    expect(first).toBeDefined()
+    if (!first) return
+    expect(first.last_run).toEqual({
+      timestamp: '2026-04-04T08:00:00.000Z',
+      status: 'timeout',
+      exit_code: 124,
+      duration_ms: 30000,
+    })
   })
 
   test('omits timeout when task does not have one', async () => {

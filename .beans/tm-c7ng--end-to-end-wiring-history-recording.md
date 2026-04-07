@@ -1,10 +1,11 @@
 ---
 # tm-c7ng
 title: End-to-end wiring + history recording
-status: todo
+status: in-progress
 type: task
+priority: normal
 created_at: 2026-04-07T12:29:19Z
-updated_at: 2026-04-07T12:29:19Z
+updated_at: 2026-04-07T17:25:52Z
 parent: tm-7fv4
 blocked_by:
     - tm-lzk7
@@ -19,15 +20,15 @@ Add `timed_out` boolean field to the history metadata schema (defaulting to `fal
 
 ## Acceptance criteria
 
-- [ ] `RunResult` gains `timedOut: boolean`
-- [ ] `executeTask` threads `task.timeout` into spawn opts and `timedOut` into the result
-- [ ] `timed_out` boolean added to history metadata Zod schema with `.default(false)`
-- [ ] History recording sets `timed_out: true` and `exit_code: 124` for timed-out runs
-- [ ] Existing history records without `timed_out` parse correctly (backwards compat)
-- [ ] CLI output distinguishes timeouts from regular failures
-- [ ] Lock is released after a timeout kill (existing `DisposableStack` cleanup)
-- [ ] Tests: full run-and-record path for a timed-out task
-- [ ] Tests: history schema parses records with and without `timed_out`
+- [x] `RunResult` gains `timedOut: boolean`
+- [x] `executeTask` threads `task.timeout` into spawn opts and `timedOut` into the result
+- [x] `timed_out` boolean added to history metadata Zod schema with `.default(false)`
+- [x] History recording sets `timed_out: true` and `exit_code: 124` for timed-out runs
+- [x] Existing history records without `timed_out` parse correctly (backwards compat)
+- [x] CLI output distinguishes timeouts from regular failures
+- [x] Lock is released after a timeout kill (existing `DisposableStack` cleanup)
+- [x] Tests: full run-and-record path for a timed-out task
+- [x] Tests: history schema parses records with and without `timed_out`
 
 ## User stories addressed
 

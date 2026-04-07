@@ -47,6 +47,7 @@ export type RunResult = {
   exitCode: number
   stdout: string
   stderr: string
+  timedOut: boolean
   cwd: ResolvedCwd
   prompt: string
   startedAt: Date
@@ -235,6 +236,7 @@ export async function executeTask(
       command,
       cwd: cwd.path,
       env: { ...env, TM_PROMPT_FILE: promptPath },
+      timeoutMs: task.timeout,
     })
     const finishedAt = new Date()
 

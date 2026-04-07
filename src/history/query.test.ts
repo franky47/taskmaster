@@ -249,6 +249,7 @@ describe('queryHistory', () => {
       duration_ms: 15456,
       exit_code: 0,
       success: true,
+      timed_out: false,
       stderrPath: undefined,
     })
   })
