@@ -1,13 +1,13 @@
 ---
 # tm-7fv4
 title: Task timeout support
-status: todo
+status: completed
 type: epic
 priority: high
 tags:
     - cli
 created_at: 2026-04-07T12:22:52Z
-updated_at: 2026-04-07T12:22:55Z
+updated_at: 2026-04-07T20:02:26Z
 ---
 
 ## Problem Statement
