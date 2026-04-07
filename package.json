@@ -13,11 +13,13 @@
     "typecheck": "tsgo --noEmit",
     "test": "bun test",
     "check": "bun run fmt:check && bun run lint && bun run typecheck && bun test",
-    "build": "bun build src/main.ts --compile --outfile tm"
+    "build": "bun build src/main.ts --compile --outfile tm",
+    "prepare": "husky"
   },
   "devDependencies": {
     "@types/bun": "latest",
     "@typescript/native-preview": "^7.0.0-dev.20260404.1",
+    "husky": "^9.1.7",
     "oxfmt": "^0.43.0",
     "oxlint": "^1.58.0",
     "oxlint-tsgolint": "^0.19.0"
