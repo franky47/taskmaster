@@ -1,11 +1,11 @@
 ---
 # tm-w484
 title: Report renderer
-status: todo
+status: completed
 type: task
 priority: high
 created_at: 2026-04-07T12:14:08Z
-updated_at: 2026-04-07T12:14:08Z
+updated_at: 2026-04-07T13:26:11Z
 parent: tm-py4h
 blocked_by:
     - tm-ymal
@@ -34,14 +34,14 @@ Minimal markdown formatting — no tables, no horizontal rules. Token-efficient 
 
 ## Acceptance criteria
 
-- [ ] Output starts with `Checked at: <timestamp>`
-- [ ] Each finding rendered as a `##` section with severity tag
-- [ ] Findings ordered by severity: critical > error > warning > info
-- [ ] Investigation commands are platform-appropriate (launchctl on darwin, crontab on linux)
-- [ ] Stderr and run artifact paths referenced, not inlined
-- [ ] All timestamps include both absolute and relative display
-- [ ] Tested with known inputs producing expected markdown output
-- [ ] Tested with both darwin and linux platform values
+- [x] Output starts with `Checked at: <timestamp>`
+- [x] Each finding rendered as a `##` section with severity tag
+- [x] Findings ordered by severity: critical > error > warning > info
+- [x] Investigation commands are platform-appropriate (launchctl on darwin, crontab on linux)
+- [x] Stderr and run artifact paths referenced, not inlined
+- [x] All timestamps include both absolute and relative display
+- [x] Tested with known inputs producing expected markdown output
+- [x] Tested with both darwin and linux platform values
 
 ## User stories addressed
 
@@ -50,3 +50,7 @@ Minimal markdown formatting — no tables, no horizontal rules. Token-efficient 
 - User story 15: Stderr paths referenced, not inlined
 - User story 16: "Checked at" timestamp at top
 - User story 18: Run artifact directories referenced
+
+## Summary of Changes
+
+Added `src/doctor/report.ts` with `renderReport()` and 18 tests covering all finding kinds, severity ordering, platform-specific commands, singular/plural forms, and fallback handling for missing error fields.
