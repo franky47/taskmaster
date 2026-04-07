@@ -1,7 +1,12 @@
 import { describe, expect, test } from 'bun:test'
 
 import type { LogEntry } from '../logger'
-import { checkLogErrors } from './checks'
+import {
+  checkHeartbeat,
+  checkLogErrors,
+  checkSchedulerInstalled,
+  formatRelativeTime,
+} from './checks'
 
 describe('checkLogErrors', () => {
   test('returns info findings for error events', () => {
@@ -28,10 +33,7 @@ describe('checkLogErrors', () => {
       severity: 'info',
       task: 'backup',
       ts: '2026-04-07T10:00:00.000Z',
-    })
-    expect(findings[0]!.error).toMatchObject({
-      name: 'RunError',
-      message: 'process exited with code 1',
+      error: { name: 'RunError', message: 'process exited with code 1' },
     })
 
     expect(findings[1]).toMatchObject({
@@ -64,5 +66,135 @@ describe('checkLogErrors', () => {
   test('returns empty array for empty input', () => {
     const findings = checkLogErrors([])
     expect(findings).toHaveLength(0)
+  })
+})
+
+// ------------------------------------------------------------------
+// formatRelativeTime
+// ------------------------------------------------------------------
+
+describe('formatRelativeTime', () => {
+  const base = new Date('2026-04-07T12:00:00.000Z')
+
+  test('returns "just now" for < 1 minute', () => {
+    const from = new Date(base.getTime() - 30_000) // 30s ago
+    expect(formatRelativeTime(from, base)).toBe('just now')
+  })
+
+  test('returns minutes for < 1 hour', () => {
+    const from = new Date(base.getTime() - 25 * 60_000) // 25m ago
+    expect(formatRelativeTime(from, base)).toBe('25m ago')
+  })
+
+  test('returns hours and minutes for < 1 day', () => {
+    const from = new Date(base.getTime() - (3 * 3600_000 + 37 * 60_000)) // 3h 37m
+    expect(formatRelativeTime(from, base)).toBe('3h 37m ago')
+  })
+
+  test('returns hours without minutes when minutes are 0', () => {
+    const from = new Date(base.getTime() - 2 * 3600_000) // exactly 2h
+    expect(formatRelativeTime(from, base)).toBe('2h 0m ago')
+  })
+
+  test('returns days and hours for >= 1 day', () => {
+    const from = new Date(base.getTime() - (2 * 86400_000 + 5 * 3600_000)) // 2d 5h
+    expect(formatRelativeTime(from, base)).toBe('2d 5h ago')
+  })
+
+  test('returns "1m ago" at exactly 1 minute', () => {
+    const from = new Date(base.getTime() - 60_000)
+    expect(formatRelativeTime(from, base)).toBe('1m ago')
+  })
+
+  test('returns "1h 0m ago" at exactly 1 hour', () => {
+    const from = new Date(base.getTime() - 3600_000)
+    expect(formatRelativeTime(from, base)).toBe('1h 0m ago')
+  })
+
+  test('returns "1d 0h ago" at exactly 1 day', () => {
+    const from = new Date(base.getTime() - 86400_000)
+    expect(formatRelativeTime(from, base)).toBe('1d 0h ago')
+  })
+})
+
+// ------------------------------------------------------------------
+// checkHeartbeat
+// ------------------------------------------------------------------
+
+describe('checkHeartbeat', () => {
+  const now = new Date('2026-04-07T12:00:00.000Z')
+
+  test('returns null when heartbeat is fresh (< 5 minutes old)', () => {
+    const heartbeat = new Date(now.getTime() - 2 * 60_000) // 2m ago
+    expect(checkHeartbeat(heartbeat, now)).toBeNull()
+  })
+
+  test('returns null at exactly 5 minutes (boundary, not stale yet)', () => {
+    const heartbeat = new Date(now.getTime() - 5 * 60_000)
+    expect(checkHeartbeat(heartbeat, now)).toBeNull()
+  })
+
+  test('returns critical finding when heartbeat > 5 minutes old', () => {
+    const heartbeat = new Date(now.getTime() - 6 * 60_000) // 6m ago
+    const finding = checkHeartbeat(heartbeat, now)
+
+    expect(finding).toMatchObject({
+      kind: 'heartbeat-stale',
+      severity: 'critical',
+      heartbeatTime: heartbeat.toISOString(),
+      relativeTime: '6m ago',
+    })
+  })
+
+  test('returns critical finding when heartbeat is very old', () => {
+    const heartbeat = new Date(now.getTime() - (3 * 3600_000 + 37 * 60_000)) // 3h 37m ago
+    const finding = checkHeartbeat(heartbeat, now)
+
+    expect(finding).toMatchObject({
+      kind: 'heartbeat-stale',
+      severity: 'critical',
+      heartbeatTime: heartbeat.toISOString(),
+      relativeTime: '3h 37m ago',
+    })
+  })
+
+  test('returns critical finding when heartbeat is null (never ticked)', () => {
+    const finding = checkHeartbeat(null, now)
+
+    expect(finding).toMatchObject({
+      kind: 'heartbeat-missing',
+      severity: 'critical',
+    })
+  })
+})
+
+// ------------------------------------------------------------------
+// checkSchedulerInstalled
+// ------------------------------------------------------------------
+
+describe('checkSchedulerInstalled', () => {
+  test('returns null when scheduler is present', () => {
+    expect(checkSchedulerInstalled('darwin', true)).toBeNull()
+    expect(checkSchedulerInstalled('linux', true)).toBeNull()
+  })
+
+  test('returns critical finding when scheduler is not present on darwin', () => {
+    const finding = checkSchedulerInstalled('darwin', false)
+
+    expect(finding).toMatchObject({
+      kind: 'scheduler-not-installed',
+      severity: 'critical',
+      platform: 'darwin',
+    })
+  })
+
+  test('returns critical finding when scheduler is not present on linux', () => {
+    const finding = checkSchedulerInstalled('linux', false)
+
+    expect(finding).toMatchObject({
+      kind: 'scheduler-not-installed',
+      severity: 'critical',
+      platform: 'linux',
+    })
   })
 })

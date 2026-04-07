@@ -1,11 +1,11 @@
 ---
 # tm-t4z4
 title: Heartbeat & scheduler checks
-status: todo
+status: completed
 type: task
 priority: high
 created_at: 2026-04-07T12:13:33Z
-updated_at: 2026-04-07T12:13:33Z
+updated_at: 2026-04-07T12:52:37Z
 parent: tm-py4h
 ---
 
@@ -23,16 +23,16 @@ A relative-time formatting helper is needed ("just now" for <1m, "Xm ago" for <1
 
 ## Acceptance criteria
 
-- [ ] `checkHeartbeat` returns critical finding when heartbeat > 5 minutes old
-- [ ] `checkHeartbeat` returns critical finding when heartbeat file is missing (null input)
-- [ ] `checkHeartbeat` returns null when heartbeat is fresh
-- [ ] Finding includes absolute timestamp + relative time string
-- [ ] `checkSchedulerInstalled` returns critical finding when scheduler not present
-- [ ] `checkSchedulerInstalled` returns null when scheduler is present
-- [ ] Finding carries platform info for downstream rendering
-- [ ] Relative-time helper produces human-friendly strings at all scale boundaries
-- [ ] All checks tested with synthetic inputs (no filesystem access)
-- [ ] Threshold (5 min) has explanatory comment
+- [x] `checkHeartbeat` returns critical finding when heartbeat > 5 minutes old
+- [x] `checkHeartbeat` returns critical finding when heartbeat file is missing (null input)
+- [x] `checkHeartbeat` returns null when heartbeat is fresh
+- [x] Finding includes absolute timestamp + relative time string
+- [x] `checkSchedulerInstalled` returns critical finding when scheduler not present
+- [x] `checkSchedulerInstalled` returns null when scheduler is present
+- [x] Finding carries platform info for downstream rendering
+- [x] Relative-time helper produces human-friendly strings at all scale boundaries
+- [x] All checks tested with synthetic inputs (no filesystem access)
+- [x] Threshold (5 min) has explanatory comment
 
 ## User stories addressed
 
@@ -41,3 +41,8 @@ A relative-time formatting helper is needed ("just now" for <1m, "Xm ago" for <1
 - User story 9: Detect scheduler not ticking
 - User story 10: Detect scheduler not installed
 - User story 16: "Checked at" timestamp context
+
+
+## Summary of Changes
+
+Added `checkHeartbeat`, `checkSchedulerInstalled`, and `formatRelativeTime` to the doctor checks module. Extended the `Finding` discriminated union with `heartbeat-stale`, `heartbeat-missing`, and `scheduler-not-installed` variants. All functions are pure with synthetic test coverage at all boundary conditions.
