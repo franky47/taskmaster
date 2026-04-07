@@ -9,5 +9,12 @@ export {
   cleanupPromptFile,
   writePromptFile,
 } from './prompt'
-export { executeTask, runTask } from './run'
-export type { ExecuteDeps, ResolvedCwd, RunResult, SpawnAgentOpts } from './run'
+export { KILL_GRACE_MS, defaultSpawnAgent, executeTask, runTask } from './run'
+export type {
+  ExecuteDeps,
+  ResolvedCwd,
+  RunResult,
+  SpawnAgentDeps,
+  SpawnAgentOpts,
+  SpawnAgentResult,
+} from './run'

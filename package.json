@@ -12,6 +12,7 @@
     "fmt:check": "oxfmt --check src/",
     "typecheck": "tsgo --noEmit",
     "test": "bun test",
+    "test:integration": "bun test ./src/**/*-test.ts",
     "check": "bun run fmt:check && bun run lint && bun run typecheck && bun test",
     "build": "bun build src/main.ts --compile --outfile tm",
     "prepare": "husky"

@@ -1,4 +1,7 @@
+import type { SpawnOptions } from 'node:child_process'
+import { spawn as nodeSpawn } from 'node:child_process'
 import path from 'node:path'
+import type { Readable } from 'node:stream'
 
 import * as errore from 'errore'
 
@@ -54,12 +57,27 @@ export type SpawnAgentOpts = {
   command: string
   cwd: string
   env: Record<string, string>
+  timeoutMs?: number
 }
 
-type SpawnAgentResult = {
+export type SpawnAgentResult = {
   exitCode: number
   stdout: string
   stderr: string
+  timedOut: boolean
+}
+
+export type SpawnedChild = {
+  pid: number | undefined
+  exitCode: number | null
+  stdout: Readable | null
+  stderr: Readable | null
+  on(event: 'close', listener: (code: number | null) => void): unknown
+}
+
+export type SpawnAgentDeps = {
+  spawn: (cmd: string, args: string[], opts: SpawnOptions) => SpawnedChild
+  killProcessGroup: (pid: number, signal: NodeJS.Signals) => void
 }
 
 export type ExecuteDeps = {
@@ -94,24 +112,69 @@ async function buildCommand(
 
 // Default implementation --
 
-async function defaultSpawnAgent(
+export const KILL_GRACE_MS = 10_000
+
+function defaultKillProcessGroup(pid: number, signal: NodeJS.Signals): void {
+  try {
+    process.kill(-pid, signal)
+  } catch {
+    // Process may already be dead
+  }
+}
+
+export async function defaultSpawnAgent(
   opts: SpawnAgentOpts,
+  deps?: Partial<SpawnAgentDeps>,
 ): Promise<SpawnAgentResult> {
-  const proc = Bun.spawn(['sh', '-c', opts.command], {
-    stdout: 'pipe',
-    stderr: 'pipe',
-    cwd: opts.cwd,
-    env: opts.env,
+  const spawnFn = deps?.spawn ?? nodeSpawn
+  const killGroup = deps?.killProcessGroup ?? defaultKillProcessGroup
+
+  return new Promise((resolve) => {
+    const child = spawnFn('sh', ['-c', opts.command], {
+      cwd: opts.cwd,
+      env: opts.env,
+      detached: true,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
+
+    const pid = child.pid
+    if (pid === undefined) {
+      resolve({ exitCode: 1, stdout: '', stderr: '', timedOut: false })
+      return
+    }
+
+    let timedOut = false
+    let timeoutTimer: ReturnType<typeof setTimeout> | undefined
+    let graceTimer: ReturnType<typeof setTimeout> | undefined
+
+    const stdoutChunks: Buffer[] = []
+    const stderrChunks: Buffer[] = []
+
+    child.stdout?.on('data', (chunk: Buffer) => stdoutChunks.push(chunk))
+    child.stderr?.on('data', (chunk: Buffer) => stderrChunks.push(chunk))
+
+    if (opts.timeoutMs !== undefined && opts.timeoutMs > 0) {
+      timeoutTimer = setTimeout(() => {
+        if (child.exitCode !== null) return
+        timedOut = true
+        killGroup(pid, 'SIGTERM')
+        graceTimer = setTimeout(() => {
+          killGroup(pid, 'SIGKILL')
+        }, KILL_GRACE_MS)
+      }, opts.timeoutMs)
+    }
+
+    child.on('close', (code: number | null) => {
+      clearTimeout(timeoutTimer)
+      clearTimeout(graceTimer)
+      resolve({
+        exitCode: code ?? 1,
+        stdout: Buffer.concat(stdoutChunks).toString(),
+        stderr: Buffer.concat(stderrChunks).toString(),
+        timedOut,
+      })
+    })
   })
-
-  const [stdout, stderr] = await Promise.all([
-    new Response(proc.stdout).text(),
-    new Response(proc.stderr).text(),
-  ])
-
-  const exitCode = await proc.exited
-
-  return { exitCode, stdout, stderr }
 }
 
 // Public API --

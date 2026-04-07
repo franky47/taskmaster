@@ -1,8 +1,10 @@
-import { describe, expect, test } from 'bun:test'
+import { describe, expect, test, vi } from 'bun:test'
+import { EventEmitter } from 'node:events'
 import fs from 'node:fs'
 import fsPromises from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
+import { PassThrough } from 'node:stream'
 
 import { AgentNotFoundError } from '../agent'
 import { TaskContentionError, acquireTaskLock, releaseLock } from '../lock'
@@ -12,13 +14,53 @@ import {
   TaskNotFoundError,
 } from '../task'
 import { CwdNotFoundError } from './cwd'
-import { executeTask, runTask } from './run'
-import type { ExecuteDeps } from './run'
+import type { ExecuteDeps, SpawnAgentDeps } from './run'
+import { KILL_GRACE_MS, defaultSpawnAgent, executeTask, runTask } from './run'
+
+// Mock child process for defaultSpawnAgent tests
+
+type MockChild = EventEmitter & {
+  pid: number
+  exitCode: number | null
+  stdout: PassThrough
+  stderr: PassThrough
+  simulateExit: (code: number) => void
+  simulateOutput: (stream: 'stdout' | 'stderr', data: string) => void
+}
+
+function createMockChild(pid = 12345): MockChild {
+  const emitter = new EventEmitter()
+  const stdout = new PassThrough()
+  const stderr = new PassThrough()
+
+  const child = Object.assign(emitter, {
+    pid,
+    exitCode: null as number | null,
+    stdout,
+    stderr,
+    simulateOutput(stream: 'stdout' | 'stderr', data: string) {
+      child[stream].write(data)
+    },
+    simulateExit(code: number) {
+      child.exitCode = code
+      stdout.end()
+      stderr.end()
+      child.emit('close', code)
+    },
+  })
+
+  return child
+}
+
+function createMockSpawn(child: MockChild): SpawnAgentDeps['spawn'] {
+  return () => child
+}
 
 type SpawnResult = {
   exitCode: number
   stdout: string
   stderr: string
+  timedOut: boolean
 }
 
 function fakeSpawn(
@@ -28,6 +70,7 @@ function fakeSpawn(
     exitCode: 0,
     stdout: '',
     stderr: '',
+    timedOut: false,
     ...result,
   })
 }
@@ -125,7 +168,7 @@ describe('executeTask', () => {
       deps: {
         spawnAgent: async (opts) => {
           receivedCommand = opts.command
-          return { exitCode: 0, stdout: '', stderr: '' }
+          return { exitCode: 0, stdout: '', stderr: '', timedOut: false }
         },
       },
     })
@@ -144,7 +187,7 @@ describe('executeTask', () => {
       deps: {
         spawnAgent: async (opts) => {
           receivedCommand = opts.command
-          return { exitCode: 0, stdout: '', stderr: '' }
+          return { exitCode: 0, stdout: '', stderr: '', timedOut: false }
         },
       },
     })
@@ -163,7 +206,7 @@ describe('executeTask', () => {
       deps: {
         spawnAgent: async (opts) => {
           receivedEnv = opts.env
-          return { exitCode: 0, stdout: '', stderr: '' }
+          return { exitCode: 0, stdout: '', stderr: '', timedOut: false }
         },
       },
     })
@@ -184,7 +227,7 @@ describe('executeTask', () => {
         spawnAgent: async (opts) => {
           promptPath = opts.env.TM_PROMPT_FILE ?? ''
           existedDuringSpawn = fs.existsSync(promptPath)
-          return { exitCode: 0, stdout: '', stderr: '' }
+          return { exitCode: 0, stdout: '', stderr: '', timedOut: false }
         },
       },
     })
@@ -205,7 +248,7 @@ describe('executeTask', () => {
       deps: {
         spawnAgent: async (opts) => {
           promptPath = opts.env.TM_PROMPT_FILE ?? ''
-          return { exitCode: 1, stdout: '', stderr: 'boom' }
+          return { exitCode: 1, stdout: '', stderr: 'boom', timedOut: false }
         },
       },
     })
@@ -242,7 +285,7 @@ describe('executeTask', () => {
       deps: {
         spawnAgent: async (opts) => {
           receivedEnv = opts.env
-          return { exitCode: 0, stdout: '', stderr: '' }
+          return { exitCode: 0, stdout: '', stderr: '', timedOut: false }
         },
       },
     })
@@ -270,7 +313,7 @@ describe('executeTask', () => {
       deps: {
         spawnAgent: async (opts) => {
           receivedCwd = opts.cwd
-          return { exitCode: 0, stdout: '', stderr: '' }
+          return { exitCode: 0, stdout: '', stderr: '', timedOut: false }
         },
       },
     })
@@ -292,7 +335,7 @@ describe('executeTask', () => {
       deps: {
         spawnAgent: async (opts) => {
           receivedCwd = opts.cwd
-          return { exitCode: 0, stdout: '', stderr: '' }
+          return { exitCode: 0, stdout: '', stderr: '', timedOut: false }
         },
       },
     })
@@ -339,7 +382,7 @@ describe('executeTask', () => {
       deps: {
         spawnAgent: async () => {
           ran = true
-          return { exitCode: 0, stdout: '', stderr: '' }
+          return { exitCode: 0, stdout: '', stderr: '', timedOut: false }
         },
       },
     })
@@ -494,7 +537,7 @@ describe('runTask', () => {
           const probe = acquireTaskLock('hold-lock', locksDir)
           lockHeldDuringExecution = 'contended' in probe
           if ('fd' in probe) releaseLock(probe.fd)
-          return { exitCode: 0, stdout: '', stderr: '' }
+          return { exitCode: 0, stdout: '', stderr: '', timedOut: false }
         },
       },
     })
@@ -543,5 +586,231 @@ describe('runTask', () => {
     const lock = acquireTaskLock('fail-lock', locksDir)
     expect('fd' in lock).toBe(true)
     if ('fd' in lock) releaseLock(lock.fd)
+  })
+})
+
+// -- defaultSpawnAgent --
+
+describe('defaultSpawnAgent', () => {
+  test('runs command and captures stdout', async () => {
+    const result = await defaultSpawnAgent({
+      command: 'echo hello',
+      cwd: '/tmp',
+      env: { PATH: process.env.PATH ?? '' },
+    })
+    expect(result.exitCode).toBe(0)
+    expect(result.stdout.trim()).toBe('hello')
+    expect(result.timedOut).toBe(false)
+  })
+
+  test('sends SIGTERM to process group on timeout', async () => {
+    vi.useFakeTimers()
+
+    const child = createMockChild(9999)
+    const kills: Array<{ pid: number; signal: NodeJS.Signals }> = []
+
+    const promise = defaultSpawnAgent(
+      {
+        command: 'ignored',
+        cwd: '/tmp',
+        env: {},
+        timeoutMs: 5000,
+      },
+      {
+        spawn: createMockSpawn(child),
+        killProcessGroup: (pid, signal) => {
+          kills.push({ pid, signal })
+          // Simulate process dying from SIGTERM
+          child.simulateExit(143)
+        },
+      },
+    )
+
+    vi.advanceTimersByTime(5000)
+    const result = await promise
+
+    expect(result.timedOut).toBe(true)
+    expect(kills).toEqual([{ pid: 9999, signal: 'SIGTERM' }])
+
+    vi.useRealTimers()
+  })
+
+  test('sends SIGKILL after grace period if process ignores SIGTERM', async () => {
+    vi.useFakeTimers()
+
+    const child = createMockChild(9999)
+    const kills: Array<{ pid: number; signal: NodeJS.Signals }> = []
+
+    const promise = defaultSpawnAgent(
+      {
+        command: 'ignored',
+        cwd: '/tmp',
+        env: {},
+        timeoutMs: 5000,
+      },
+      {
+        spawn: createMockSpawn(child),
+        killProcessGroup: (pid, signal) => {
+          kills.push({ pid, signal })
+          // Only die on SIGKILL
+          if (signal === 'SIGKILL') child.simulateExit(137)
+        },
+      },
+    )
+
+    // Fire timeout → SIGTERM
+    vi.advanceTimersByTime(5000)
+    expect(kills).toEqual([{ pid: 9999, signal: 'SIGTERM' }])
+
+    // Fire grace period → SIGKILL
+    vi.advanceTimersByTime(KILL_GRACE_MS)
+    const result = await promise
+
+    expect(kills).toEqual([
+      { pid: 9999, signal: 'SIGTERM' },
+      { pid: 9999, signal: 'SIGKILL' },
+    ])
+    expect(result.timedOut).toBe(true)
+
+    vi.useRealTimers()
+  })
+
+  test('does not send SIGKILL if process exits during grace period', async () => {
+    vi.useFakeTimers()
+
+    const child = createMockChild(9999)
+    const kills: Array<{ pid: number; signal: NodeJS.Signals }> = []
+
+    const promise = defaultSpawnAgent(
+      {
+        command: 'ignored',
+        cwd: '/tmp',
+        env: {},
+        timeoutMs: 5000,
+      },
+      {
+        spawn: createMockSpawn(child),
+        killProcessGroup: (pid, signal) => kills.push({ pid, signal }),
+      },
+    )
+
+    // Fire timeout → SIGTERM
+    vi.advanceTimersByTime(5000)
+    expect(kills).toHaveLength(1)
+
+    // Process exits during grace period (responds to SIGTERM)
+    child.simulateExit(143)
+    const result = await promise
+
+    // Advance past grace period — SIGKILL should NOT fire
+    vi.advanceTimersByTime(KILL_GRACE_MS)
+
+    expect(kills).toHaveLength(1)
+    expect(result.timedOut).toBe(true)
+    expect(result.exitCode).toBe(143)
+
+    vi.useRealTimers()
+  })
+
+  test('captures partial stdout before timeout', async () => {
+    vi.useFakeTimers()
+
+    const child = createMockChild(9999)
+
+    const promise = defaultSpawnAgent(
+      {
+        command: 'ignored',
+        cwd: '/tmp',
+        env: {},
+        timeoutMs: 5000,
+      },
+      {
+        spawn: createMockSpawn(child),
+        killProcessGroup: (_pid, _signal) => child.simulateExit(143),
+      },
+    )
+
+    // Process emits some output before timeout
+    child.simulateOutput('stdout', 'partial output\n')
+
+    vi.advanceTimersByTime(5000)
+    const result = await promise
+
+    expect(result.stdout).toBe('partial output\n')
+    expect(result.timedOut).toBe(true)
+
+    vi.useRealTimers()
+  })
+
+  test('normal exit before timeout clears timer', async () => {
+    vi.useFakeTimers()
+
+    const child = createMockChild(9999)
+    const kills: Array<{ pid: number; signal: NodeJS.Signals }> = []
+
+    const promise = defaultSpawnAgent(
+      {
+        command: 'ignored',
+        cwd: '/tmp',
+        env: {},
+        timeoutMs: 60_000,
+      },
+      {
+        spawn: createMockSpawn(child),
+        killProcessGroup: (pid, signal) => kills.push({ pid, signal }),
+      },
+    )
+
+    // Process exits before timeout fires
+    child.simulateOutput('stdout', 'done\n')
+    child.simulateExit(0)
+    const result = await promise
+
+    // Advance past the timeout — should not fire
+    vi.advanceTimersByTime(60_000)
+
+    expect(result.timedOut).toBe(false)
+    expect(result.exitCode).toBe(0)
+    expect(result.stdout).toBe('done\n')
+    expect(kills).toHaveLength(0)
+
+    vi.useRealTimers()
+  })
+
+  test('skips kill if process already exited when timeout fires', async () => {
+    vi.useFakeTimers()
+
+    const child = createMockChild(9999)
+    const kills: Array<{ pid: number; signal: NodeJS.Signals }> = []
+
+    // Set exitCode before timeout fires (simulates race)
+    child.exitCode = 0
+
+    const promise = defaultSpawnAgent(
+      {
+        command: 'ignored',
+        cwd: '/tmp',
+        env: {},
+        timeoutMs: 1000,
+      },
+      {
+        spawn: createMockSpawn(child),
+        killProcessGroup: (pid, signal) => kills.push({ pid, signal }),
+      },
+    )
+
+    vi.advanceTimersByTime(1000)
+
+    // Timeout fired but guard prevented kill
+    expect(kills).toHaveLength(0)
+
+    // Now close the process
+    child.simulateExit(0)
+    const result = await promise
+
+    expect(result.timedOut).toBe(false)
+    expect(result.exitCode).toBe(0)
+
+    vi.useRealTimers()
   })
 })

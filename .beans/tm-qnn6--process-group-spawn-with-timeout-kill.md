@@ -1,12 +1,13 @@
 ---
 # tm-qnn6
 title: Process group spawn with timeout kill
-status: todo
+status: completed
 type: task
+priority: normal
 tags:
     - hitl
 created_at: 2026-04-07T12:29:08Z
-updated_at: 2026-04-07T12:29:08Z
+updated_at: 2026-04-07T16:34:36Z
 parent: tm-7fv4
 ---
 
@@ -20,19 +21,24 @@ The parent `tm run` process must be in a separate process group and must NOT be 
 
 ## Acceptance criteria
 
-- [ ] `SpawnAgentOpts` gains `timeout?: number` (milliseconds, undefined = no limit)
-- [ ] `SpawnAgentResult` gains `timedOut: boolean`
-- [ ] Child process is spawned in a new process group
-- [ ] On timeout: SIGTERM sent to process group, 10s grace, then SIGKILL
-- [ ] On normal exit before timeout: timer is cancelled, `timedOut: false`
-- [ ] Partial stdout/stderr is captured up to the kill point
-- [ ] Parent `tm run` process is not affected by the kill signal
-- [ ] `KILL_GRACE_MS` is a named constant
-- [ ] Tests: fast command with generous timeout completes normally (`timedOut: false`)
-- [ ] Tests: slow command (`sleep`) with short timeout is killed (`timedOut: true`)
-- [ ] Tests: child processes of the shell are also killed (process group kill verified)
+- [x] `SpawnAgentOpts` gains `timeoutMs?: number` (milliseconds, undefined = no limit)
+- [x] `SpawnAgentResult` gains `timedOut: boolean`
+- [x] Child process is spawned in a new process group
+- [x] On timeout: SIGTERM sent to process group, 10s grace, then SIGKILL
+- [x] On normal exit before timeout: timer is cancelled, `timedOut: false`
+- [x] Partial stdout/stderr is captured up to the kill point
+- [x] Parent `tm run` process is not affected by the kill signal
+- [x] `KILL_GRACE_MS` is a named constant
+- [x] Tests: fast command with generous timeout completes normally (`timedOut: false`)
+- [x] Tests: slow command (`sleep`) with short timeout is killed (`timedOut: true`)
+- [x] Tests: child processes of the shell are also killed (process group kill verified)
 
 ## User stories addressed
 
 - User story 5: entire process tree is killed, not just the shell wrapper
 - User story 6: SIGTERM first with grace period before SIGKILL
+
+
+## Summary of Changes
+
+Reworked `defaultSpawnAgent` to use `node:child_process.spawn` with `detached: true` for process group isolation. On timeout: SIGTERM to group, 10s grace, then SIGKILL. Narrowed `SpawnedChild` type so both real `ChildProcess` and test mocks satisfy it without type assertions. 7 unit tests (fake timers + mock spawn, instant) + 1 integration test (real process group kill, ~1s).
