@@ -1,11 +1,11 @@
 ---
 # tm-eu53
 title: Multi-agent support
-status: todo
+status: completed
 type: epic
 priority: high
 created_at: 2026-04-05T22:40:56Z
-updated_at: 2026-04-06T05:11:40Z
+updated_at: 2026-04-07T12:31:29Z
 blocked_by:
     - tm-n9i7
     - tm-ho6e
