@@ -1,16 +1,47 @@
-import { appendFileSync, mkdirSync } from 'node:fs'
+import { appendFileSync, mkdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
+
+import { z } from 'zod'
 
 import { logFilePath } from './config'
 
+// Schema --
+
+const startedEntrySchema = z.object({
+  ts: z.string(),
+  event: z.literal('started'),
+  task: z.string(),
+  trigger: z.enum(['manual', 'tick']),
+})
+
+const skippedEntrySchema = z.object({
+  ts: z.string(),
+  event: z.literal('skipped'),
+  task: z.string(),
+  reason: z.literal('contention'),
+})
+
+const errorEntrySchema = z.object({
+  ts: z.string(),
+  event: z.literal('error'),
+  task: z.string(),
+  error: z.record(z.string(), z.unknown()),
+})
+
+export const logEntrySchema = z.discriminatedUnion('event', [
+  startedEntrySchema,
+  skippedEntrySchema,
+  errorEntrySchema,
+])
+
 // Types --
 
-type LogEntry =
+export type LogEntry = z.infer<typeof logEntrySchema>
+
+type LogInput =
   | { event: 'started'; task: string; trigger: 'manual' | 'tick' }
   | { event: 'skipped'; task: string; reason: 'contention' }
   | { event: 'error'; task: string; error: Error }
-
-export type { LogEntry }
 
 // Serialization --
 
@@ -37,7 +68,7 @@ export function serializeError(err: Error): Record<string, unknown> {
   return serialized
 }
 
-function serializeEntry(entry: LogEntry): Record<string, unknown> {
+function serializeEntry(entry: LogInput): Record<string, unknown> {
   if (entry.event === 'error') {
     return {
       ts: new Date().toISOString(),
@@ -50,11 +81,35 @@ function serializeEntry(entry: LogEntry): Record<string, unknown> {
 
 // Public API --
 
-export function log(entry: LogEntry, target = logFilePath): void {
+export function log(entry: LogInput, target = logFilePath): void {
   try {
     mkdirSync(path.dirname(target), { recursive: true })
     appendFileSync(target, JSON.stringify(serializeEntry(entry)) + '\n')
   } catch {
     // best-effort: logging must never break the program
   }
+}
+
+export function readLog(since: Date, logPath = logFilePath): LogEntry[] {
+  const sinceISO = since.toISOString()
+  let content: string
+  try {
+    content = readFileSync(logPath, 'utf-8')
+  } catch {
+    return []
+  }
+  const entries: LogEntry[] = []
+  for (const line of content.split('\n')) {
+    if (line.trim() === '') continue
+    try {
+      const parsed = logEntrySchema.parse(JSON.parse(line))
+      if (parsed.ts >= sinceISO) {
+        entries.push(parsed)
+      }
+    } catch {
+      // Skip malformed lines
+      continue
+    }
+  }
+  return entries
 }

@@ -1,11 +1,11 @@
 ---
 # tm-ymal
 title: 'Deepen logger: Zod schema + readLog + log error check'
-status: todo
+status: completed
 type: task
 priority: high
 created_at: 2026-04-07T12:13:19Z
-updated_at: 2026-04-07T12:13:19Z
+updated_at: 2026-04-07T12:46:17Z
 parent: tm-py4h
 ---
 
@@ -23,15 +23,15 @@ Use the `typescript-advanced-types` skill for the Zod schema design.
 
 ## Acceptance criteria
 
-- [ ] Zod schema is the single source of truth for the serialized log entry format
-- [ ] `LogEntry` type is inferred from the Zod schema (no hand-written type)
-- [ ] Existing `log()` write function still works (serialization unchanged)
-- [ ] `readLog(since, path?)` parses JSONL, validates with Zod, filters by time window
-- [ ] Malformed lines in the JSONL are silently skipped
-- [ ] `checkLogErrors` returns info-severity findings for error events
-- [ ] Finding type is a discriminated union on a `kind` field
-- [ ] Tests cover: valid entries, malformed lines, time filtering, empty file, mixed entry types
-- [ ] Tests for `checkLogErrors` with synthetic LogEntry arrays
+- [x] Zod schema is the single source of truth for the serialized log entry format
+- [x] `LogEntry` type is inferred from the Zod schema (no hand-written type)
+- [x] Existing `log()` write function still works (serialization unchanged)
+- [x] `readLog(since, path?)` parses JSONL, validates with Zod, filters by time window
+- [x] Malformed lines in the JSONL are silently skipped
+- [x] `checkLogErrors` returns info-severity findings for error events
+- [x] Finding type is a discriminated union on a `kind` field
+- [x] Tests cover: valid entries, malformed lines, time filtering, empty file, mixed entry types
+- [x] Tests for `checkLogErrors` with synthetic LogEntry arrays
 
 ## User stories addressed
 

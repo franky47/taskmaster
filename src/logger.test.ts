@@ -5,7 +5,7 @@ import path from 'node:path'
 
 import * as errore from 'errore'
 
-import { log, serializeError } from './logger'
+import { log, readLog, serializeError } from './logger'
 
 function makeTempLogFile(): string {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tm-logger-'))
@@ -135,5 +135,104 @@ describe('log', () => {
         '/proc/nonexistent/impossible/taskmaster.log',
       )
     }).not.toThrow()
+  })
+})
+
+describe('readLog', () => {
+  test('parses valid JSONL entries', () => {
+    const logFile = makeTempLogFile()
+
+    log({ event: 'started', task: 'my-task', trigger: 'manual' }, logFile)
+    log({ event: 'skipped', task: 'my-task', reason: 'contention' }, logFile)
+    log(
+      {
+        event: 'error',
+        task: 'my-task',
+        error: new Error('boom'),
+      },
+      logFile,
+    )
+
+    const entries = readLog(new Date(0), logFile)
+    expect(entries).toHaveLength(3)
+    expect(entries[0]).toMatchObject({
+      event: 'started',
+      task: 'my-task',
+      trigger: 'manual',
+    })
+    expect(entries[1]).toMatchObject({
+      event: 'skipped',
+      task: 'my-task',
+      reason: 'contention',
+    })
+    const errorEntry = entries[2]!
+    expect(errorEntry).toMatchObject({ event: 'error', task: 'my-task' })
+    expect(errorEntry.ts).toBeString()
+    if (errorEntry.event === 'error') {
+      expect(errorEntry.error.message).toBe('boom')
+    }
+  })
+
+  test('filters entries by time window', () => {
+    const logFile = makeTempLogFile()
+
+    // Write entries with known timestamps by writing raw JSONL
+    const old = JSON.stringify({
+      ts: '2026-01-01T00:00:00.000Z',
+      event: 'started',
+      task: 'old',
+      trigger: 'tick',
+    })
+    const recent = JSON.stringify({
+      ts: '2026-04-01T00:00:00.000Z',
+      event: 'started',
+      task: 'recent',
+      trigger: 'tick',
+    })
+    fs.mkdirSync(path.dirname(logFile), { recursive: true })
+    fs.writeFileSync(logFile, old + '\n' + recent + '\n')
+
+    const entries = readLog(new Date('2026-03-01T00:00:00.000Z'), logFile)
+    expect(entries).toHaveLength(1)
+    expect(entries[0]!.task).toBe('recent')
+  })
+
+  test('skips malformed lines', () => {
+    const logFile = makeTempLogFile()
+    fs.mkdirSync(path.dirname(logFile), { recursive: true })
+
+    const valid = JSON.stringify({
+      ts: '2026-04-01T00:00:00.000Z',
+      event: 'started',
+      task: 'ok',
+      trigger: 'manual',
+    })
+    fs.writeFileSync(
+      logFile,
+      [
+        'not json at all',
+        '{"partial": true}',
+        valid,
+        '{"event": "started", "task": "missing-ts", "trigger": "tick"}',
+      ].join('\n') + '\n',
+    )
+
+    const entries = readLog(new Date(0), logFile)
+    expect(entries).toHaveLength(1)
+    expect(entries[0]!.task).toBe('ok')
+  })
+
+  test('returns empty array for missing file', () => {
+    const entries = readLog(new Date(0), '/tmp/nonexistent-tm-log.jsonl')
+    expect(entries).toHaveLength(0)
+  })
+
+  test('returns empty array for empty file', () => {
+    const logFile = makeTempLogFile()
+    fs.mkdirSync(path.dirname(logFile), { recursive: true })
+    fs.writeFileSync(logFile, '')
+
+    const entries = readLog(new Date(0), logFile)
+    expect(entries).toHaveLength(0)
   })
 })
