@@ -1,13 +1,13 @@
 ---
 # tm-py4h
 title: 'tm doctor: diagnostic report command'
-status: todo
+status: completed
 type: epic
 priority: high
 tags:
     - cli
 created_at: 2026-04-07T12:09:08Z
-updated_at: 2026-04-07T12:11:28Z
+updated_at: 2026-04-07T14:08:34Z
 ---
 
 ## Problem Statement
@@ -109,3 +109,8 @@ The orchestrator and CLI wiring are thin enough to skip unit tests — they're i
 - The heartbeat staleness threshold (5 minutes) is hardcoded with a comment explaining: tick runs every 60 seconds, so 5 minutes means 5 missed ticks — enough to rule out transient delays.
 - Relative time display should degrade gracefully: "just now" for < 1 min, "Xm ago" for < 1h, "Xh Ym ago" for < 1d, "Xd Yh ago" for longer.
 - The report references file paths (stderr, run artifacts) rather than inlining content, keeping output token-efficient for AI agent consumption.
+
+
+## Summary of Changes
+
+All child tasks completed: Zod logger schema (tm-ymal), heartbeat & scheduler checks (tm-t4z4), task failure checks (tm-rsra), task validation/never-ran/contention checks (tm-g12o), report renderer (tm-w484), and orchestrator + CLI wiring (tm-a3la). The `tm doctor` command is fully operational.
