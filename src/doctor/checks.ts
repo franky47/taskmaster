@@ -1,3 +1,6 @@
+import path from 'node:path'
+
+import type { HistoryEntry } from '../history'
 import type { LogEntry } from '../logger'
 
 // Finding types --
@@ -28,11 +31,24 @@ type SchedulerNotInstalledFinding = {
   platform: 'darwin' | 'linux'
 }
 
+type TaskFailureFinding = {
+  kind: 'task-failures'
+  severity: 'critical' | 'warning'
+  task: string
+  consecutiveFailures: number
+  lastFailureTimestamp: string
+  relativeTime: string
+  exitCode: number
+  stderrPath: string | undefined
+  runDir: string | undefined
+}
+
 export type Finding =
   | LogErrorFinding
   | HeartbeatStaleFinding
   | HeartbeatMissingFinding
   | SchedulerNotInstalledFinding
+  | TaskFailureFinding
 
 // Helpers --
 
@@ -98,4 +114,38 @@ export function checkLogErrors(entries: LogEntry[]): Finding[] {
     }
   }
   return findings
+}
+
+const CRITICAL_FAILURE_THRESHOLD = 3
+
+export function checkTaskFailures(
+  taskName: string,
+  history: HistoryEntry[],
+  now: Date,
+): TaskFailureFinding | null {
+  const first = history[0]
+  if (first === undefined || first.success) return null
+
+  let consecutiveFailures = 0
+  for (const entry of history) {
+    if (entry.success) break
+    consecutiveFailures++
+  }
+
+  const lastFailureTime = new Date(first.finished_at)
+
+  return {
+    kind: 'task-failures',
+    severity:
+      consecutiveFailures >= CRITICAL_FAILURE_THRESHOLD
+        ? 'critical'
+        : 'warning',
+    task: taskName,
+    consecutiveFailures,
+    lastFailureTimestamp: first.finished_at,
+    relativeTime: formatRelativeTime(lastFailureTime, now),
+    exitCode: first.exit_code,
+    stderrPath: first.stderrPath,
+    runDir: first.stderrPath ? path.dirname(first.stderrPath) : undefined,
+  }
 }

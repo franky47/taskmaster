@@ -1,11 +1,11 @@
 ---
 # tm-rsra
 title: Task failure checks (consecutive + last-run)
-status: todo
+status: completed
 type: task
 priority: high
 created_at: 2026-04-07T12:13:45Z
-updated_at: 2026-04-07T12:13:45Z
+updated_at: 2026-04-07T13:04:52Z
 parent: tm-py4h
 ---
 
@@ -25,14 +25,14 @@ Findings reference file paths (stderr, run artifact dirs) rather than inlining c
 
 ## Acceptance criteria
 
-- [ ] Returns critical finding when last 3+ runs all failed
-- [ ] Returns warning finding when last run failed but < 3 consecutive
-- [ ] Returns null when most recent run succeeded
-- [ ] Returns null for empty history (no runs = nothing to report as failure)
-- [ ] Finding includes: task name, consecutive failure count, last failure timestamp + relative time, exit code
-- [ ] Finding references stderr path and run artifact directory path
-- [ ] Handles edge cases: exactly 3 failures, 2 failures, 1 failure, history shorter than 3 entries
-- [ ] All tested with synthetic HistoryEntry arrays
+- [x] Returns critical finding when last 3+ runs all failed
+- [x] Returns warning finding when last run failed but < 3 consecutive
+- [x] Returns null when most recent run succeeded
+- [x] Returns null for empty history (no runs = nothing to report as failure)
+- [x] Finding includes: task name, consecutive failure count, last failure timestamp + relative time, exit code
+- [x] Finding references stderr path and run artifact directory path
+- [x] Handles edge cases: exactly 3 failures, 2 failures, 1 failure, history shorter than 3 entries
+- [x] All tested with synthetic HistoryEntry arrays
 
 ## User stories addressed
 

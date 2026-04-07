@@ -1,10 +1,12 @@
 import { describe, expect, test } from 'bun:test'
 
+import type { HistoryEntry } from '../history'
 import type { LogEntry } from '../logger'
 import {
   checkHeartbeat,
   checkLogErrors,
   checkSchedulerInstalled,
+  checkTaskFailures,
   formatRelativeTime,
 } from './checks'
 
@@ -196,5 +198,187 @@ describe('checkSchedulerInstalled', () => {
       severity: 'critical',
       platform: 'linux',
     })
+  })
+})
+
+// ------------------------------------------------------------------
+// checkTaskFailures
+// ------------------------------------------------------------------
+
+describe('checkTaskFailures', () => {
+  const now = new Date('2026-04-07T12:00:00.000Z')
+
+  function makeEntry(
+    overrides: Partial<HistoryEntry> & { success: boolean },
+  ): HistoryEntry {
+    return {
+      timestamp: '2026-04-07T11-00-00',
+      started_at: '2026-04-07T11:00:00.000Z',
+      finished_at: '2026-04-07T11:00:05.000Z',
+      duration_ms: 5000,
+      exit_code: overrides.success ? 0 : 1,
+      stderrPath: '/history/backup/2026-04-07T11-00-00.stderr.txt',
+      ...overrides,
+    }
+  }
+
+  test('returns null for empty history', () => {
+    expect(checkTaskFailures('backup', [], now)).toBeNull()
+  })
+
+  test('returns null when most recent run succeeded', () => {
+    const history: HistoryEntry[] = [
+      makeEntry({ success: true }),
+      makeEntry({ success: false }),
+      makeEntry({ success: false }),
+    ]
+    expect(checkTaskFailures('backup', history, now)).toBeNull()
+  })
+
+  test('returns warning when only the last run failed (1 failure)', () => {
+    const history: HistoryEntry[] = [
+      makeEntry({
+        success: false,
+        exit_code: 2,
+        finished_at: '2026-04-07T11:30:00.000Z',
+        stderrPath: '/history/backup/run1.stderr.txt',
+      }),
+      makeEntry({ success: true }),
+    ]
+
+    const finding = checkTaskFailures('backup', history, now)
+
+    expect(finding).toMatchObject({
+      kind: 'task-failures',
+      severity: 'warning',
+      task: 'backup',
+      consecutiveFailures: 1,
+      lastFailureTimestamp: '2026-04-07T11:30:00.000Z',
+      exitCode: 2,
+      stderrPath: '/history/backup/run1.stderr.txt',
+    })
+    expect(finding!.relativeTime).toBe('30m ago')
+    expect(finding!.runDir).toBe('/history/backup')
+  })
+
+  test('returns warning when 2 consecutive failures', () => {
+    const history: HistoryEntry[] = [
+      makeEntry({
+        success: false,
+        finished_at: '2026-04-07T11:50:00.000Z',
+      }),
+      makeEntry({ success: false }),
+      makeEntry({ success: true }),
+    ]
+
+    const finding = checkTaskFailures('backup', history, now)
+
+    expect(finding).toMatchObject({
+      kind: 'task-failures',
+      severity: 'warning',
+      consecutiveFailures: 2,
+    })
+  })
+
+  test('returns critical when exactly 3 consecutive failures', () => {
+    const history: HistoryEntry[] = [
+      makeEntry({
+        success: false,
+        finished_at: '2026-04-07T11:55:00.000Z',
+        exit_code: 127,
+        stderrPath: '/history/sync/latest.stderr.txt',
+      }),
+      makeEntry({ success: false }),
+      makeEntry({ success: false }),
+      makeEntry({ success: true }),
+    ]
+
+    const finding = checkTaskFailures('sync', history, now)
+
+    expect(finding).toMatchObject({
+      kind: 'task-failures',
+      severity: 'critical',
+      task: 'sync',
+      consecutiveFailures: 3,
+      lastFailureTimestamp: '2026-04-07T11:55:00.000Z',
+      exitCode: 127,
+      stderrPath: '/history/sync/latest.stderr.txt',
+      runDir: '/history/sync',
+    })
+    expect(finding!.relativeTime).toBe('5m ago')
+  })
+
+  test('returns critical when more than 3 consecutive failures', () => {
+    const history: HistoryEntry[] = [
+      makeEntry({
+        success: false,
+        finished_at: '2026-04-07T11:00:00.000Z',
+      }),
+      makeEntry({ success: false }),
+      makeEntry({ success: false }),
+      makeEntry({ success: false }),
+      makeEntry({ success: false }),
+    ]
+
+    const finding = checkTaskFailures('backup', history, now)
+
+    expect(finding).toMatchObject({
+      kind: 'task-failures',
+      severity: 'critical',
+      consecutiveFailures: 5,
+    })
+  })
+
+  test('returns warning when history has only 1 entry and it failed', () => {
+    const history: HistoryEntry[] = [
+      makeEntry({
+        success: false,
+        finished_at: '2026-04-07T10:00:00.000Z',
+        exit_code: 1,
+      }),
+    ]
+
+    const finding = checkTaskFailures('backup', history, now)
+
+    expect(finding).toMatchObject({
+      kind: 'task-failures',
+      severity: 'warning',
+      consecutiveFailures: 1,
+    })
+    expect(finding!.relativeTime).toBe('2h ago')
+  })
+
+  test('returns null when history has only 1 entry and it succeeded', () => {
+    const history: HistoryEntry[] = [makeEntry({ success: true })]
+    expect(checkTaskFailures('backup', history, now)).toBeNull()
+  })
+
+  test('handles undefined stderrPath', () => {
+    const history: HistoryEntry[] = [
+      makeEntry({
+        success: false,
+        stderrPath: undefined,
+      }),
+    ]
+
+    const finding = checkTaskFailures('backup', history, now)
+
+    expect(finding).toMatchObject({
+      kind: 'task-failures',
+      stderrPath: undefined,
+      runDir: undefined,
+    })
+  })
+
+  test('old failures after a successful run are not reported', () => {
+    const history: HistoryEntry[] = [
+      makeEntry({ success: true }),
+      makeEntry({ success: false }),
+      makeEntry({ success: false }),
+      makeEntry({ success: false }),
+      makeEntry({ success: false }),
+    ]
+
+    expect(checkTaskFailures('backup', history, now)).toBeNull()
   })
 })
