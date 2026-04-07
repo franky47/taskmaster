@@ -289,3 +289,23 @@ export async function teardown(
 
   return new Error(`Unsupported platform: ${platform}`)
 }
+
+export async function isSchedulerInstalled(
+  options?: SchedulerOptions,
+): Promise<boolean> {
+  const platform = options?.platform ?? process.platform
+
+  if (platform === 'darwin') {
+    const dir = options?.launchAgentsDir ?? defaultLaunchAgentsDir()
+    return pathExists(path.join(dir, PLIST_FILENAME))
+  }
+
+  if (platform === 'linux') {
+    const run = options?.exec ?? defaultRunCommand
+    const tmCommand = options?.tmCommand ?? defaultTmCommand()
+    const crontab = await readCrontab(run)
+    return crontab.includes(crontabLine(tmCommand))
+  }
+
+  return false
+}

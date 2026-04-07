@@ -2,6 +2,7 @@ import { Command, Option } from 'commander'
 import { z } from 'zod'
 
 import { tasksDir } from './config'
+import { doctor } from './doctor'
 import {
   formatTimestamp,
   manualTimestamp,
@@ -301,6 +302,34 @@ async function main(): Promise<void> {
         } else {
           console.log(`No scheduler to remove (${result.method})`)
         }
+      }
+    })
+
+  program
+    .command('doctor')
+    .description('Run diagnostic checks')
+    .option(
+      '--since <iso8601>',
+      'Check from this timestamp (default: 7 days ago)',
+    )
+    .action(async (opts: { since?: string }) => {
+      let since: Date | undefined
+      if (opts.since) {
+        const parsed = new Date(opts.since)
+        if (isNaN(parsed.getTime())) {
+          console.error('Invalid --since timestamp')
+          process.exit(1)
+        }
+        since = parsed
+      }
+
+      const result = await doctor({ since })
+      if (result.ok) {
+        console.log(result.message)
+        process.exit(0)
+      } else {
+        console.log(result.report)
+        process.exit(1)
       }
     })
 

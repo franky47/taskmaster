@@ -1,11 +1,11 @@
 ---
 # tm-a3la
 title: Orchestrator + CLI wiring
-status: todo
+status: completed
 type: task
 priority: high
 created_at: 2026-04-07T12:14:21Z
-updated_at: 2026-04-07T12:14:21Z
+updated_at: 2026-04-07T14:02:40Z
 parent: tm-py4h
 blocked_by:
     - tm-ymal
@@ -36,14 +36,14 @@ The orchestrator uses the existing module functions (`listTasks`, `validateTasks
 
 ## Acceptance criteria
 
-- [ ] `tm doctor` with no issues prints "All systems operational" and exits 0
-- [ ] `tm doctor` with issues prints markdown report and exits 1
-- [ ] Default time window is 7 days
-- [ ] `--since <iso8601>` narrows the time window
-- [ ] Orchestrator reads heartbeat, tasks, history, log, scheduler config
-- [ ] Orchestrator calls all check functions and collects findings
-- [ ] No subprocess calls — reuses existing module functions directly
-- [ ] Scheduler detection is platform-aware (plist on darwin, crontab on linux)
+- [x] `tm doctor` with no issues prints "All systems operational" and exits 0
+- [x] `tm doctor` with issues prints markdown report and exits 1
+- [x] Default time window is 7 days
+- [x] `--since <iso8601>` narrows the time window
+- [x] Orchestrator reads heartbeat, tasks, history, log, scheduler config
+- [x] Orchestrator calls all check functions and collects findings
+- [x] No subprocess calls — reuses existing module functions directly
+- [x] Scheduler detection is platform-aware (plist on darwin, crontab on linux)
 
 ## User stories addressed
 
@@ -51,3 +51,8 @@ The orchestrator uses the existing module functions (`listTasks`, `validateTasks
 - User story 2: Findings include specific commands to run next
 - User story 3: Quick system health check
 - User story 6: `--since` flag for narrowing window
+
+
+## Summary of Changes
+
+Orchestrator in `doctor/doctor.ts` with full DI via `DoctorDeps` type. CLI command `tm doctor [--since <iso8601>]` registered in `main.ts`. Added `isSchedulerInstalled` to the setup module for platform-aware scheduler detection. 16 tests covering all finding types, error resilience, and since-window behavior.
