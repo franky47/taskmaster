@@ -1,9 +1,51 @@
 import { CronExpressionParser } from 'cron-parser'
 import * as errore from 'errore'
 import matter from 'gray-matter'
+import ms from 'ms'
 import { z } from 'zod'
 
 const VALID_TIMEZONES = new Set(Intl.supportedValuesOf('timeZone'))
+
+// Duration string schema — mirrors ms.StringValue in lowercase.
+// z.templateLiteral produces a type assignable to ms.StringValue,
+// so ms() accepts it without type assertions.
+const timeUnit = z.enum([
+  'ms',
+  'msec',
+  'msecs',
+  'millisecond',
+  'milliseconds',
+  's',
+  'sec',
+  'secs',
+  'second',
+  'seconds',
+  'm',
+  'min',
+  'mins',
+  'minute',
+  'minutes',
+  'h',
+  'hr',
+  'hrs',
+  'hour',
+  'hours',
+  'd',
+  'day',
+  'days',
+  'w',
+  'week',
+  'weeks',
+  'y',
+  'yr',
+  'yrs',
+  'year',
+  'years',
+])
+
+const durationString = z.templateLiteral([z.number(), timeUnit], {
+  error: 'invalid duration string',
+})
 
 export type Frontmatter = z.output<typeof frontmatterSchema>
 
@@ -39,6 +81,8 @@ export class FrontmatterValidationError extends errore.createTaggedError({
 }
 
 // --
+
+const MIN_TIMEOUT_MS = 1000
 
 const UNQUOTED_STAR_RE = /^schedule:\s*[^"']*\*/m
 
@@ -149,6 +193,20 @@ const rawFrontmatter = z.object({
     .boolean({ error: 'enabled must be a boolean' })
     .optional()
     .default(true),
+
+  timeout: z
+    .string({ error: 'timeout must be a string' })
+    .pipe(durationString)
+    .superRefine((v, ctx) => {
+      if (ms(v) < MIN_TIMEOUT_MS) {
+        ctx.addIssue({
+          code: 'custom',
+          message: `timeout must be at least 1 second, got "${v}"`,
+        })
+      }
+    })
+    .transform((v) => ms(v))
+    .optional(),
 })
 
 const frontmatterSchema = rawFrontmatter

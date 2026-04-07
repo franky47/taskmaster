@@ -7,7 +7,7 @@ import { TasksDirReadError } from '../validate'
 
 export type TaskListEntry = Pick<
   TaskDefinition,
-  'schedule' | 'timezone' | 'enabled'
+  'schedule' | 'timezone' | 'enabled' | 'timeout'
 > & {
   name: string
 }
@@ -39,6 +39,9 @@ export async function listTasks(
     }
     if (parsed.timezone) {
       entry.timezone = parsed.timezone
+    }
+    if (parsed.timeout) {
+      entry.timeout = parsed.timeout
     }
     results.push(entry)
   }

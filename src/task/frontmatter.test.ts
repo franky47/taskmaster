@@ -406,6 +406,136 @@ describe('parseMarkdown', () => {
     })
   })
 
+  describe('timeout', () => {
+    test('allows missing timeout', () => {
+      const result = parseMarkdown(md(`schedule: '0 8 * * *'\n${VALID_AGENT}`))
+      expect(result).not.toBeInstanceOf(Error)
+      if (result instanceof Error) return
+      expect(result.timeout).toBeUndefined()
+    })
+
+    test('accepts "30s" and converts to 30000ms', () => {
+      const result = parseMarkdown(
+        md(`schedule: '0 8 * * *'\n${VALID_AGENT}\ntimeout: '30s'`),
+      )
+      expect(result).not.toBeInstanceOf(Error)
+      if (result instanceof Error) return
+      expect(result.timeout).toBe(30_000)
+    })
+
+    test('accepts "5m" and converts to 300000ms', () => {
+      const result = parseMarkdown(
+        md(`schedule: '0 8 * * *'\n${VALID_AGENT}\ntimeout: '5m'`),
+      )
+      expect(result).not.toBeInstanceOf(Error)
+      if (result instanceof Error) return
+      expect(result.timeout).toBe(300_000)
+    })
+
+    test('accepts "2h" and converts to 7200000ms', () => {
+      const result = parseMarkdown(
+        md(`schedule: '0 8 * * *'\n${VALID_AGENT}\ntimeout: '2h'`),
+      )
+      expect(result).not.toBeInstanceOf(Error)
+      if (result instanceof Error) return
+      expect(result.timeout).toBe(7_200_000)
+    })
+
+    test('accepts exactly 1s (boundary)', () => {
+      const result = parseMarkdown(
+        md(`schedule: '0 8 * * *'\n${VALID_AGENT}\ntimeout: '1s'`),
+      )
+      expect(result).not.toBeInstanceOf(Error)
+      if (result instanceof Error) return
+      expect(result.timeout).toBe(1000)
+    })
+
+    test('rejects unparseable string', () => {
+      const result = parseMarkdown(
+        md(`schedule: '0 8 * * *'\n${VALID_AGENT}\ntimeout: 'abc'`),
+      )
+      expect(result).toBeInstanceOf(FrontmatterValidationError)
+      if (!(result instanceof FrontmatterValidationError)) return
+      expect(
+        result.errors.some(
+          (e) => e.key === 'timeout' && e.message.includes('invalid'),
+        ),
+      ).toBe(true)
+    })
+
+    test('rejects empty string', () => {
+      const result = parseMarkdown(
+        md(`schedule: '0 8 * * *'\n${VALID_AGENT}\ntimeout: ''`),
+      )
+      expect(result).toBeInstanceOf(FrontmatterValidationError)
+      if (!(result instanceof FrontmatterValidationError)) return
+      expect(
+        result.errors.some(
+          (e) => e.key === 'timeout' && e.message.includes('invalid'),
+        ),
+      ).toBe(true)
+    })
+
+    test('rejects sub-1s value "500ms"', () => {
+      const result = parseMarkdown(
+        md(`schedule: '0 8 * * *'\n${VALID_AGENT}\ntimeout: '500ms'`),
+      )
+      expect(result).toBeInstanceOf(FrontmatterValidationError)
+      if (!(result instanceof FrontmatterValidationError)) return
+      expect(
+        result.errors.some(
+          (e) => e.key === 'timeout' && e.message.includes('at least 1 second'),
+        ),
+      ).toBe(true)
+    })
+
+    test('rejects "0s"', () => {
+      const result = parseMarkdown(
+        md(`schedule: '0 8 * * *'\n${VALID_AGENT}\ntimeout: '0s'`),
+      )
+      expect(result).toBeInstanceOf(FrontmatterValidationError)
+      if (!(result instanceof FrontmatterValidationError)) return
+      expect(
+        result.errors.some(
+          (e) => e.key === 'timeout' && e.message.includes('at least 1 second'),
+        ),
+      ).toBe(true)
+    })
+
+    test('rejects non-string timeout', () => {
+      const result = parseMarkdown(
+        md(`schedule: '0 8 * * *'\n${VALID_AGENT}\ntimeout: 30`),
+      )
+      expect(result).toBeInstanceOf(FrontmatterValidationError)
+      if (!(result instanceof FrontmatterValidationError)) return
+      expect(
+        result.errors.some(
+          (e) => e.key === 'timeout' && e.message.includes('must be a string'),
+        ),
+      ).toBe(true)
+    })
+
+    test('threads through agent variant', () => {
+      const result = parseMarkdown(
+        md(`schedule: '0 8 * * *'\n${VALID_AGENT}\ntimeout: '5m'`),
+      )
+      expect(result).not.toBeInstanceOf(Error)
+      if (result instanceof Error) return
+      expect(result).toHaveProperty('agent')
+      expect(result.timeout).toBe(300_000)
+    })
+
+    test('threads through run variant', () => {
+      const result = parseMarkdown(
+        md(`schedule: '0 8 * * *'\n${VALID_RUN}\ntimeout: '5m'`),
+      )
+      expect(result).not.toBeInstanceOf(Error)
+      if (result instanceof Error) return
+      expect(result).toHaveProperty('run')
+      expect(result.timeout).toBe(300_000)
+    })
+  })
+
   describe('error accumulation', () => {
     test('reports errors for multiple fields at once', () => {
       const result = parseMarkdown(

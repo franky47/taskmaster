@@ -42,6 +42,15 @@ timezone: 'America/New_York'
 Weekly task.
 `
 
+const TASK_WITH_TIMEOUT = `---
+schedule: '0 8 * * 1-5'
+agent: opencode
+timeout: '5m'
+---
+
+Task with timeout.
+`
+
 const RUN_TASK = `---
 schedule: '0 12 * * *'
 run: 'my-cmd $TM_PROMPT_FILE'
@@ -141,6 +150,20 @@ Bad.
     const result = await listTasks(tasksDir)
     expect(result).toEqual([
       { name: 'good-task', schedule: '0 8 * * 1-5', enabled: true },
+    ])
+  })
+
+  test('includes timeout when present', async () => {
+    const tasksDir = await makeTmpTasksDir()
+    await writeTask(tasksDir, 'timed', TASK_WITH_TIMEOUT)
+    const result = await listTasks(tasksDir)
+    expect(result).toEqual([
+      {
+        name: 'timed',
+        schedule: '0 8 * * 1-5',
+        enabled: true,
+        timeout: 300_000,
+      },
     ])
   })
 
