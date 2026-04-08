@@ -142,6 +142,16 @@ function renderFinding(finding: Finding, platform: Platform): string {
         '  Increase the schedule interval or decrease the timeout.',
       ].join('\n')
 
+    case 'offline-skips':
+      return [
+        `## Offline skips: ${finding.task} [${finding.severity}]`,
+        '',
+        `${finding.skipCount} skipped execution${finding.skipCount === 1 ? '' : 's'} due to offline connectivity.`,
+        '',
+        'Hint:',
+        `  Set \`enabled: 'always'\` if this task can run without network.`,
+      ].join('\n')
+
     case 'log-error': {
       const name =
         typeof finding.error['name'] === 'string'

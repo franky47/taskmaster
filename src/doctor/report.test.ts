@@ -399,4 +399,37 @@ describe('renderReport', () => {
     expect(headings[2]).toContain('[warning]')
     expect(headings[3]).toContain('[warning]')
   })
+
+  // -- Offline skip findings --
+
+  test('renders offline-skips finding with skip count and hint', () => {
+    const findings: Finding[] = [
+      {
+        kind: 'offline-skips',
+        severity: 'warning',
+        task: 'sync',
+        skipCount: 5,
+      },
+    ]
+
+    const report = renderReport(findings, checkedAt, 'darwin')
+    expect(report).toContain('## Offline skips: sync [warning]')
+    expect(report).toContain('5 skipped executions')
+    expect(report).toContain("enabled: 'always'")
+  })
+
+  test('renders offline-skips with singular form for 1 skip', () => {
+    const findings: Finding[] = [
+      {
+        kind: 'offline-skips',
+        severity: 'warning',
+        task: 'sync',
+        skipCount: 1,
+      },
+    ]
+
+    const report = renderReport(findings, checkedAt, 'darwin')
+    expect(report).toContain('1 skipped execution due')
+    expect(report).not.toContain('executions')
+  })
 })

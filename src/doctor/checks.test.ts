@@ -7,6 +7,7 @@ import {
   checkContention,
   checkHeartbeat,
   checkLogErrors,
+  checkOfflineSkips,
   checkSchedulerInstalled,
   checkTaskFailures,
   checkTaskNeverRan,
@@ -782,5 +783,60 @@ describe('checkContention', () => {
       task: 'backup',
       eventCount: 1,
     })
+  })
+})
+
+// ------------------------------------------------------------------
+// checkOfflineSkips
+// ------------------------------------------------------------------
+
+describe('checkOfflineSkips', () => {
+  test('returns warning with skip count when offline skip events exist', () => {
+    const entries: LogEntry[] = [
+      {
+        ts: '2026-04-07T10:00:00.000Z',
+        event: 'skipped',
+        task: 'sync',
+        reason: 'offline',
+      },
+      {
+        ts: '2026-04-07T11:00:00.000Z',
+        event: 'skipped',
+        task: 'sync',
+        reason: 'offline',
+      },
+      {
+        ts: '2026-04-07T12:00:00.000Z',
+        event: 'skipped',
+        task: 'sync',
+        reason: 'offline',
+      },
+    ]
+
+    const finding = checkOfflineSkips('sync', entries)
+
+    expect(finding).toMatchObject({
+      kind: 'offline-skips',
+      severity: 'warning',
+      task: 'sync',
+      skipCount: 3,
+    })
+  })
+
+  test('returns null when no offline skip events exist', () => {
+    const entries: LogEntry[] = [
+      {
+        ts: '2026-04-07T10:00:00.000Z',
+        event: 'started',
+        task: 'sync',
+        trigger: 'tick',
+      },
+    ]
+
+    expect(checkOfflineSkips('sync', entries)).toBeNull()
+  })
+
+  test('returns null for empty entries', () => {
+    expect(checkOfflineSkips('sync', [])).toBeNull()
   })
 })

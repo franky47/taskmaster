@@ -85,6 +85,13 @@ type TimeoutContentionFinding = {
   schedule: string
 }
 
+type OfflineSkipsFinding = {
+  kind: 'offline-skips'
+  severity: 'warning'
+  task: string
+  skipCount: number
+}
+
 export type Finding =
   | LogErrorFinding
   | HeartbeatStaleFinding
@@ -96,6 +103,7 @@ export type Finding =
   | ContentionFinding
   | TaskTimeoutFinding
   | TimeoutContentionFinding
+  | OfflineSkipsFinding
 
 // Helpers --
 
@@ -271,6 +279,25 @@ export function checkTaskNeverRan(
 ): TaskNeverRanFinding | null {
   if (enabled === false || historyLength > 0) return null
   return { kind: 'task-never-ran', severity: 'warning', task: taskName }
+}
+
+export function checkOfflineSkips(
+  taskName: string,
+  entries: LogEntry[],
+): OfflineSkipsFinding | null {
+  let count = 0
+  for (const entry of entries) {
+    if (entry.event === 'skipped' && entry.reason === 'offline') {
+      count++
+    }
+  }
+  if (count === 0) return null
+  return {
+    kind: 'offline-skips',
+    severity: 'warning',
+    task: taskName,
+    skipCount: count,
+  }
 }
 
 export function checkContention(

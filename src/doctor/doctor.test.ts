@@ -293,4 +293,31 @@ describe('doctor', () => {
     const result = await doctor({ now, deps })
     expect(result.ok).toBe(true)
   })
+
+  test('reports offline skip diagnostic', async () => {
+    const offlineEntries: LogEntry[] = [
+      {
+        ts: '2026-04-06T10:00:00.000Z',
+        event: 'skipped',
+        task: 'backup',
+        reason: 'offline',
+      },
+      {
+        ts: '2026-04-06T11:00:00.000Z',
+        event: 'skipped',
+        task: 'backup',
+        reason: 'offline',
+      },
+    ]
+    const deps = healthyDeps()
+    deps.readLog = () => offlineEntries
+
+    const result = await doctor({ now, deps })
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.report).toContain('offline')
+    expect(result.report).toContain('backup')
+    expect(result.report).toContain('2')
+    expect(result.report).toContain("enabled: 'always'")
+  })
 })

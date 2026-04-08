@@ -1,14 +1,14 @@
 ---
 # tm-5dd1
 title: Doctor offline skip diagnostic
-status: todo
+status: completed
 type: task
 priority: normal
 tags:
     - doctor
     - diagnostics
 created_at: 2026-04-08T10:11:45Z
-updated_at: 2026-04-08T10:11:45Z
+updated_at: 2026-04-08T11:08:40Z
 parent: tm-kgff
 blocked_by:
     - tm-38to
@@ -24,17 +24,21 @@ See parent PRD sections: "Doctor diagnostic".
 
 ## Acceptance criteria
 
-- [ ] New finding type for offline connectivity skips
-- [ ] Aggregates `{ event: 'skipped', reason: 'offline' }` entries from `readLog(since)`, grouped by task name
-- [ ] Emits a `warning`-severity finding for each task with at least 1 offline skip in the time window
-- [ ] Warning message includes the task name and skip count
-- [ ] Warning includes hint: set `enabled: 'always'` if this task can run without network
-- [ ] No finding emitted for tasks with zero offline skips
-- [ ] Unit tests for skip aggregation and warning output
-- [ ] Unit tests for zero-skip case (no findings)
-- [ ] Tests use DI via `DoctorDeps` to inject fake log entries (prior art: existing doctor tests)
+- [x] New finding type for offline connectivity skips
+- [x] Aggregates `{ event: 'skipped', reason: 'offline' }` entries from `readLog(since)`, grouped by task name
+- [x] Emits a `warning`-severity finding for each task with at least 1 offline skip in the time window
+- [x] Warning message includes the task name and skip count
+- [x] Warning includes hint: set `enabled: 'always'` if this task can run without network
+- [x] No finding emitted for tasks with zero offline skips
+- [x] Unit tests for skip aggregation and warning output
+- [x] Unit tests for zero-skip case (no findings)
+- [x] Tests use DI via `DoctorDeps` to inject fake log entries (prior art: existing doctor tests)
 
 ## User stories addressed
 
 - User story 4: doctor reports offline skip count per task
 - User story 5: doctor suggests `enabled: 'always'`
+
+## Summary of Changes
+
+Added `checkOfflineSkips` check function mirroring the existing `checkContention` pattern. Wired into the doctor per-task loop. Added report rendering with actionable hint.

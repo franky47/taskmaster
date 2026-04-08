@@ -15,6 +15,7 @@ import {
   checkContention,
   checkHeartbeat,
   checkLogErrors,
+  checkOfflineSkips,
   checkSchedulerInstalled,
   checkTaskFailures,
   checkTaskNeverRan,
@@ -148,6 +149,9 @@ export async function doctor(options?: DoctorOptions): Promise<DoctorResult> {
       const taskLogEntries = logEntries.filter((e) => e.task === task.name)
       const contentionFinding = checkContention(task.name, taskLogEntries)
       if (contentionFinding) findings.push(contentionFinding)
+
+      const offlineSkipsFinding = checkOfflineSkips(task.name, taskLogEntries)
+      if (offlineSkipsFinding) findings.push(offlineSkipsFinding)
     }
   }
 
