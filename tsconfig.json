@@ -14,6 +14,11 @@
     "verbatimModuleSyntax": true,
     "noEmit": true,
 
+    // Path aliases (mirrors package.json "imports" for tooling)
+    "paths": {
+      "#src/*": ["./src/*"]
+    },
+
     // Best practices
     "strict": true,
     "skipLibCheck": true,

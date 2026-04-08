@@ -11,8 +11,8 @@
     "typescript/no-unsafe-type-assertion": "error",
     "no-restricted-imports": ["error", {
       "patterns": [{
-        "regex": "^\\.\\.\\/[^/]+\\/",
-        "message": "Import from the barrel file (index.ts) instead of reaching into module internals."
+        "regex": "^\\.\\.\\/",
+        "message": "Use #src/ imports for cross-module dependencies (e.g. '#src/history' instead of '../history')."
       }]
     }]
   },

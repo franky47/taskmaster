@@ -10,21 +10,21 @@ import {
   type AgentsFileReadError,
   type AgentsFileValidationError,
   resolveAgent,
-} from '../agent'
+} from '#src/agent'
 import {
   agentsFilePath as defaultAgentsFilePath,
   locksDir as defaultLocksDir,
   envFilePath,
   taskFilePath,
-} from '../config'
-import type { EnvFileParseError, EnvFileReadError } from '../env'
-import { buildEnv, loadEnvFile } from '../env'
+} from '#src/config'
+import type { EnvFileParseError, EnvFileReadError } from '#src/env'
+import { buildEnv, loadEnvFile } from '#src/env'
 import {
   LockAcquireError,
   TaskContentionError,
   acquireTaskLock,
   releaseLock,
-} from '../lock'
+} from '#src/lock'
 import type {
   FrontmatterParseError,
   FrontmatterValidationError,
@@ -32,8 +32,9 @@ import type {
   TaskFileNameError,
   TaskFileReadError,
   TaskNotFoundError,
-} from '../task'
-import { parseTaskFile } from '../task'
+} from '#src/task'
+import { parseTaskFile } from '#src/task'
+
 import type { CwdNotDirectoryError, CwdNotFoundError, ResolvedCwd } from './cwd'
 import { resolveCwd } from './cwd'
 import type { PromptFileWriteError } from './prompt'

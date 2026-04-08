@@ -1,16 +1,17 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 
-import { configDir, tasksDir } from '../config'
-import { queryHistory } from '../history'
-import type { HistoryEntry } from '../history'
-import { listTasks } from '../list'
-import type { TaskListEntry } from '../list'
-import { readLog } from '../logger'
-import type { LogEntry } from '../logger'
-import { isSchedulerInstalled } from '../setup'
-import { validateTasks } from '../validate'
-import type { ValidationResult } from '../validate'
+import { configDir, tasksDir } from '#src/config'
+import { queryHistory } from '#src/history'
+import type { HistoryEntry } from '#src/history'
+import { listTasks } from '#src/list'
+import type { TaskListEntry } from '#src/list'
+import { readLog } from '#src/logger'
+import type { LogEntry } from '#src/logger'
+import { isSchedulerInstalled } from '#src/setup'
+import { validateTasks } from '#src/validate'
+import type { ValidationResult } from '#src/validate'
+
 import {
   checkContention,
   checkHeartbeat,

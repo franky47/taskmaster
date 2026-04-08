@@ -3,7 +3,8 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 
-import { readLog } from '../logger'
+import { readLog } from '#src/logger'
+
 import { tick } from './tick'
 
 async function makeConfigDir(): Promise<string> {

@@ -1,6 +1,7 @@
 import { describe, expect, mock, test } from 'bun:test'
 
-import type { LogEntry } from '../logger'
+import type { LogEntry } from '#src/logger'
+
 import { doctor } from './doctor'
 import type { DoctorDeps } from './doctor'
 

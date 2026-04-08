@@ -6,7 +6,8 @@ import * as errore from 'errore'
 import {
   configDir as defaultConfigDir,
   runsDir as defaultRunsDir,
-} from '../config'
+} from '#src/config'
+
 import type { HistoryMetaInput } from './schema'
 import { historyMetaSchema } from './schema'
 

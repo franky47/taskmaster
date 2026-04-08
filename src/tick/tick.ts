@@ -3,13 +3,13 @@ import path from 'node:path'
 
 import { CronExpressionParser } from 'cron-parser'
 
-import { configDir as defaultConfigDir } from '../config'
-import { formatTimestamp, purgeHistory, queryHistory } from '../history'
-import type { TaskListEntry } from '../list'
-import { listTasks } from '../list'
-import { log } from '../logger'
-import { isOnline as defaultIsOnline } from '../network'
-import type { TasksDirReadError } from '../validate'
+import { configDir as defaultConfigDir } from '#src/config'
+import { formatTimestamp, purgeHistory, queryHistory } from '#src/history'
+import type { TaskListEntry } from '#src/list'
+import { listTasks } from '#src/list'
+import { log } from '#src/logger'
+import { isOnline as defaultIsOnline } from '#src/network'
+import type { TasksDirReadError } from '#src/validate'
 
 // Types --
 

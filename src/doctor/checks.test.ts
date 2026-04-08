@@ -1,8 +1,9 @@
 import { describe, expect, test } from 'bun:test'
 
-import type { HistoryEntry } from '../history'
-import type { LogEntry } from '../logger'
-import type { ValidationResult } from '../validate'
+import type { HistoryEntry } from '#src/history'
+import type { LogEntry } from '#src/logger'
+import type { ValidationResult } from '#src/validate'
+
 import {
   checkContention,
   checkHeartbeat,

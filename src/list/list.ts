@@ -1,9 +1,9 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 
-import { parseTaskFile } from '../task'
-import type { TaskDefinition } from '../task'
-import { TasksDirReadError } from '../validate'
+import { parseTaskFile } from '#src/task'
+import type { TaskDefinition } from '#src/task'
+import { TasksDirReadError } from '#src/validate'
 
 export type TaskListEntry = Pick<
   TaskDefinition,

@@ -3,10 +3,10 @@ import path from 'node:path'
 import { CronExpressionParser } from 'cron-parser'
 import ms from 'ms'
 
-import { configDir as defaultConfigDir } from '../config'
-import { queryHistory } from '../history'
-import { listTasks } from '../list'
-import type { TasksDirReadError } from '../validate'
+import { configDir as defaultConfigDir } from '#src/config'
+import { queryHistory } from '#src/history'
+import { listTasks } from '#src/list'
+import type { TasksDirReadError } from '#src/validate'
 
 // Types --
 

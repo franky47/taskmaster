@@ -6,13 +6,14 @@ import os from 'node:os'
 import path from 'node:path'
 import { PassThrough } from 'node:stream'
 
-import { AgentNotFoundError } from '../agent'
-import { TaskContentionError, acquireTaskLock, releaseLock } from '../lock'
+import { AgentNotFoundError } from '#src/agent'
+import { TaskContentionError, acquireTaskLock, releaseLock } from '#src/lock'
 import {
   FrontmatterValidationError,
   TaskFileNameError,
   TaskNotFoundError,
-} from '../task'
+} from '#src/task'
+
 import { CwdNotFoundError } from './cwd'
 import type { ExecuteDeps, SpawnAgentDeps } from './run'
 import { KILL_GRACE_MS, defaultSpawnAgent, executeTask, runTask } from './run'

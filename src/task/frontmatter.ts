@@ -4,7 +4,7 @@ import matter from 'gray-matter'
 import ms from 'ms'
 import { z } from 'zod'
 
-import { minCronIntervalMs } from '../schedule'
+import { minCronIntervalMs } from '#src/schedule'
 
 const VALID_TIMEZONES = new Set(Intl.supportedValuesOf('timeZone'))
 

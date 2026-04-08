@@ -2,7 +2,7 @@ import fs from 'node:fs'
 
 import * as errore from 'errore'
 
-import { formatTimestamp } from '../history'
+import { formatTimestamp } from '#src/history'
 
 // Errors --
 

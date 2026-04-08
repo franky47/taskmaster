@@ -7,7 +7,7 @@ import {
   FrontmatterValidationError,
   parseTaskFile,
   TaskFileNameError,
-} from '../task'
+} from '#src/task'
 
 type ValidResult = {
   name: string
