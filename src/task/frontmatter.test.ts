@@ -336,14 +336,14 @@ describe('parseMarkdown', () => {
       expect(result.timeout).toBe(3_600_000)
     })
 
-    test('defaults timeout to interval when omitted and interval <= 1h', () => {
-      // Schedule: every 5 minutes — default should be 5m (300000ms)
+    test('defaults timeout to interval minus buffer when omitted and interval <= 1h', () => {
+      // Schedule: every 5 minutes — default should be 5m - 10s = 290000ms
       const result = parseMarkdown(
         md(`schedule: '*/5 * * * *'\n${VALID_AGENT}`),
       )
       expect(result).not.toBeInstanceOf(Error)
       if (result instanceof Error) return
-      expect(result.timeout).toBe(300_000)
+      expect(result.timeout).toBe(290_000)
     })
 
     test('does not crash when schedule is invalid and timeout is set', () => {

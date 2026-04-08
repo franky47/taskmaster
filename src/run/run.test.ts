@@ -546,8 +546,8 @@ describe('executeTask', () => {
       },
     })
 
-    // Hourly schedule → default timeout = min(1h, 1h) = 3_600_000
-    expect(receivedTimeoutMs).toBe(3_600_000)
+    // Hourly schedule → default timeout = min(1h - 10s, 1h) = 3_590_000
+    expect(receivedTimeoutMs).toBe(3_590_000)
   })
 
   test('threads timedOut from spawnAgent into RunResult', async () => {

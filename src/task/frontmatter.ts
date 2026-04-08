@@ -86,6 +86,7 @@ export class FrontmatterValidationError extends errore.createTaggedError({
 
 const MIN_TIMEOUT_MS = 1000
 const DEFAULT_TIMEOUT_CAP_MS = 60 * 60_000 // 1 hour
+const SCHEDULE_BUFFER_MS = 10_000 // headroom to avoid overlapping the next run
 
 const UNQUOTED_STAR_RE = /^schedule:\s*[^"']*\*/m
 
@@ -274,7 +275,10 @@ const frontmatterSchema = rawFrontmatter
     let effectiveTimeout = timeout
     if (effectiveTimeout === undefined) {
       const minInterval = minCronIntervalMs(data.schedule)
-      effectiveTimeout = Math.min(minInterval, DEFAULT_TIMEOUT_CAP_MS)
+      effectiveTimeout = Math.min(
+        minInterval - SCHEDULE_BUFFER_MS,
+        DEFAULT_TIMEOUT_CAP_MS,
+      )
     }
     if (agent !== undefined) {
       return { ...common, timeout: effectiveTimeout, agent, args }
