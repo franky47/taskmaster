@@ -682,7 +682,7 @@ describe('checkTaskValidation', () => {
 
 describe('checkTaskNeverRan', () => {
   test('returns warning for enabled task with zero history', () => {
-    const finding = checkTaskNeverRan('backup', true, 0)
+    const finding = checkTaskNeverRan('backup', 'when-online', 0)
 
     expect(finding).toMatchObject({
       kind: 'task-never-ran',
@@ -696,7 +696,7 @@ describe('checkTaskNeverRan', () => {
   })
 
   test('returns null for tasks with history', () => {
-    expect(checkTaskNeverRan('backup', true, 3)).toBeNull()
+    expect(checkTaskNeverRan('backup', 'when-online', 3)).toBeNull()
   })
 
   test('returns null for disabled tasks even with zero history', () => {

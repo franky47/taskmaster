@@ -20,7 +20,7 @@ type LastRun = {
 export type TaskStatus = {
   name: string
   schedule: string
-  enabled: boolean
+  enabled: false | 'when-online' | 'always'
   timezone?: string
   timeout?: string
   last_run?: LastRun
@@ -79,7 +79,7 @@ export async function getTaskStatuses(
     }
 
     // Next run (only for enabled tasks)
-    if (task.enabled) {
+    if (task.enabled !== false) {
       const cronOpts: { currentDate: Date; tz?: string } = { currentDate: now }
       if (task.timezone) {
         cronOpts.tz = task.timezone

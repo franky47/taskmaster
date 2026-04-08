@@ -83,7 +83,7 @@ export async function tick(
   const tasks = await listTasks(tasksDir)
   if (tasks instanceof Error) return tasks
 
-  const enabledTasks = tasks.filter((t) => t.enabled)
+  const enabledTasks = tasks.filter((t) => t.enabled !== false)
 
   const dispatched: string[] = []
   const skipped: string[] = []

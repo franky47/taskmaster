@@ -1,14 +1,14 @@
 ---
 # tm-yqrq
 title: enabled enum schema + display
-status: in-progress
+status: completed
 type: task
 priority: normal
 tags:
     - schema
     - display
 created_at: 2026-04-08T10:11:15Z
-updated_at: 2026-04-08T10:18:00Z
+updated_at: 2026-04-08T10:29:34Z
 parent: tm-kgff
 ---
 
@@ -22,17 +22,17 @@ See parent PRD sections: "enabled field schema change", "Display changes".
 
 ## Acceptance criteria
 
-- [ ] Zod schema for `enabled` is `z.union([z.literal(false), z.literal('when-online'), z.literal('always')]).default('when-online')`
-- [ ] `enabled: true` is rejected by the schema (no backward compat)
-- [ ] Omitting `enabled` defaults to `'when-online'`
-- [ ] `tm validate` rejects tasks with `enabled: true` with a clear error
-- [ ] `tm list` shows `always` tag for `enabled: 'always'` tasks
-- [ ] `tm list` shows `enabled` (no extra tag) for `when-online` tasks
-- [ ] `tm list` shows `disabled` for `enabled: false` tasks
-- [ ] `tm status` displays the enum value for each task
-- [ ] `--json` output includes `enabled` as its string/boolean value in both `tm list` and `tm status`
-- [ ] Unit tests for schema parsing (all three values, default, rejection of `true`)
-- [ ] Unit tests for list and status display formatting
+- [x] Zod schema for `enabled` is `z.union([z.literal(false), z.literal('when-online'), z.literal('always')]).default('when-online')`
+- [x] `enabled: true` is rejected by the schema (no backward compat)
+- [x] Omitting `enabled` defaults to `'when-online'`
+- [x] `tm validate` rejects tasks with `enabled: true` with a clear error
+- [x] `tm list` shows `always` tag for `enabled: 'always'` tasks
+- [x] `tm list` shows `enabled` (no extra tag) for `when-online` tasks
+- [x] `tm list` shows `disabled` for `enabled: false` tasks
+- [x] `tm status` displays the enum value for each task
+- [x] `--json` output includes `enabled` as its string/boolean value in both `tm list` and `tm status`
+- [x] Unit tests for schema parsing (all three values, default, rejection of `true`)
+- [x] Unit tests for list and status display formatting
 
 ## User stories addressed
 
@@ -41,3 +41,7 @@ See parent PRD sections: "enabled field schema change", "Display changes".
 - User story 7: enum value in `tm status`
 - User story 9: `enabled: true` rejected by validate
 - User story 12: JSON output includes enum value
+
+## Summary of Changes
+
+Updated the Zod schema from `z.boolean().default(true)` to `z.union([z.literal(false), z.literal('when-online'), z.literal('always')]).default('when-online')`. Propagated the type change through status, doctor, and tick modules. Updated display formatting in `tm list` and `tm status`.

@@ -111,7 +111,7 @@ describe('getTaskStatuses', () => {
     expect(first).toEqual({
       name: 'my-task',
       schedule: '0 8 * * 1-5',
-      enabled: true,
+      enabled: 'when-online',
       // Next weekday after Sunday 2026-04-05 is Monday 2026-04-06 at 08:00 UTC
       next_run: '2026-04-06T08:00:00.000Z',
     })
@@ -216,6 +216,32 @@ describe('getTaskStatuses', () => {
     expect(first.last_run?.timestamp).toBe('2026-04-04T08:00:00.000Z')
   })
 
+  test("'always' task computes next_run", async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(
+      configDir,
+      'local-task',
+      `---
+schedule: '0 8 * * 1-5'
+agent: opencode
+enabled: 'always'
+---
+
+Local model task.
+`,
+    )
+
+    const result = await getTaskStatuses({ configDir, now: NOW })
+    expect(result).not.toBeInstanceOf(Error)
+    if (result instanceof Error) return
+
+    const first = result[0]
+    expect(first).toBeDefined()
+    if (!first) return
+    expect(first.enabled).toBe('always')
+    expect(first.next_run).toBe('2026-04-06T08:00:00.000Z')
+  })
+
   test('disabled task omits next_run', async () => {
     const configDir = await makeConfigDir()
     await writeTask(configDir, 'off-task', DISABLED_TASK)
@@ -273,7 +299,7 @@ describe('getTaskStatuses', () => {
     if (!first) return
     expect(first.name).toBe('run-task')
     expect(first.schedule).toBe('0 12 * * *')
-    expect(first.enabled).toBe(true)
+    expect(first.enabled).toBe('when-online')
     expect(first.next_run).toBe('2026-04-06T12:00:00.000Z')
   })
 

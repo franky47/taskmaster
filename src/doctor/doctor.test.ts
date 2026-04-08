@@ -11,7 +11,7 @@ function healthyDeps(): DoctorDeps {
   return {
     readHeartbeat: async () => new Date('2026-04-07T11:59:00.000Z'),
     listTasks: async () => [
-      { name: 'backup', schedule: '0 * * * *', enabled: true },
+      { name: 'backup', schedule: '0 * * * *', enabled: 'when-online' },
     ],
     validateTasks: async () => [{ name: 'backup', valid: true as const }],
     queryHistory: async () => [
@@ -204,8 +204,8 @@ describe('doctor', () => {
   test('filters contention log entries per task', async () => {
     const deps = healthyDeps()
     deps.listTasks = async () => [
-      { name: 'backup', schedule: '0 * * * *', enabled: true },
-      { name: 'sync', schedule: '*/5 * * * *', enabled: true },
+      { name: 'backup', schedule: '0 * * * *', enabled: 'when-online' },
+      { name: 'sync', schedule: '*/5 * * * *', enabled: 'when-online' },
     ]
     deps.readLog = () => [
       {
@@ -248,7 +248,12 @@ describe('doctor', () => {
       },
     ]
     deps.listTasks = async () => [
-      { name: 'backup', schedule: '0 * * * *', enabled: true, timeout: 30_000 },
+      {
+        name: 'backup',
+        schedule: '0 * * * *',
+        enabled: 'when-online',
+        timeout: 30_000,
+      },
     ]
     const result = await doctor({ now, deps })
     expect(result.ok).toBe(false)
@@ -264,7 +269,7 @@ describe('doctor', () => {
       {
         name: 'backup',
         schedule: '*/5 * * * *',
-        enabled: true,
+        enabled: 'when-online',
         timeout: 600_000,
       },
     ]
@@ -281,7 +286,7 @@ describe('doctor', () => {
       {
         name: 'backup',
         schedule: '0 * * * *',
-        enabled: true,
+        enabled: 'when-online',
         timeout: 30_000,
       },
     ]

@@ -125,9 +125,13 @@ async function main(): Promise<void> {
         console.log(JSON.stringify(tasks))
       } else {
         for (const task of tasks) {
-          console.log(
-            `${task.name} ${task.schedule} ${task.enabled ? 'enabled' : 'disabled'}`,
-          )
+          const tag =
+            task.enabled === false
+              ? 'disabled'
+              : task.enabled === 'always'
+                ? 'always'
+                : 'enabled'
+          console.log(`${task.name} ${task.schedule} ${tag}`)
         }
       }
     })

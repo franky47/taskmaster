@@ -266,10 +266,10 @@ export function checkTaskValidation(
 
 export function checkTaskNeverRan(
   taskName: string,
-  enabled: boolean,
+  enabled: false | 'when-online' | 'always',
   historyLength: number,
 ): TaskNeverRanFinding | null {
-  if (!enabled || historyLength > 0) return null
+  if (enabled === false || historyLength > 0) return null
   return { kind: 'task-never-ran', severity: 'warning', task: taskName }
 }
 

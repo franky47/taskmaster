@@ -83,7 +83,7 @@ describe('listTasks', () => {
     await writeTask(tasksDir, 'my-task', ENABLED_TASK)
     const result = await listTasks(tasksDir)
     expect(result).toEqual([
-      { name: 'my-task', schedule: '0 8 * * 1-5', enabled: true },
+      { name: 'my-task', schedule: '0 8 * * 1-5', enabled: 'when-online' },
     ])
   })
 
@@ -96,7 +96,7 @@ describe('listTasks', () => {
         name: 'weekly',
         schedule: '0 9 * * 1',
         timezone: 'America/New_York',
-        enabled: true,
+        enabled: 'when-online',
       },
     ])
   })
@@ -139,7 +139,7 @@ Bad.
     )
     const result = await listTasks(tasksDir)
     expect(result).toEqual([
-      { name: 'good-task', schedule: '0 8 * * 1-5', enabled: true },
+      { name: 'good-task', schedule: '0 8 * * 1-5', enabled: 'when-online' },
     ])
   })
 
@@ -149,7 +149,7 @@ Bad.
     await writeTask(tasksDir, 'Bad_Name', ENABLED_TASK)
     const result = await listTasks(tasksDir)
     expect(result).toEqual([
-      { name: 'good-task', schedule: '0 8 * * 1-5', enabled: true },
+      { name: 'good-task', schedule: '0 8 * * 1-5', enabled: 'when-online' },
     ])
   })
 
@@ -161,7 +161,7 @@ Bad.
       {
         name: 'timed',
         schedule: '0 8 * * 1-5',
-        enabled: true,
+        enabled: 'when-online',
         timeout: 300_000,
       },
     ])
@@ -172,7 +172,7 @@ Bad.
     await writeTask(tasksDir, 'run-task', RUN_TASK)
     const result = await listTasks(tasksDir)
     expect(result).toEqual([
-      { name: 'run-task', schedule: '0 12 * * *', enabled: true },
+      { name: 'run-task', schedule: '0 12 * * *', enabled: 'when-online' },
     ])
   })
 })

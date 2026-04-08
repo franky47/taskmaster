@@ -192,9 +192,11 @@ const rawFrontmatter = z.object({
     .default({}),
 
   enabled: z
-    .boolean({ error: 'enabled must be a boolean' })
+    .union([z.literal(false), z.literal('when-online'), z.literal('always')], {
+      error: "enabled must be false, 'when-online', or 'always'",
+    })
     .optional()
-    .default(true),
+    .default('when-online'),
 
   timeout: z
     .string({ error: 'timeout must be a string' })

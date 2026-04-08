@@ -444,20 +444,29 @@ describe('parseMarkdown', () => {
   })
 
   describe('enabled', () => {
-    test('defaults to true when missing', () => {
+    test("defaults to 'when-online' when missing", () => {
       const result = parseMarkdown(md(`schedule: '0 8 * * *'\n${VALID_AGENT}`))
       expect(result).not.toBeInstanceOf(Error)
       if (result instanceof Error) return
-      expect(result.enabled).toBe(true)
+      expect(result.enabled).toBe('when-online')
     })
 
-    test('accepts true', () => {
+    test("accepts 'when-online'", () => {
       const result = parseMarkdown(
-        md(`schedule: '0 8 * * *'\n${VALID_AGENT}\nenabled: true`),
+        md(`schedule: '0 8 * * *'\n${VALID_AGENT}\nenabled: 'when-online'`),
       )
       expect(result).not.toBeInstanceOf(Error)
       if (result instanceof Error) return
-      expect(result.enabled).toBe(true)
+      expect(result.enabled).toBe('when-online')
+    })
+
+    test("accepts 'always'", () => {
+      const result = parseMarkdown(
+        md(`schedule: '0 8 * * *'\n${VALID_AGENT}\nenabled: 'always'`),
+      )
+      expect(result).not.toBeInstanceOf(Error)
+      if (result instanceof Error) return
+      expect(result.enabled).toBe('always')
     })
 
     test('accepts false', () => {
@@ -469,17 +478,22 @@ describe('parseMarkdown', () => {
       expect(result.enabled).toBe(false)
     })
 
-    test('rejects non-boolean', () => {
+    test('rejects true', () => {
+      const result = parseMarkdown(
+        md(`schedule: '0 8 * * *'\n${VALID_AGENT}\nenabled: true`),
+      )
+      expect(result).toBeInstanceOf(FrontmatterValidationError)
+      if (!(result instanceof FrontmatterValidationError)) return
+      expect(result.errors.some((e) => e.key === 'enabled')).toBe(true)
+    })
+
+    test('rejects invalid string', () => {
       const result = parseMarkdown(
         md(`schedule: '0 8 * * *'\n${VALID_AGENT}\nenabled: 'yes'`),
       )
       expect(result).toBeInstanceOf(FrontmatterValidationError)
       if (!(result instanceof FrontmatterValidationError)) return
-      expect(
-        result.errors.some(
-          (e) => e.key === 'enabled' && e.message.includes('must be a boolean'),
-        ),
-      ).toBe(true)
+      expect(result.errors.some((e) => e.key === 'enabled')).toBe(true)
     })
   })
 
