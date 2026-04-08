@@ -1,14 +1,14 @@
 ---
 # tm-kgff
 title: Connectivity-aware task scheduling
-status: draft
+status: completed
 type: feature
 priority: normal
 tags:
     - connectivity
     - scheduling
 created_at: 2026-04-08T10:01:13Z
-updated_at: 2026-04-08T10:01:13Z
+updated_at: 2026-04-08T11:13:30Z
 ---
 
 ## Problem Statement
