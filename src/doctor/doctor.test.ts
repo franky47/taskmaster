@@ -12,7 +12,12 @@ function healthyDeps(): DoctorDeps {
   return {
     readHeartbeat: async () => new Date('2026-04-07T11:59:00.000Z'),
     listTasks: async () => [
-      { name: 'backup', schedule: '0 * * * *', enabled: 'when-online' },
+      {
+        name: 'backup',
+        schedule: '0 * * * *',
+        enabled: 'when-online',
+        timeout: 1_800_000,
+      },
     ],
     validateTasks: async () => [{ name: 'backup', valid: true as const }],
     queryHistory: async () => [
@@ -205,8 +210,18 @@ describe('doctor', () => {
   test('filters contention log entries per task', async () => {
     const deps = healthyDeps()
     deps.listTasks = async () => [
-      { name: 'backup', schedule: '0 * * * *', enabled: 'when-online' },
-      { name: 'sync', schedule: '*/5 * * * *', enabled: 'when-online' },
+      {
+        name: 'backup',
+        schedule: '0 * * * *',
+        enabled: 'when-online',
+        timeout: 3_600_000,
+      },
+      {
+        name: 'sync',
+        schedule: '*/5 * * * *',
+        enabled: 'when-online',
+        timeout: 300_000,
+      },
     ]
     deps.readLog = () => [
       {
@@ -227,7 +242,12 @@ describe('doctor', () => {
   test('skips disabled tasks for never-ran check', async () => {
     const deps = healthyDeps()
     deps.listTasks = async () => [
-      { name: 'backup', schedule: '0 * * * *', enabled: false },
+      {
+        name: 'backup',
+        schedule: '0 * * * *',
+        enabled: false,
+        timeout: 1_800_000,
+      },
     ]
     deps.queryHistory = async () => []
     const result = await doctor({ now, deps })

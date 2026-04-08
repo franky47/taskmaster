@@ -301,23 +301,7 @@ describe('parseMarkdown', () => {
       ).toBe(true)
     })
 
-    test('rejects timeout exceeding schedule interval', () => {
-      // Schedule: every 5 minutes, timeout: 10m
-      const result = parseMarkdown(
-        md(`schedule: '*/5 * * * *'\n${VALID_AGENT}\ntimeout: '10m'`),
-      )
-      expect(result).toBeInstanceOf(FrontmatterValidationError)
-      if (!(result instanceof FrontmatterValidationError)) return
-      expect(
-        result.errors.some(
-          (e) =>
-            e.key === 'timeout' &&
-            e.message.includes('less than the schedule interval'),
-        ),
-      ).toBe(true)
-    })
-
-    test('uses minimum gap for non-uniform cron schedules', () => {
+    test('rejects timeout exceeding minimum gap for non-uniform schedules', () => {
       // Schedule: 9am and 5pm — minimum gap is 8h
       // Timeout: 10h exceeds the 8h gap
       const result = parseMarkdown(
@@ -332,6 +316,34 @@ describe('parseMarkdown', () => {
             e.message.includes('less than the schedule interval'),
         ),
       ).toBe(true)
+    })
+
+    test('accepts explicit timeout > 1h when under the schedule interval', () => {
+      // Schedule: daily (24h interval), timeout: 2h — well under
+      const result = parseMarkdown(
+        md(`schedule: '0 0 * * *'\n${VALID_AGENT}\ntimeout: '2h'`),
+      )
+      expect(result).not.toBeInstanceOf(Error)
+      if (result instanceof Error) return
+      expect(result.timeout).toBe(7_200_000)
+    })
+
+    test('defaults timeout to 1h when omitted and interval > 1h', () => {
+      // Schedule: daily (24h interval) — default should be 1h
+      const result = parseMarkdown(md(`schedule: '0 0 * * *'\n${VALID_AGENT}`))
+      expect(result).not.toBeInstanceOf(Error)
+      if (result instanceof Error) return
+      expect(result.timeout).toBe(3_600_000)
+    })
+
+    test('defaults timeout to interval when omitted and interval <= 1h', () => {
+      // Schedule: every 5 minutes — default should be 5m (300000ms)
+      const result = parseMarkdown(
+        md(`schedule: '*/5 * * * *'\n${VALID_AGENT}`),
+      )
+      expect(result).not.toBeInstanceOf(Error)
+      if (result instanceof Error) return
+      expect(result.timeout).toBe(300_000)
     })
 
     test('does not crash when schedule is invalid and timeout is set', () => {
@@ -498,11 +510,12 @@ describe('parseMarkdown', () => {
   })
 
   describe('timeout', () => {
-    test('allows missing timeout', () => {
+    test('defaults timeout when omitted', () => {
+      // Schedule: daily at 8am (24h interval) — default capped at 1h
       const result = parseMarkdown(md(`schedule: '0 8 * * *'\n${VALID_AGENT}`))
       expect(result).not.toBeInstanceOf(Error)
       if (result instanceof Error) return
-      expect(result.timeout).toBeUndefined()
+      expect(result.timeout).toBe(3_600_000)
     })
 
     test('accepts "30s" and converts to 30000ms', () => {
@@ -523,13 +536,13 @@ describe('parseMarkdown', () => {
       expect(result.timeout).toBe(300_000)
     })
 
-    test('accepts "2h" and converts to 7200000ms', () => {
+    test('accepts "30m" and converts to 1800000ms', () => {
       const result = parseMarkdown(
-        md(`schedule: '0 8 * * *'\n${VALID_AGENT}\ntimeout: '2h'`),
+        md(`schedule: '0 8 * * *'\n${VALID_AGENT}\ntimeout: '30m'`),
       )
       expect(result).not.toBeInstanceOf(Error)
       if (result instanceof Error) return
-      expect(result.timeout).toBe(7_200_000)
+      expect(result.timeout).toBe(1_800_000)
     })
 
     test('accepts exactly 1s (boundary)', () => {

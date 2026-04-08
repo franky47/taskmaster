@@ -85,6 +85,7 @@ export class FrontmatterValidationError extends errore.createTaggedError({
 // --
 
 const MIN_TIMEOUT_MS = 1000
+const DEFAULT_TIMEOUT_CAP_MS = 60 * 60_000 // 1 hour
 
 const UNQUOTED_STAR_RE = /^schedule:\s*[^"']*\*/m
 
@@ -269,14 +270,19 @@ const frontmatterSchema = rawFrontmatter
     }
   })
   .transform((data) => {
-    const { agent, run, args, ...common } = data
+    const { agent, run, args, timeout, ...common } = data
+    let effectiveTimeout = timeout
+    if (effectiveTimeout === undefined) {
+      const minInterval = minCronIntervalMs(data.schedule)
+      effectiveTimeout = Math.min(minInterval, DEFAULT_TIMEOUT_CAP_MS)
+    }
     if (agent !== undefined) {
-      return { ...common, agent, args }
+      return { ...common, timeout: effectiveTimeout, agent, args }
     }
     if (run === undefined) {
       throw new Error(
         'invariant: superRefine guarantees exactly one of agent/run',
       )
     }
-    return { ...common, run }
+    return { ...common, timeout: effectiveTimeout, run }
   })

@@ -36,12 +36,10 @@ export async function listTasks(
       name: file.replace(/\.md$/, ''),
       schedule: parsed.schedule,
       enabled: parsed.enabled,
+      timeout: parsed.timeout,
     }
     if (parsed.timezone) {
       entry.timezone = parsed.timezone
-    }
-    if (parsed.timeout) {
-      entry.timeout = parsed.timeout
     }
     results.push(entry)
   }

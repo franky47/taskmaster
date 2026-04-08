@@ -527,7 +527,7 @@ describe('executeTask', () => {
     expect(receivedTimeoutMs).toBe(30_000)
   })
 
-  test('does not pass timeout when frontmatter omits it', async () => {
+  test('uses default timeout when frontmatter omits it', async () => {
     const configDir = await makeConfigDir()
     await writeTask(
       configDir,
@@ -535,7 +535,7 @@ describe('executeTask', () => {
       '---\nschedule: "0 * * * *"\nagent: opencode\n---\nGo',
     )
 
-    let receivedTimeoutMs: number | undefined = 999
+    let receivedTimeoutMs: number | undefined
     await executeTask('no-timeout', {
       configDir,
       deps: {
@@ -546,7 +546,8 @@ describe('executeTask', () => {
       },
     })
 
-    expect(receivedTimeoutMs).toBeUndefined()
+    // Hourly schedule → default timeout = min(1h, 1h) = 3_600_000
+    expect(receivedTimeoutMs).toBe(3_600_000)
   })
 
   test('threads timedOut from spawnAgent into RunResult', async () => {

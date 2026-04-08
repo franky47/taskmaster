@@ -121,6 +121,7 @@ describe('getTaskStatuses', () => {
       name: 'my-task',
       schedule: '0 8 * * 1-5',
       enabled: 'when-online',
+      timeout: '1h',
       // Next weekday after Sunday 2026-04-05 is Monday 2026-04-06 at 08:00 UTC
       next_run: '2026-04-06T08:00:00.000Z',
     })
@@ -362,7 +363,7 @@ Task with timeout.
     })
   })
 
-  test('omits timeout when task does not have one', async () => {
+  test('defaults timeout to 1h for daily schedule', async () => {
     const configDir = await makeConfigDir()
     await writeTask(configDir, 'no-timeout', ENABLED_TASK)
 
@@ -373,6 +374,6 @@ Task with timeout.
     const first = result[0]
     expect(first).toBeDefined()
     if (!first) return
-    expect(first).not.toHaveProperty('timeout')
+    expect(first.timeout).toBe('1h')
   })
 })

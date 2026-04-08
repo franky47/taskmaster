@@ -83,7 +83,12 @@ describe('listTasks', () => {
     await writeTask(tasksDir, 'my-task', ENABLED_TASK)
     const result = await listTasks(tasksDir)
     expect(result).toEqual([
-      { name: 'my-task', schedule: '0 8 * * 1-5', enabled: 'when-online' },
+      {
+        name: 'my-task',
+        schedule: '0 8 * * 1-5',
+        enabled: 'when-online',
+        timeout: 3_600_000,
+      },
     ])
   })
 
@@ -97,6 +102,7 @@ describe('listTasks', () => {
         schedule: '0 9 * * 1',
         timezone: 'America/New_York',
         enabled: 'when-online',
+        timeout: 3_600_000,
       },
     ])
   })
@@ -106,7 +112,12 @@ describe('listTasks', () => {
     await writeTask(tasksDir, 'off-task', DISABLED_TASK)
     const result = await listTasks(tasksDir)
     expect(result).toEqual([
-      { name: 'off-task', schedule: '30 6 * * *', enabled: false },
+      {
+        name: 'off-task',
+        schedule: '30 6 * * *',
+        enabled: false,
+        timeout: 3_600_000,
+      },
     ])
   })
 
@@ -139,7 +150,12 @@ Bad.
     )
     const result = await listTasks(tasksDir)
     expect(result).toEqual([
-      { name: 'good-task', schedule: '0 8 * * 1-5', enabled: 'when-online' },
+      {
+        name: 'good-task',
+        schedule: '0 8 * * 1-5',
+        enabled: 'when-online',
+        timeout: 3_600_000,
+      },
     ])
   })
 
@@ -149,7 +165,12 @@ Bad.
     await writeTask(tasksDir, 'Bad_Name', ENABLED_TASK)
     const result = await listTasks(tasksDir)
     expect(result).toEqual([
-      { name: 'good-task', schedule: '0 8 * * 1-5', enabled: 'when-online' },
+      {
+        name: 'good-task',
+        schedule: '0 8 * * 1-5',
+        enabled: 'when-online',
+        timeout: 3_600_000,
+      },
     ])
   })
 
@@ -172,7 +193,12 @@ Bad.
     await writeTask(tasksDir, 'run-task', RUN_TASK)
     const result = await listTasks(tasksDir)
     expect(result).toEqual([
-      { name: 'run-task', schedule: '0 12 * * *', enabled: 'when-online' },
+      {
+        name: 'run-task',
+        schedule: '0 12 * * *',
+        enabled: 'when-online',
+        timeout: 3_600_000,
+      },
     ])
   })
 })

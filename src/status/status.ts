@@ -22,7 +22,7 @@ type TaskStatus = {
   schedule: string
   enabled: false | 'when-online' | 'always'
   timezone?: string
-  timeout?: string
+  timeout: string
   last_run?: LastRun
   next_run?: string
 }
@@ -51,14 +51,11 @@ export async function getTaskStatuses(
       name: task.name,
       schedule: task.schedule,
       enabled: task.enabled,
+      timeout: ms(task.timeout),
     }
 
     if (task.timezone) {
       status.timezone = task.timezone
-    }
-
-    if (task.timeout) {
-      status.timeout = ms(task.timeout)
     }
 
     // Last run

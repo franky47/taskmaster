@@ -57,7 +57,7 @@ The filename (minus `.md`) is the task ID and must match `[a-z0-9-]+`.
 | `cwd` | no | temp dir | Working directory (`~` is expanded) |
 | `timezone` | no | system local | IANA timezone for cron evaluation |
 | `env` | no | `{}` | Environment variables (string key-value pairs) |
-| `timeout` | no | none | Max runtime as duration string (`30s`, `5m`, `1h`). Must be < schedule interval |
+| `timeout` | no | min(interval, 1h) | Max runtime as duration string (`30s`, `5m`). Must be < schedule interval |
 | `enabled` | no | `'when-online'` | `false` = never auto-scheduled. `'when-online'` = skip when offline. `'always'` = run regardless |
 
 **Constraints:**
@@ -65,7 +65,7 @@ The filename (minus `.md`) is the task ID and must match `[a-z0-9-]+`.
 - Exactly one of `agent` or `run` must be set.
 - `args` can only be used with `agent`, not `run`.
 - `run` must contain `$TM_PROMPT_FILE`.
-- `timeout` minimum is `1s` and must be shorter than the schedule interval.
+- `timeout` minimum is `1s` and must be shorter than the schedule interval. Defaults to min(interval, 1h) when omitted.
 
 ### Minimal Example
 
