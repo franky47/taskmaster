@@ -36,14 +36,14 @@ export type DoctorDeps = {
   isSchedulerInstalled: () => Promise<boolean>
 }
 
-export type DoctorOptions = {
+type DoctorOptions = {
   since?: Date
   now?: Date
   platform?: 'darwin' | 'linux'
   deps?: Partial<DoctorDeps>
 }
 
-export type DoctorResult =
+type DoctorResult =
   | { ok: true; message: string }
   | { ok: false; report: string }
 

@@ -35,11 +35,6 @@ export class TaskFileReadError extends errore.createTaggedError({
   message: 'Failed to read task file $path',
 }) {}
 
-export class TaskParseError extends errore.createTaggedError({
-  name: 'TaskParseError',
-  message: 'Task "$taskName" has validation errors',
-}) {}
-
 // --
 
 export async function parseTaskFile(

@@ -41,9 +41,7 @@ import { cleanupPromptFile, writePromptFile } from './prompt'
 
 // Types --
 
-export type { ResolvedCwd }
-
-export type RunResult = {
+type RunResult = {
   exitCode: number
   stdout: string
   stderr: string
@@ -54,21 +52,21 @@ export type RunResult = {
   finishedAt: Date
 }
 
-export type SpawnAgentOpts = {
+type SpawnAgentOpts = {
   command: string
   cwd: string
   env: Record<string, string>
   timeoutMs?: number
 }
 
-export type SpawnAgentResult = {
+type SpawnAgentResult = {
   exitCode: number
   stdout: string
   stderr: string
   timedOut: boolean
 }
 
-export type SpawnedChild = {
+type SpawnedChild = {
   pid: number | undefined
   exitCode: number | null
   stdout: Readable | null
@@ -180,7 +178,7 @@ export async function defaultSpawnAgent(
 
 // Public API --
 
-export type ExecuteError =
+type ExecuteError =
   | TaskFileNameError
   | TaskNotFoundError
   | TaskFileReadError
@@ -195,7 +193,7 @@ export type ExecuteError =
   | EnvFileReadError
   | EnvFileParseError
 
-export type RunError = ExecuteError | LockAcquireError | TaskContentionError
+type RunError = ExecuteError | LockAcquireError | TaskContentionError
 
 export async function executeTask(
   name: string,

@@ -8,7 +8,7 @@ import { historyMetaSchema } from './schema'
 
 // Errors --
 
-export class PurgeError extends errore.createTaggedError({
+class PurgeError extends errore.createTaggedError({
   name: 'PurgeError',
   message: 'Failed to purge history: $reason',
 }) {}

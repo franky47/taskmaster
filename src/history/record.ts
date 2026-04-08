@@ -3,7 +3,10 @@ import path from 'node:path'
 
 import * as errore from 'errore'
 
-import { configDir as defaultConfigDir } from '../config'
+import {
+  configDir as defaultConfigDir,
+  runsDir as defaultRunsDir,
+} from '../config'
 import type { HistoryMeta } from './schema'
 
 // Errors --
@@ -100,7 +103,10 @@ export async function recordHistory(
         await fs.rm(cwd.path, { recursive: true })
       } else {
         // S4.6: move temp dir to runs/ on failure, write artifacts
-        const runsPath = path.join(cfgDir, 'runs', taskName, timestamp)
+        const runsBase = deps?.configDir
+          ? path.join(deps.configDir, 'runs')
+          : defaultRunsDir
+        const runsPath = path.join(runsBase, taskName, timestamp)
         await fs.mkdir(path.dirname(runsPath), { recursive: true })
         await moveTempDir(cwd.path, runsPath)
 

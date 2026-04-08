@@ -16,7 +16,7 @@ type TickOptions = {
   spawnRun?: (name: string, timestamp: string) => void
 }
 
-export type TickResult = {
+type TickResult = {
   dispatched: string[]
   skipped: string[]
   heartbeat: string

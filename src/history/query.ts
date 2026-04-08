@@ -15,7 +15,7 @@ export class TaskNotFoundError extends errore.createTaggedError({
     'No task found named "$taskName", list available tasks with `tm list`.',
 }) {}
 
-export class HistoryReadError extends errore.createTaggedError({
+class HistoryReadError extends errore.createTaggedError({
   name: 'HistoryReadError',
   message: 'Failed to read history for task "$taskName": $reason',
 }) {}

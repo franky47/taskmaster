@@ -17,7 +17,7 @@ type LastRun = {
   duration_ms: number
 }
 
-export type TaskStatus = {
+type TaskStatus = {
   name: string
   schedule: string
   enabled: false | 'when-online' | 'always'

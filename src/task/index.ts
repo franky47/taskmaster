@@ -8,5 +8,4 @@ export {
   TaskFileNameError,
   TaskFileReadError,
   TaskNotFoundError,
-  TaskParseError,
 } from './parser'

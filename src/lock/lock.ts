@@ -7,11 +7,11 @@ import * as ffi from './ffi'
 
 // Types --
 
-export type LockAcquired = {
+type LockAcquired = {
   fd: number
 }
 
-export type LockContended = {
+type LockContended = {
   contended: true
 }
 
@@ -29,7 +29,7 @@ export class TaskContentionError extends errore.createTaggedError({
 
 // Public API --
 
-export function acquireLock(
+function acquireLock(
   lockPath: string,
 ): LockAcquireError | LockContended | LockAcquired {
   const fd = fs.openSync(lockPath, 'w')
