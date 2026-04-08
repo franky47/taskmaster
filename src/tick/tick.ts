@@ -5,7 +5,10 @@ import { CronExpressionParser } from 'cron-parser'
 
 import { configDir as defaultConfigDir } from '../config'
 import { formatTimestamp, purgeHistory, queryHistory } from '../history'
+import type { TaskListEntry } from '../list'
 import { listTasks } from '../list'
+import { log } from '../logger'
+import { isOnline as defaultIsOnline } from '../network'
 import type { TasksDirReadError } from '../validate'
 
 // Types --
@@ -14,6 +17,7 @@ type TickOptions = {
   configDir?: string
   now?: Date
   spawnRun?: (name: string, timestamp: string) => void
+  isOnline?: () => Promise<boolean>
 }
 
 type TickResult = {
@@ -74,12 +78,13 @@ export async function tick(
   const cfgDir = options?.configDir ?? defaultConfigDir
   const now = options?.now ?? new Date()
   const spawnRun = options?.spawnRun ?? defaultSpawnRun
+  const checkOnline = options?.isOnline ?? defaultIsOnline
 
   const tasksDir = path.join(cfgDir, 'tasks')
   const floored = floorToMinute(now)
   const timestamp = formatTimestamp(floored)
 
-  // S8.1: Read all task files, filter to enabled
+  // Stage 1: Read all task files, filter out disabled
   const tasks = await listTasks(tasksDir)
   if (tasks instanceof Error) return tasks
 
@@ -88,11 +93,12 @@ export async function tick(
   const dispatched: string[] = []
   const skipped: string[] = []
 
+  // Stage 2-3: Evaluate cron + dedup — collect tasks ready to dispatch
+  const ready: TaskListEntry[] = []
+
   for (const task of enabledTasks) {
-    // S8.3: Evaluate cron expression against floored time
     if (!isCronMatch(task.schedule, floored, task.timezone)) continue
 
-    // S8.4: Dedup against most recent history entry
     const history = await queryHistory(task.name, {
       configDir: cfgDir,
       last: 1,
@@ -106,7 +112,28 @@ export async function tick(
       continue
     }
 
-    // S8.5: Spawn detached tm run
+    ready.push(task)
+  }
+
+  // Stage 4: Connectivity filter
+  let toDispatch = ready
+  if (ready.some((t) => t.enabled === 'when-online')) {
+    const online = await checkOnline()
+    if (!online) {
+      toDispatch = []
+      for (const task of ready) {
+        if (task.enabled === 'when-online') {
+          log({ event: 'skipped', task: task.name, reason: 'offline' })
+          skipped.push(task.name)
+        } else {
+          toDispatch.push(task)
+        }
+      }
+    }
+  }
+
+  // Stage 5: Dispatch
+  for (const task of toDispatch) {
     spawnRun(task.name, timestamp)
     dispatched.push(task.name)
   }

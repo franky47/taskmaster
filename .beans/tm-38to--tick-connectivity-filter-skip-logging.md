@@ -1,14 +1,14 @@
 ---
 # tm-38to
 title: Tick connectivity filter + skip logging
-status: todo
+status: completed
 type: task
 priority: normal
 tags:
     - tick
     - logging
 created_at: 2026-04-08T10:11:34Z
-updated_at: 2026-04-08T10:11:34Z
+updated_at: 2026-04-08T11:00:09Z
 parent: tm-kgff
 blocked_by:
     - tm-yqrq
@@ -25,20 +25,20 @@ See parent PRD sections: "Tick pipeline changes", "Logger extension", "Manual ex
 
 ## Acceptance criteria
 
-- [ ] Tick pipeline checks connectivity via `isOnline()` after the dedup stage
-- [ ] When offline, `enabled: 'when-online'` tasks are filtered out (not dispatched)
-- [ ] When offline, `enabled: 'always'` tasks are dispatched normally
-- [ ] When online, all enabled tasks are dispatched regardless of `enabled` value
-- [ ] Logger `reason` field extended from `z.literal('contention')` to `z.enum(['contention', 'offline'])`
-- [ ] Each offline-skipped task logs `{ event: 'skipped', task: name, reason: 'offline' }` to the global log
-- [ ] DNS probe is skipped when no remaining tasks have `enabled: 'when-online'`
-- [ ] DNS probe is skipped when task list is empty after any prior filter stage
-- [ ] Pipeline exits early at each stage when the task list empties
-- [ ] `tm run <name>` is unaffected — no connectivity check on manual execution
-- [ ] Unit tests for online/offline filtering behavior
-- [ ] Unit tests for DNS probe skip optimization
-- [ ] Unit tests for offline skip log entries
-- [ ] Unit tests for early exit at each pipeline stage
+- [x] Tick pipeline checks connectivity via `isOnline()` after the dedup stage
+- [x] When offline, `enabled: 'when-online'` tasks are filtered out (not dispatched)
+- [x] When offline, `enabled: 'always'` tasks are dispatched normally
+- [x] When online, all enabled tasks are dispatched regardless of `enabled` value
+- [x] Logger `reason` field extended from `z.literal('contention')` to `z.enum(['contention', 'offline'])`
+- [x] Each offline-skipped task logs `{ event: 'skipped', task: name, reason: 'offline' }` to the global log
+- [x] DNS probe is skipped when no remaining tasks have `enabled: 'when-online'`
+- [x] DNS probe is skipped when task list is empty after any prior filter stage
+- [x] Pipeline exits early at each stage when the task list empties
+- [x] `tm run <name>` is unaffected — no connectivity check on manual execution
+- [x] Unit tests for online/offline filtering behavior
+- [x] Unit tests for DNS probe skip optimization
+- [x] Unit tests for offline skip log entries
+- [x] Unit tests for early exit at each pipeline stage
 
 ## User stories addressed
 
@@ -48,3 +48,7 @@ See parent PRD sections: "Tick pipeline changes", "Logger extension", "Manual ex
 - User story 13: offline skips logged
 - User story 14: DNS probe skipped when all tasks are `always`
 - User story 15: DNS probe skipped when no tasks are due
+
+## Summary of Changes
+
+Restructured the tick pipeline into staged processing: cron+dedup collection, then connectivity filter, then dispatch. Extended the logger reason enum to accept 'offline'. Offline-skipped tasks are both logged and included in TickResult.skipped.

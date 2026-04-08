@@ -3,6 +3,7 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 
+import { readLog } from '../logger'
 import { tick } from './tick'
 
 async function makeConfigDir(): Promise<string> {
@@ -101,6 +102,7 @@ describe('tick', () => {
       configDir,
       now: NOW,
       spawnRun: (name, timestamp) => spawned.push({ name, timestamp }),
+      isOnline: async () => true,
     })
 
     expect(result).not.toBeInstanceOf(Error)
@@ -121,6 +123,7 @@ describe('tick', () => {
       configDir,
       now,
       spawnRun: (name, timestamp) => spawned.push({ name, timestamp }),
+      isOnline: async () => true,
     })
 
     expect(result).not.toBeInstanceOf(Error)
@@ -138,6 +141,7 @@ describe('tick', () => {
       configDir,
       now: NOW,
       spawnRun: (name, timestamp) => spawned.push({ name, timestamp }),
+      isOnline: async () => true,
     })
 
     expect(result).not.toBeInstanceOf(Error)
@@ -158,6 +162,7 @@ describe('tick', () => {
       configDir,
       now,
       spawnRun: (name, timestamp) => spawned.push({ name, timestamp }),
+      isOnline: async () => true,
     })
 
     expect(result).not.toBeInstanceOf(Error)
@@ -178,6 +183,7 @@ describe('tick', () => {
       configDir,
       now: NOW,
       spawnRun: (name, timestamp) => spawned.push({ name, timestamp }),
+      isOnline: async () => true,
     })
 
     expect(result).not.toBeInstanceOf(Error)
@@ -199,6 +205,7 @@ describe('tick', () => {
       configDir,
       now: NOW,
       spawnRun: (name, timestamp) => spawned.push({ name, timestamp }),
+      isOnline: async () => true,
     })
 
     expect(result).not.toBeInstanceOf(Error)
@@ -219,6 +226,7 @@ describe('tick', () => {
       configDir,
       now,
       spawnRun: (name, timestamp) => spawned.push({ name, timestamp }),
+      isOnline: async () => true,
     })
 
     expect(result).not.toBeInstanceOf(Error)
@@ -238,6 +246,7 @@ describe('tick', () => {
       configDir,
       now,
       spawnRun: (name, timestamp) => spawned.push({ name, timestamp }),
+      isOnline: async () => true,
     })
 
     expect(result).not.toBeInstanceOf(Error)
@@ -253,6 +262,7 @@ describe('tick', () => {
       configDir,
       now: NOW,
       spawnRun: () => {},
+      isOnline: async () => true,
     })
 
     expect(result).not.toBeInstanceOf(Error)
@@ -279,6 +289,7 @@ describe('tick', () => {
       configDir,
       now: NOW,
       spawnRun: () => {},
+      isOnline: async () => true,
     })
 
     expect(result).not.toBeInstanceOf(Error)
@@ -302,6 +313,7 @@ describe('tick', () => {
       configDir,
       now: NOW,
       spawnRun: (name, timestamp) => spawned.push({ name, timestamp }),
+      isOnline: async () => true,
     })
 
     expect(result).not.toBeInstanceOf(Error)
@@ -318,6 +330,7 @@ describe('tick', () => {
       configDir,
       now: NOW,
       spawnRun: () => {},
+      isOnline: async () => true,
     })
 
     expect(result).not.toBeInstanceOf(Error)
@@ -325,6 +338,142 @@ describe('tick', () => {
 
     expect(result.dispatched).toEqual([])
     expect(result.skipped).toEqual([])
+  })
+
+  test("offline: skips 'when-online' tasks", async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(configDir, 'cloud-task', EVERY_MINUTE_TASK) // defaults to 'when-online'
+
+    const spawned: Array<{ name: string; timestamp: string }> = []
+    const result = await tick({
+      configDir,
+      now: NOW,
+      spawnRun: (name, timestamp) => spawned.push({ name, timestamp }),
+      isOnline: async () => false,
+    })
+
+    expect(result).not.toBeInstanceOf(Error)
+    if (result instanceof Error) return
+
+    expect(result.dispatched).toEqual([])
+    expect(result.skipped).toEqual(['cloud-task'])
+    expect(spawned).toEqual([])
+  })
+
+  test("offline: dispatches 'always' tasks normally", async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(
+      configDir,
+      'local-task',
+      `---
+schedule: "* * * * *"
+agent: opencode
+enabled: 'always'
+---
+
+Local model task.
+`,
+    )
+
+    const spawned: Array<{ name: string; timestamp: string }> = []
+    const result = await tick({
+      configDir,
+      now: NOW,
+      spawnRun: (name, timestamp) => spawned.push({ name, timestamp }),
+      isOnline: async () => false,
+    })
+
+    expect(result).not.toBeInstanceOf(Error)
+    if (result instanceof Error) return
+
+    expect(result.dispatched).toEqual(['local-task'])
+    expect(spawned).toHaveLength(1)
+  })
+
+  test("online: dispatches both 'when-online' and 'always' tasks", async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(configDir, 'cloud', EVERY_MINUTE_TASK) // defaults to 'when-online'
+    await writeTask(
+      configDir,
+      'local',
+      `---
+schedule: "* * * * *"
+agent: opencode
+enabled: 'always'
+---
+
+Local task.
+`,
+    )
+
+    const spawned: Array<{ name: string; timestamp: string }> = []
+    const result = await tick({
+      configDir,
+      now: NOW,
+      spawnRun: (name, timestamp) => spawned.push({ name, timestamp }),
+      isOnline: async () => true,
+    })
+
+    expect(result).not.toBeInstanceOf(Error)
+    if (result instanceof Error) return
+
+    expect(result.dispatched).toEqual(['cloud', 'local'])
+    expect(spawned).toHaveLength(2)
+  })
+
+  test("skips DNS probe when all due tasks are 'always'", async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(
+      configDir,
+      'local-only',
+      `---
+schedule: "* * * * *"
+agent: opencode
+enabled: 'always'
+---
+
+Local only task.
+`,
+    )
+
+    let probeCalled = false
+    const result = await tick({
+      configDir,
+      now: NOW,
+      spawnRun: () => {},
+      isOnline: async () => {
+        probeCalled = true
+        return false
+      },
+    })
+
+    expect(result).not.toBeInstanceOf(Error)
+    if (result instanceof Error) return
+
+    expect(result.dispatched).toEqual(['local-only'])
+    expect(probeCalled).toBe(false)
+  })
+
+  test('logs offline-skipped tasks to global log', async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(configDir, 'cloud-a', EVERY_MINUTE_TASK)
+    await writeTask(configDir, 'cloud-b', EVERY_MINUTE_TASK)
+
+    const before = new Date()
+    await tick({
+      configDir,
+      now: NOW,
+      spawnRun: () => {},
+      isOnline: async () => false,
+    })
+
+    const entries = readLog(before)
+    const offlineSkips = entries.filter(
+      (e) => e.event === 'skipped' && e.reason === 'offline',
+    )
+    expect(offlineSkips).toHaveLength(2)
+    const names = offlineSkips.map((e) => e.task).sort()
+    expect(names).toEqual(['cloud-a', 'cloud-b'])
   })
 
   test('does not dispatch on weekends for weekday-only schedule', async () => {
@@ -338,6 +487,7 @@ describe('tick', () => {
       configDir,
       now,
       spawnRun: (name, timestamp) => spawned.push({ name, timestamp }),
+      isOnline: async () => true,
     })
 
     expect(result).not.toBeInstanceOf(Error)

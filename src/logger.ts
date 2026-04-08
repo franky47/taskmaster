@@ -18,7 +18,7 @@ const skippedEntrySchema = z.object({
   ts: z.string(),
   event: z.literal('skipped'),
   task: z.string(),
-  reason: z.literal('contention'),
+  reason: z.enum(['contention', 'offline']),
 })
 
 const errorEntrySchema = z.object({
@@ -40,7 +40,7 @@ export type LogEntry = z.infer<typeof logEntrySchema>
 
 type LogInput =
   | { event: 'started'; task: string; trigger: 'manual' | 'tick' }
-  | { event: 'skipped'; task: string; reason: 'contention' }
+  | { event: 'skipped'; task: string; reason: 'contention' | 'offline' }
   | { event: 'error'; task: string; error: Error }
 
 // Serialization --

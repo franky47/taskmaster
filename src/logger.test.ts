@@ -72,7 +72,7 @@ describe('log', () => {
     expect(lines[0]!.ts).toBeString()
   })
 
-  test('writes skipped event', () => {
+  test('writes skipped event with contention reason', () => {
     const logFile = makeTempLogFile()
 
     log({ event: 'skipped', task: 'my-task', reason: 'contention' }, logFile)
@@ -83,6 +83,20 @@ describe('log', () => {
       event: 'skipped',
       task: 'my-task',
       reason: 'contention',
+    })
+  })
+
+  test('writes skipped event with offline reason', () => {
+    const logFile = makeTempLogFile()
+
+    log({ event: 'skipped', task: 'my-task', reason: 'offline' }, logFile)
+
+    const entries = readLog(new Date(0), logFile)
+    expect(entries).toHaveLength(1)
+    expect(entries[0]).toMatchObject({
+      event: 'skipped',
+      task: 'my-task',
+      reason: 'offline',
     })
   })
 
