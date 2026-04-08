@@ -15,19 +15,22 @@
     "test:integration": "bun test ./src/**/*-test.ts",
     "check": "bun run fmt:check && bun run lint && bun run typecheck && bun test",
     "build": "bun build src/main.ts --compile --outfile tm",
-    "prepare": "husky"
+    "prepare": "husky",
+    "knip": "knip"
   },
   "devDependencies": {
     "@types/bun": "latest",
     "@types/ms": "^2.1.0",
+    "@types/node": "^25.5.2",
     "@typescript/native-preview": "^7.0.0-dev.20260404.1",
     "husky": "^9.1.7",
+    "knip": "^6.3.1",
     "oxfmt": "^0.43.0",
     "oxlint": "^1.58.0",
     "oxlint-tsgolint": "^0.19.0"
   },
   "peerDependencies": {
-    "typescript": "^5"
+    "typescript": "^6.0.2"
   },
   "dependencies": {
     "commander": "^14.0.3",
