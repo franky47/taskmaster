@@ -7,26 +7,24 @@ import {
   configDir as defaultConfigDir,
   runsDir as defaultRunsDir,
 } from '../config'
-import type { HistoryMeta } from './schema'
+import type { HistoryMetaInput } from './schema'
+import { historyMetaSchema } from './schema'
 
 // Errors --
 
 export class HistoryWriteError extends errore.createTaggedError({
   name: 'HistoryWriteError',
-  message: 'Failed to write history for task "$taskName": $reason',
+  message: 'Failed to write history for task "$task_name": $reason',
 }) {}
 
-export type RecordHistoryInput = {
-  taskName: string
-  timestamp: string
-  startedAt: Date
-  finishedAt: Date
-  exitCode: number
+// Types --
+
+export type RecordArtifacts = {
+  task_name: string
   stdout: string
   stderr: string
   prompt: string
-  cwd: { path: string; isTemp: boolean }
-  timedOut: boolean
+  cwd: { path: string; is_temp: boolean }
 }
 
 type RecordHistoryDeps = {
@@ -52,52 +50,45 @@ async function moveTempDir(src: string, dest: string): Promise<void> {
 // Public API --
 
 export async function recordHistory(
-  input: RecordHistoryInput,
+  meta: HistoryMetaInput,
+  artifacts: RecordArtifacts,
   deps?: RecordHistoryDeps,
 ): Promise<HistoryWriteError | undefined> {
-  const {
-    taskName,
-    timestamp,
-    startedAt,
-    finishedAt,
-    exitCode,
-    stdout,
-    stderr,
-    prompt,
-    cwd,
-    timedOut,
-  } = input
-  const success = exitCode === 0
+  const { task_name, stdout, stderr, prompt, cwd } = artifacts
+  const success = meta.exit_code === 0
+  const duration_ms = meta.finished_at.getTime() - meta.started_at.getTime()
   const cfgDir = deps?.configDir ?? defaultConfigDir
 
   try {
     // Write history files
-    const histDir = path.join(cfgDir, 'history', taskName)
+    const histDir = path.join(cfgDir, 'history', task_name)
     await fs.mkdir(histDir, { recursive: true })
 
-    const meta: HistoryMeta = {
-      timestamp,
-      started_at: startedAt.toISOString(),
-      finished_at: finishedAt.toISOString(),
-      duration_ms: finishedAt.getTime() - startedAt.getTime(),
-      exit_code: exitCode,
+    const serialized = historyMetaSchema.encode({
+      ...meta,
       success,
-      timed_out: timedOut,
-    }
+      duration_ms,
+    })
 
     await fs.writeFile(
-      path.join(histDir, `${timestamp}.meta.json`),
-      JSON.stringify(meta, null, 2) + '\n',
+      path.join(histDir, `${meta.timestamp}.meta.json`),
+      JSON.stringify(serialized, null, 2) + '\n',
     )
 
-    await fs.writeFile(path.join(histDir, `${timestamp}.stdout.txt`), stdout)
+    await fs.writeFile(
+      path.join(histDir, `${meta.timestamp}.stdout.txt`),
+      stdout,
+    )
 
     if (stderr) {
-      await fs.writeFile(path.join(histDir, `${timestamp}.stderr.txt`), stderr)
+      await fs.writeFile(
+        path.join(histDir, `${meta.timestamp}.stderr.txt`),
+        stderr,
+      )
     }
 
     // Temp dir lifecycle
-    if (cwd.isTemp) {
+    if (cwd.is_temp) {
       if (success) {
         // S4.5: delete temp dir on success
         await fs.rm(cwd.path, { recursive: true })
@@ -106,7 +97,7 @@ export async function recordHistory(
         const runsBase = deps?.configDir
           ? path.join(deps.configDir, 'runs')
           : defaultRunsDir
-        const runsPath = path.join(runsBase, taskName, timestamp)
+        const runsPath = path.join(runsBase, task_name, meta.timestamp)
         await fs.mkdir(path.dirname(runsPath), { recursive: true })
         await moveTempDir(cwd.path, runsPath)
 
@@ -121,7 +112,7 @@ export async function recordHistory(
     // S4.7: explicit cwd — no directory operations
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err)
-    return new HistoryWriteError({ taskName, reason })
+    return new HistoryWriteError({ task_name, reason })
   }
 
   return undefined

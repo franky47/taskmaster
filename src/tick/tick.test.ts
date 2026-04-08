@@ -35,14 +35,21 @@ async function writeMeta(
   const histDir = path.join(configDir, 'history', taskName)
   await fs.mkdir(histDir, { recursive: true })
 
+  const started_at =
+    overrides.started_at ?? timestamp.replace(/\./g, ':').replace(/Z$/, '.000Z')
+  const duration_ms = overrides.duration_ms ?? 0
+  const finished_at =
+    overrides.finished_at ??
+    new Date(new Date(started_at).getTime() + duration_ms).toISOString()
+  const exit_code = overrides.exit_code ?? 0
+
   const meta = {
     timestamp,
-    started_at: timestamp.replace(/\./g, ':').replace(/Z$/, '.000Z'),
-    finished_at: timestamp.replace(/\./g, ':').replace(/Z$/, '.000Z'),
-    duration_ms: 1000,
-    exit_code: 0,
-    success: true,
-    ...overrides,
+    started_at,
+    finished_at,
+    duration_ms,
+    exit_code,
+    success: overrides.success ?? exit_code === 0,
   }
 
   await fs.writeFile(

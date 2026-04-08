@@ -120,7 +120,7 @@ describe('renderReport', () => {
         lastFailureTimestamp: '2026-04-07T11:55:00.000Z',
         relativeTime: '5m ago',
         exitCode: 127,
-        stderrPath:
+        stderr_path:
           '/home/user/.config/taskmaster/history/backup/2026-04-07T11.55.00Z.stderr.txt',
         runDir: '/home/user/.config/taskmaster/history/backup',
       },
@@ -149,7 +149,7 @@ describe('renderReport', () => {
         lastFailureTimestamp: '2026-04-07T11:30:00.000Z',
         relativeTime: '30m ago',
         exitCode: 1,
-        stderrPath: undefined,
+        stderr_path: undefined,
         runDir: undefined,
       },
     ]

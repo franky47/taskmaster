@@ -72,18 +72,25 @@ async function main(): Promise<void> {
         const exitCode = result.timedOut ? 124 : result.exitCode
 
         // Record history (non-fatal)
-        const recordErr = await recordHistory({
-          taskName: name,
-          timestamp,
-          startedAt: result.startedAt,
-          finishedAt: result.finishedAt,
-          exitCode,
-          stdout: result.stdout,
-          stderr: result.stderr,
-          prompt: result.prompt,
-          cwd: result.cwd,
-          timedOut: result.timedOut,
-        })
+        const recordErr = await recordHistory(
+          {
+            timestamp,
+            started_at: result.startedAt,
+            finished_at: result.finishedAt,
+            exit_code: exitCode,
+            timed_out: result.timedOut,
+          },
+          {
+            task_name: name,
+            stdout: result.stdout,
+            stderr: result.stderr,
+            prompt: result.prompt,
+            cwd: {
+              path: result.cwd.path,
+              is_temp: result.cwd.isTemp,
+            },
+          },
+        )
         if (recordErr instanceof Error) {
           console.error(recordErr.message)
         }
@@ -197,7 +204,9 @@ async function main(): Promise<void> {
         }
 
         if (opts.json) {
-          const jsonEntries = result.map(({ stderrPath: _, ...entry }) => entry)
+          const jsonEntries = result.map(
+            ({ stderr_path: _, ...entry }) => entry,
+          )
           console.log(JSON.stringify(jsonEntries))
         } else {
           for (const entry of result) {
@@ -210,8 +219,8 @@ async function main(): Promise<void> {
                 ? 'timeout'
                 : 'err'
             console.log(`  status    ${status}`)
-            if (entry.stderrPath) {
-              console.log(`  stderr    ${entry.stderrPath}`)
+            if (entry.stderr_path) {
+              console.log(`  stderr    ${entry.stderr_path}`)
             }
           }
         }

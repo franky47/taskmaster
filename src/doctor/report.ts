@@ -65,8 +65,8 @@ function renderFinding(finding: Finding, platform: Platform): string {
         `${finding.consecutiveFailures} consecutive failure${finding.consecutiveFailures === 1 ? '' : 's'}, exit code ${finding.exitCode}`,
         `Last failure: ${finding.lastFailureTimestamp} (${finding.relativeTime})`,
       ]
-      if (finding.stderrPath) {
-        lines.push('', `Stderr: ${finding.stderrPath}`)
+      if (finding.stderr_path) {
+        lines.push('', `Stderr: ${finding.stderr_path}`)
       }
       if (finding.runDir) {
         lines.push(`Run dir: ${finding.runDir}`)

@@ -17,13 +17,13 @@ function healthyDeps(): DoctorDeps {
     queryHistory: async () => [
       {
         timestamp: '2026-04-07T11.00.00Z',
-        started_at: '2026-04-07T11:00:00.000Z',
-        finished_at: '2026-04-07T11:00:05.000Z',
+        started_at: new Date('2026-04-07T11:00:00.000Z'),
+        finished_at: new Date('2026-04-07T11:00:05.000Z'),
         duration_ms: 5000,
         exit_code: 0,
         success: true,
         timed_out: false,
-        stderrPath: undefined,
+        stderr_path: undefined,
       },
     ],
     readLog: () => [],
@@ -72,13 +72,13 @@ describe('doctor', () => {
     deps.queryHistory = async () => [
       {
         timestamp: '2026-04-07T11.00.00Z',
-        started_at: '2026-04-07T11:00:00.000Z',
-        finished_at: '2026-04-07T11:00:05.000Z',
+        started_at: new Date('2026-04-07T11:00:00.000Z'),
+        finished_at: new Date('2026-04-07T11:00:05.000Z'),
         duration_ms: 5000,
         exit_code: 1,
         success: false,
         timed_out: false,
-        stderrPath: '/tmp/stderr.txt',
+        stderr_path: '/tmp/stderr.txt',
       },
     ]
     const result = await doctor({ now, deps })
@@ -238,13 +238,13 @@ describe('doctor', () => {
     deps.queryHistory = async () => [
       {
         timestamp: '2026-04-07T11.00.00Z',
-        started_at: '2026-04-07T11:00:00.000Z',
-        finished_at: '2026-04-07T11:00:30.000Z',
+        started_at: new Date('2026-04-07T11:00:00.000Z'),
+        finished_at: new Date('2026-04-07T11:00:30.000Z'),
         duration_ms: 30_000,
         exit_code: 124,
         success: false,
         timed_out: true,
-        stderrPath: undefined,
+        stderr_path: undefined,
       },
     ]
     deps.listTasks = async () => [

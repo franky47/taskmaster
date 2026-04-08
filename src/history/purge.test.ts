@@ -19,7 +19,7 @@ function makeMeta(opts: MetaOpts): string {
     timestamp: '2026-01-01T00.00.00Z',
     started_at: opts.finished_at,
     finished_at: opts.finished_at,
-    duration_ms: 1000,
+    duration_ms: 0,
     exit_code: opts.success ? 0 : 1,
     success: opts.success,
   })

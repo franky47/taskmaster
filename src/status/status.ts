@@ -70,7 +70,7 @@ export async function getTaskStatuses(
       const latest = history[0]
       if (latest) {
         status.last_run = {
-          timestamp: latest.started_at,
+          timestamp: latest.started_at.toISOString(),
           status: latest.success ? 'ok' : latest.timed_out ? 'timeout' : 'err',
           exit_code: latest.exit_code,
           duration_ms: latest.duration_ms,

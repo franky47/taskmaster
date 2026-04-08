@@ -220,12 +220,12 @@ describe('checkTaskFailures', () => {
   ): HistoryEntry {
     return {
       timestamp: '2026-04-07T11-00-00',
-      started_at: '2026-04-07T11:00:00.000Z',
-      finished_at: '2026-04-07T11:00:05.000Z',
+      started_at: new Date('2026-04-07T11:00:00.000Z'),
+      finished_at: new Date('2026-04-07T11:00:05.000Z'),
       duration_ms: 5000,
       exit_code: overrides.success ? 0 : 1,
       timed_out: false,
-      stderrPath: '/history/backup/2026-04-07T11-00-00.stderr.txt',
+      stderr_path: '/history/backup/2026-04-07T11-00-00.stderr.txt',
       ...overrides,
     }
   }
@@ -248,8 +248,8 @@ describe('checkTaskFailures', () => {
       makeEntry({
         success: false,
         exit_code: 2,
-        finished_at: '2026-04-07T11:30:00.000Z',
-        stderrPath: '/history/backup/run1.stderr.txt',
+        finished_at: new Date('2026-04-07T11:30:00.000Z'),
+        stderr_path: '/history/backup/run1.stderr.txt',
       }),
       makeEntry({ success: true }),
     ]
@@ -263,7 +263,7 @@ describe('checkTaskFailures', () => {
       consecutiveFailures: 1,
       lastFailureTimestamp: '2026-04-07T11:30:00.000Z',
       exitCode: 2,
-      stderrPath: '/history/backup/run1.stderr.txt',
+      stderr_path: '/history/backup/run1.stderr.txt',
     })
     expect(finding!.relativeTime).toBe('30m ago')
     expect(finding!.runDir).toBe('/history/backup')
@@ -273,7 +273,7 @@ describe('checkTaskFailures', () => {
     const history: HistoryEntry[] = [
       makeEntry({
         success: false,
-        finished_at: '2026-04-07T11:50:00.000Z',
+        finished_at: new Date('2026-04-07T11:50:00.000Z'),
       }),
       makeEntry({ success: false }),
       makeEntry({ success: true }),
@@ -292,9 +292,9 @@ describe('checkTaskFailures', () => {
     const history: HistoryEntry[] = [
       makeEntry({
         success: false,
-        finished_at: '2026-04-07T11:55:00.000Z',
+        finished_at: new Date('2026-04-07T11:55:00.000Z'),
         exit_code: 127,
-        stderrPath: '/history/sync/latest.stderr.txt',
+        stderr_path: '/history/sync/latest.stderr.txt',
       }),
       makeEntry({ success: false }),
       makeEntry({ success: false }),
@@ -310,7 +310,7 @@ describe('checkTaskFailures', () => {
       consecutiveFailures: 3,
       lastFailureTimestamp: '2026-04-07T11:55:00.000Z',
       exitCode: 127,
-      stderrPath: '/history/sync/latest.stderr.txt',
+      stderr_path: '/history/sync/latest.stderr.txt',
       runDir: '/history/sync',
     })
     expect(finding!.relativeTime).toBe('5m ago')
@@ -320,7 +320,7 @@ describe('checkTaskFailures', () => {
     const history: HistoryEntry[] = [
       makeEntry({
         success: false,
-        finished_at: '2026-04-07T11:00:00.000Z',
+        finished_at: new Date('2026-04-07T11:00:00.000Z'),
       }),
       makeEntry({ success: false }),
       makeEntry({ success: false }),
@@ -341,7 +341,7 @@ describe('checkTaskFailures', () => {
     const history: HistoryEntry[] = [
       makeEntry({
         success: false,
-        finished_at: '2026-04-07T10:00:00.000Z',
+        finished_at: new Date('2026-04-07T10:00:00.000Z'),
         exit_code: 1,
       }),
     ]
@@ -361,11 +361,11 @@ describe('checkTaskFailures', () => {
     expect(checkTaskFailures('backup', history, now)).toBeNull()
   })
 
-  test('handles undefined stderrPath', () => {
+  test('handles undefined stderr_path', () => {
     const history: HistoryEntry[] = [
       makeEntry({
         success: false,
-        stderrPath: undefined,
+        stderr_path: undefined,
       }),
     ]
 
@@ -373,7 +373,7 @@ describe('checkTaskFailures', () => {
 
     expect(finding).toMatchObject({
       kind: 'task-failures',
-      stderrPath: undefined,
+      stderr_path: undefined,
       runDir: undefined,
     })
   })
@@ -405,7 +405,7 @@ describe('checkTaskFailures', () => {
         success: false,
         timed_out: false,
         exit_code: 1,
-        finished_at: '2026-04-07T11:50:00.000Z',
+        finished_at: new Date('2026-04-07T11:50:00.000Z'),
       }),
       makeEntry({ success: false, timed_out: true, exit_code: 124 }),
       makeEntry({ success: false, timed_out: false }),
@@ -434,12 +434,12 @@ describe('checkTaskTimeouts', () => {
   ): HistoryEntry {
     return {
       timestamp: '2026-04-07T11-00-00',
-      started_at: '2026-04-07T11:00:00.000Z',
-      finished_at: '2026-04-07T11:00:05.000Z',
+      started_at: new Date('2026-04-07T11:00:00.000Z'),
+      finished_at: new Date('2026-04-07T11:00:05.000Z'),
       duration_ms: 5000,
       exit_code: overrides.success ? 0 : 1,
       timed_out: false,
-      stderrPath: undefined,
+      stderr_path: undefined,
       ...overrides,
     }
   }
@@ -467,7 +467,7 @@ describe('checkTaskTimeouts', () => {
         success: false,
         timed_out: true,
         exit_code: 124,
-        finished_at: '2026-04-07T11:30:00.000Z',
+        finished_at: new Date('2026-04-07T11:30:00.000Z'),
       }),
       makeEntry({ success: true }),
     ]
@@ -491,7 +491,7 @@ describe('checkTaskTimeouts', () => {
         success: false,
         timed_out: true,
         exit_code: 124,
-        finished_at: '2026-04-07T11:55:00.000Z',
+        finished_at: new Date('2026-04-07T11:55:00.000Z'),
       }),
       makeEntry({ success: false, timed_out: true, exit_code: 124 }),
       makeEntry({ success: false, timed_out: true, exit_code: 124 }),
@@ -531,7 +531,7 @@ describe('checkTaskTimeouts', () => {
         success: false,
         timed_out: true,
         exit_code: 124,
-        finished_at: '2026-04-07T11:55:00.000Z',
+        finished_at: new Date('2026-04-07T11:55:00.000Z'),
       }),
     ]
 
@@ -555,12 +555,10 @@ describe('checkTimeoutContention', () => {
   })
 
   test('returns null when timeout is less than schedule interval', () => {
-    // Schedule: every hour (3_600_000ms), timeout: 30s
     expect(checkTimeoutContention('backup', 30_000, '0 * * * *')).toBeNull()
   })
 
   test('returns warning when timeout equals schedule interval', () => {
-    // Schedule: every 5 minutes (300_000ms), timeout: 5m (300_000ms)
     const finding = checkTimeoutContention('backup', 300_000, '*/5 * * * *')
 
     expect(finding).toMatchObject({
@@ -573,7 +571,6 @@ describe('checkTimeoutContention', () => {
   })
 
   test('returns warning when timeout exceeds schedule interval', () => {
-    // Schedule: every 5 minutes, timeout: 10m
     const finding = checkTimeoutContention('backup', 600_000, '*/5 * * * *')
 
     expect(finding).toMatchObject({
@@ -586,13 +583,10 @@ describe('checkTimeoutContention', () => {
   })
 
   test('returns null when timeout is well under interval', () => {
-    // Schedule: daily at midnight, timeout: 1h
     expect(checkTimeoutContention('backup', 3_600_000, '0 0 * * *')).toBeNull()
   })
 
   test('uses minimum gap for non-uniform schedules', () => {
-    // Schedule: 9am and 5pm daily — minimum gap is 8h (9am→5pm)
-    // Timeout: 10h exceeds the 8h minimum gap
     const finding = checkTimeoutContention(
       'backup',
       10 * 3_600_000,
@@ -607,8 +601,6 @@ describe('checkTimeoutContention', () => {
   })
 
   test('returns null for non-uniform schedule when timeout under minimum gap', () => {
-    // Schedule: 9am and 5pm daily — minimum gap is 8h
-    // Timeout: 7h is under the 8h minimum gap
     expect(
       checkTimeoutContention('backup', 7 * 3_600_000, '0 9,17 * * *'),
     ).toBeNull()

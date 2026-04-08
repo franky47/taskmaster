@@ -43,7 +43,7 @@ type TaskFailureFinding = {
   lastFailureTimestamp: string
   relativeTime: string
   exitCode: number
-  stderrPath: string | undefined
+  stderr_path: string | undefined
   runDir: string | undefined
 }
 
@@ -187,8 +187,6 @@ export function checkTaskFailures(
     consecutiveFailures++
   }
 
-  const lastFailureTime = new Date(first.finished_at)
-
   return {
     kind: 'task-failures',
     severity:
@@ -197,11 +195,11 @@ export function checkTaskFailures(
         : 'warning',
     task: taskName,
     consecutiveFailures,
-    lastFailureTimestamp: first.finished_at,
-    relativeTime: formatRelativeTime(lastFailureTime, now),
+    lastFailureTimestamp: first.finished_at.toISOString(),
+    relativeTime: formatRelativeTime(first.finished_at, now),
     exitCode: first.exit_code,
-    stderrPath: first.stderrPath,
-    runDir: first.stderrPath ? path.dirname(first.stderrPath) : undefined,
+    stderr_path: first.stderr_path,
+    runDir: first.stderr_path ? path.dirname(first.stderr_path) : undefined,
   }
 }
 
@@ -220,8 +218,6 @@ export function checkTaskTimeouts(
     consecutiveTimeouts++
   }
 
-  const lastTimeoutTime = new Date(first.finished_at)
-
   return {
     kind: 'task-timeout',
     severity:
@@ -230,8 +226,8 @@ export function checkTaskTimeouts(
         : 'warning',
     task: taskName,
     consecutiveTimeouts,
-    lastTimeoutTimestamp: first.finished_at,
-    relativeTime: formatRelativeTime(lastTimeoutTime, now),
+    lastTimeoutTimestamp: first.finished_at.toISOString(),
+    relativeTime: formatRelativeTime(first.finished_at, now),
     timeout: timeoutMs !== undefined ? ms(timeoutMs) : undefined,
   }
 }

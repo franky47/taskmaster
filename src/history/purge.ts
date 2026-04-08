@@ -67,16 +67,14 @@ export async function purgeHistory(
       for (const metaFile of metaFiles) {
         const metaPath = path.join(taskDir, metaFile)
         const raw = await fs.readFile(metaPath, 'utf-8')
-        const parsed: unknown = JSON.parse(raw)
-        const validated = historyMetaSchema.safeParse(parsed)
-        if (!validated.success) continue
-        const meta = validated.data
+        const result = historyMetaSchema.safeDecode(JSON.parse(raw))
+        if (!result.success) continue
+        const meta = result.data
 
         // S4.9: never purge failed entries
         if (!meta.success) continue
 
-        const finishedAt = new Date(meta.finished_at)
-        const age = now.getTime() - finishedAt.getTime()
+        const age = now.getTime() - meta.finished_at.getTime()
         if (age <= maxAge) continue
 
         // Delete the entry set
