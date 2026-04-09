@@ -59,8 +59,7 @@ function createMockSpawn(child: MockChild): SpawnAgentDeps['spawn'] {
 
 type SpawnResult = {
   exitCode: number
-  stdout: string
-  stderr: string
+  output: string
   timedOut: boolean
 }
 
@@ -69,8 +68,7 @@ function fakeSpawn(
 ): ExecuteDeps['spawnAgent'] {
   return async () => ({
     exitCode: 0,
-    stdout: '',
-    stderr: '',
+    output: '',
     timedOut: false,
     ...result,
   })
@@ -169,7 +167,7 @@ describe('executeTask', () => {
       deps: {
         spawnAgent: async (opts) => {
           receivedCommand = opts.command
-          return { exitCode: 0, stdout: '', stderr: '', timedOut: false }
+          return { exitCode: 0, output: '', timedOut: false }
         },
       },
     })
@@ -188,7 +186,7 @@ describe('executeTask', () => {
       deps: {
         spawnAgent: async (opts) => {
           receivedCommand = opts.command
-          return { exitCode: 0, stdout: '', stderr: '', timedOut: false }
+          return { exitCode: 0, output: '', timedOut: false }
         },
       },
     })
@@ -207,7 +205,7 @@ describe('executeTask', () => {
       deps: {
         spawnAgent: async (opts) => {
           receivedEnv = opts.env
-          return { exitCode: 0, stdout: '', stderr: '', timedOut: false }
+          return { exitCode: 0, output: '', timedOut: false }
         },
       },
     })
@@ -228,7 +226,7 @@ describe('executeTask', () => {
         spawnAgent: async (opts) => {
           promptPath = opts.env.TM_PROMPT_FILE ?? ''
           existedDuringSpawn = fs.existsSync(promptPath)
-          return { exitCode: 0, stdout: '', stderr: '', timedOut: false }
+          return { exitCode: 0, output: '', timedOut: false }
         },
       },
     })
@@ -249,7 +247,7 @@ describe('executeTask', () => {
       deps: {
         spawnAgent: async (opts) => {
           promptPath = opts.env.TM_PROMPT_FILE ?? ''
-          return { exitCode: 1, stdout: '', stderr: 'boom', timedOut: false }
+          return { exitCode: 1, output: 'boom', timedOut: false }
         },
       },
     })
@@ -286,7 +284,7 @@ describe('executeTask', () => {
       deps: {
         spawnAgent: async (opts) => {
           receivedEnv = opts.env
-          return { exitCode: 0, stdout: '', stderr: '', timedOut: false }
+          return { exitCode: 0, output: '', timedOut: false }
         },
       },
     })
@@ -314,7 +312,7 @@ describe('executeTask', () => {
       deps: {
         spawnAgent: async (opts) => {
           receivedCwd = opts.cwd
-          return { exitCode: 0, stdout: '', stderr: '', timedOut: false }
+          return { exitCode: 0, output: '', timedOut: false }
         },
       },
     })
@@ -336,7 +334,7 @@ describe('executeTask', () => {
       deps: {
         spawnAgent: async (opts) => {
           receivedCwd = opts.cwd
-          return { exitCode: 0, stdout: '', stderr: '', timedOut: false }
+          return { exitCode: 0, output: '', timedOut: false }
         },
       },
     })
@@ -383,7 +381,7 @@ describe('executeTask', () => {
       deps: {
         spawnAgent: async () => {
           ran = true
-          return { exitCode: 0, stdout: '', stderr: '', timedOut: false }
+          return { exitCode: 0, output: '', timedOut: false }
         },
       },
     })
@@ -408,7 +406,7 @@ describe('executeTask', () => {
     expect(result.exitCode).toBe(42)
   })
 
-  test('captures stdout and stderr', async () => {
+  test('captures output', async () => {
     const configDir = await makeConfigDir()
     await writeTask(
       configDir,
@@ -420,15 +418,13 @@ describe('executeTask', () => {
       configDir,
       deps: {
         spawnAgent: fakeSpawn({
-          stdout: 'hello out',
-          stderr: 'hello err',
+          output: 'hello out\nhello err',
         }),
       },
     })
 
     if (result instanceof Error) throw result
-    expect(result.stdout).toBe('hello out')
-    expect(result.stderr).toBe('hello err')
+    expect(result.output).toBe('hello out\nhello err')
   })
 
   test('includes startedAt and finishedAt timestamps', async () => {
@@ -519,7 +515,7 @@ describe('executeTask', () => {
       deps: {
         spawnAgent: async (opts) => {
           receivedTimeoutMs = opts.timeoutMs
-          return { exitCode: 0, stdout: '', stderr: '', timedOut: false }
+          return { exitCode: 0, output: '', timedOut: false }
         },
       },
     })
@@ -541,7 +537,7 @@ describe('executeTask', () => {
       deps: {
         spawnAgent: async (opts) => {
           receivedTimeoutMs = opts.timeoutMs
-          return { exitCode: 0, stdout: '', stderr: '', timedOut: false }
+          return { exitCode: 0, output: '', timedOut: false }
         },
       },
     })
@@ -617,7 +613,7 @@ describe('runTask', () => {
           const probe = acquireTaskLock('hold-lock', locksDir)
           lockHeldDuringExecution = 'contended' in probe
           if ('fd' in probe) releaseLock(probe.fd)
-          return { exitCode: 0, stdout: '', stderr: '', timedOut: false }
+          return { exitCode: 0, output: '', timedOut: false }
         },
       },
     })
@@ -672,15 +668,26 @@ describe('runTask', () => {
 // -- defaultSpawnAgent --
 
 describe('defaultSpawnAgent', () => {
-  test('runs command and captures stdout', async () => {
+  test('runs command and captures output', async () => {
     const result = await defaultSpawnAgent({
       command: 'echo hello',
       cwd: '/tmp',
       env: { PATH: process.env.PATH ?? '' },
     })
     expect(result.exitCode).toBe(0)
-    expect(result.stdout.trim()).toBe('hello')
+    expect(result.output.trim()).toBe('hello')
     expect(result.timedOut).toBe(false)
+  })
+
+  test('merges stdout and stderr into output', async () => {
+    const result = await defaultSpawnAgent({
+      command: 'echo out && echo err >&2',
+      cwd: '/tmp',
+      env: { PATH: process.env.PATH ?? '' },
+    })
+    expect(result.exitCode).toBe(0)
+    expect(result.output).toContain('out')
+    expect(result.output).toContain('err')
   })
 
   test('sends SIGTERM to process group on timeout', async () => {
@@ -792,7 +799,7 @@ describe('defaultSpawnAgent', () => {
     vi.useRealTimers()
   })
 
-  test('captures partial stdout before timeout', async () => {
+  test('captures partial output before timeout', async () => {
     vi.useFakeTimers()
 
     const child = createMockChild(9999)
@@ -816,7 +823,7 @@ describe('defaultSpawnAgent', () => {
     vi.advanceTimersByTime(5000)
     const result = await promise
 
-    expect(result.stdout).toBe('partial output\n')
+    expect(result.output).toBe('partial output\n')
     expect(result.timedOut).toBe(true)
 
     vi.useRealTimers()
@@ -851,7 +858,7 @@ describe('defaultSpawnAgent', () => {
 
     expect(result.timedOut).toBe(false)
     expect(result.exitCode).toBe(0)
-    expect(result.stdout).toBe('done\n')
+    expect(result.output).toBe('done\n')
     expect(kills).toHaveLength(0)
 
     vi.useRealTimers()

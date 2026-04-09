@@ -14,7 +14,7 @@ describe('defaultSpawnAgent (integration)', () => {
     expect(result.timedOut).toBe(true)
 
     // Extract grandchild PID from stdout
-    const grandchildPid = parseInt(result.stdout.trim())
+    const grandchildPid = parseInt(result.output.trim())
     expect(grandchildPid).toBeGreaterThan(0)
 
     // Grandchild should be dead (killed with the process group)

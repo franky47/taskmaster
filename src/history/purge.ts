@@ -81,6 +81,8 @@ export async function purgeHistory(
         // Delete the entry set
         const tsPrefix = metaFile.replace('.meta.json', '')
         await fs.unlink(metaPath)
+        await tryUnlink(path.join(taskDir, `${tsPrefix}.output.txt`))
+        // Legacy files from before the stdout+stderr merge
         await tryUnlink(path.join(taskDir, `${tsPrefix}.stdout.txt`))
         await tryUnlink(path.join(taskDir, `${tsPrefix}.stderr.txt`))
         deleted++

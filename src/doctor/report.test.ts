@@ -120,8 +120,8 @@ describe('renderReport', () => {
         lastFailureTimestamp: '2026-04-07T11:55:00.000Z',
         relativeTime: '5m ago',
         exitCode: 127,
-        stderr_path:
-          '/home/user/.config/taskmaster/history/backup/2026-04-07T11.55.00Z.stderr.txt',
+        output_path:
+          '/home/user/.config/taskmaster/history/backup/2026-04-07T11.55.00Z.output.txt',
         runDir: '/home/user/.config/taskmaster/history/backup',
       },
     ]
@@ -134,7 +134,7 @@ describe('renderReport', () => {
     expect(report).toContain('5m ago')
     expect(report).toContain('2026-04-07T11:55:00.000Z')
     expect(report).toContain(
-      '/home/user/.config/taskmaster/history/backup/2026-04-07T11.55.00Z.stderr.txt',
+      '/home/user/.config/taskmaster/history/backup/2026-04-07T11.55.00Z.output.txt',
     )
     expect(report).toContain('tm history backup --failures --last 5')
   })
@@ -149,7 +149,7 @@ describe('renderReport', () => {
         lastFailureTimestamp: '2026-04-07T11:30:00.000Z',
         relativeTime: '30m ago',
         exitCode: 1,
-        stderr_path: undefined,
+        output_path: undefined,
         runDir: undefined,
       },
     ]

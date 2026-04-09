@@ -24,7 +24,7 @@ class HistoryReadError extends errore.createTaggedError({
 // Types --
 
 export type HistoryEntry = HistoryMeta & {
-  stderr_path: string | undefined
+  output_path: string | undefined
 }
 
 type QueryHistoryOptions = {
@@ -75,12 +75,15 @@ export async function queryHistory(
       const content = await fs.readFile(path.join(histDir, file), 'utf-8')
       const parsed = historyMetaSchema.decode(JSON.parse(content))
 
-      const stderrFile = file.replace(/\.meta\.json$/, '.stderr.txt')
-      const stderr_path = fileSet.has(stderrFile)
-        ? path.join(histDir, stderrFile)
-        : undefined
+      const outputFile = file.replace(/\.meta\.json$/, '.output.txt')
+      const stdoutFile = file.replace(/\.meta\.json$/, '.stdout.txt')
+      const output_path = fileSet.has(outputFile)
+        ? path.join(histDir, outputFile)
+        : fileSet.has(stdoutFile)
+          ? path.join(histDir, stdoutFile)
+          : undefined
 
-      entries.push({ ...parsed, stderr_path })
+      entries.push({ ...parsed, output_path })
     } catch {
       // Skip malformed meta files
       continue

@@ -82,8 +82,7 @@ async function main(): Promise<void> {
           },
           {
             task_name: name,
-            stdout: result.stdout,
-            stderr: result.stderr,
+            output: result.output,
             prompt: result.prompt,
             cwd: {
               path: result.cwd.path,
@@ -106,11 +105,8 @@ async function main(): Promise<void> {
             }),
           )
         } else {
-          if (result.stdout) {
-            process.stdout.write(result.stdout)
-          }
-          if (result.stderr) {
-            process.stderr.write(result.stderr)
+          if (result.output) {
+            process.stdout.write(result.output)
           }
         }
         process.exit(exitCode)
@@ -205,7 +201,7 @@ async function main(): Promise<void> {
 
         if (opts.json) {
           const jsonEntries = result.map(
-            ({ stderr_path: _, ...entry }) => entry,
+            ({ output_path: _, ...entry }) => entry,
           )
           console.log(JSON.stringify(jsonEntries))
         } else {
@@ -219,8 +215,8 @@ async function main(): Promise<void> {
                 ? 'timeout'
                 : 'err'
             console.log(`  status    ${status}`)
-            if (entry.stderr_path) {
-              console.log(`  stderr    ${entry.stderr_path}`)
+            if (entry.output_path) {
+              console.log(`  output    ${entry.output_path}`)
             }
           }
         }

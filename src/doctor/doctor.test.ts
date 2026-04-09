@@ -29,7 +29,7 @@ function healthyDeps(): DoctorDeps {
         exit_code: 0,
         success: true,
         timed_out: false,
-        stderr_path: undefined,
+        output_path: undefined,
       },
     ],
     readLog: () => [],
@@ -84,7 +84,7 @@ describe('doctor', () => {
         exit_code: 1,
         success: false,
         timed_out: false,
-        stderr_path: '/tmp/stderr.txt',
+        output_path: '/tmp/output.txt',
       },
     ]
     const result = await doctor({ now, deps })
@@ -265,7 +265,7 @@ describe('doctor', () => {
         exit_code: 124,
         success: false,
         timed_out: true,
-        stderr_path: undefined,
+        output_path: undefined,
       },
     ]
     deps.listTasks = async () => [

@@ -22,8 +22,7 @@ export class HistoryWriteError extends errore.createTaggedError({
 
 export type RecordArtifacts = {
   task_name: string
-  stdout: string
-  stderr: string
+  output: string
   prompt: string
   cwd: { path: string; is_temp: boolean }
 }
@@ -55,7 +54,7 @@ export async function recordHistory(
   artifacts: RecordArtifacts,
   deps?: RecordHistoryDeps,
 ): Promise<HistoryWriteError | undefined> {
-  const { task_name, stdout, stderr, prompt, cwd } = artifacts
+  const { task_name, output, prompt, cwd } = artifacts
   const success = meta.exit_code === 0
   const duration_ms = meta.finished_at.getTime() - meta.started_at.getTime()
   const cfgDir = deps?.configDir ?? defaultConfigDir
@@ -77,16 +76,9 @@ export async function recordHistory(
     )
 
     await fs.writeFile(
-      path.join(histDir, `${meta.timestamp}.stdout.txt`),
-      stdout,
+      path.join(histDir, `${meta.timestamp}.output.txt`),
+      output,
     )
-
-    if (stderr) {
-      await fs.writeFile(
-        path.join(histDir, `${meta.timestamp}.stderr.txt`),
-        stderr,
-      )
-    }
 
     // Temp dir lifecycle
     if (cwd.is_temp) {
@@ -102,12 +94,8 @@ export async function recordHistory(
         await fs.mkdir(path.dirname(runsPath), { recursive: true })
         await moveTempDir(cwd.path, runsPath)
 
-        // Write prompt, stdout, stderr into the preserved directory
         await fs.writeFile(path.join(runsPath, 'prompt.md'), prompt)
-        await fs.writeFile(path.join(runsPath, 'stdout.txt'), stdout)
-        if (stderr) {
-          await fs.writeFile(path.join(runsPath, 'stderr.txt'), stderr)
-        }
+        await fs.writeFile(path.join(runsPath, 'output.txt'), output)
       }
     }
     // S4.7: explicit cwd — no directory operations

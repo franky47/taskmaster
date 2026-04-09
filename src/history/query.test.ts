@@ -61,14 +61,24 @@ async function writeMeta(
   )
 }
 
-async function writeStderr(
+async function writeOutput(
   configDir: string,
   taskName: string,
   timestamp: string,
   content: string,
 ): Promise<void> {
   const histDir = path.join(configDir, 'history', taskName)
-  await fs.writeFile(path.join(histDir, `${timestamp}.stderr.txt`), content)
+  await fs.writeFile(path.join(histDir, `${timestamp}.output.txt`), content)
+}
+
+async function writeStdout(
+  configDir: string,
+  taskName: string,
+  timestamp: string,
+  content: string,
+): Promise<void> {
+  const histDir = path.join(configDir, 'history', taskName)
+  await fs.writeFile(path.join(histDir, `${timestamp}.stdout.txt`), content)
 }
 
 describe('queryHistory', () => {
@@ -176,14 +186,14 @@ describe('queryHistory', () => {
     expect(result[0]!.timestamp).toBe('2026-04-03T08.00.00Z')
   })
 
-  test('includes stderr_path when stderr file exists', async () => {
+  test('includes output_path when output file exists', async () => {
     const configDir = await makeConfigDir()
     await writeTask(configDir, 'daily-audit')
     await writeMeta(configDir, 'daily-audit', '2026-04-01T08.00.00Z', {
       exit_code: 1,
       success: false,
     })
-    await writeStderr(
+    await writeOutput(
       configDir,
       'daily-audit',
       '2026-04-01T08.00.00Z',
@@ -194,17 +204,42 @@ describe('queryHistory', () => {
     expect(result).not.toBeInstanceOf(Error)
     if (result instanceof Error) return
 
-    expect(result[0]!.stderr_path).toBe(
+    expect(result[0]!.output_path).toBe(
       path.join(
         configDir,
         'history',
         'daily-audit',
-        '2026-04-01T08.00.00Z.stderr.txt',
+        '2026-04-01T08.00.00Z.output.txt',
       ),
     )
   })
 
-  test('omits stderr_path when stderr file does not exist', async () => {
+  test('falls back to stdout.txt for old entries', async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(configDir, 'daily-audit')
+    await writeMeta(configDir, 'daily-audit', '2026-04-01T08.00.00Z')
+    await writeStdout(
+      configDir,
+      'daily-audit',
+      '2026-04-01T08.00.00Z',
+      'old output',
+    )
+
+    const result = await queryHistory('daily-audit', { configDir })
+    expect(result).not.toBeInstanceOf(Error)
+    if (result instanceof Error) return
+
+    expect(result[0]!.output_path).toBe(
+      path.join(
+        configDir,
+        'history',
+        'daily-audit',
+        '2026-04-01T08.00.00Z.stdout.txt',
+      ),
+    )
+  })
+
+  test('omits output_path when no output file exists', async () => {
     const configDir = await makeConfigDir()
     await writeTask(configDir, 'daily-audit')
     await writeMeta(configDir, 'daily-audit', '2026-04-01T08.00.00Z')
@@ -213,7 +248,7 @@ describe('queryHistory', () => {
     expect(result).not.toBeInstanceOf(Error)
     if (result instanceof Error) return
 
-    expect(result[0]!.stderr_path).toBeUndefined()
+    expect(result[0]!.output_path).toBeUndefined()
   })
 
   test('skips malformed meta.json files', async () => {
@@ -259,6 +294,6 @@ describe('queryHistory', () => {
     expect(entry.exit_code).toBe(0)
     expect(entry.success).toBe(true)
     expect(entry.timed_out).toBe(false)
-    expect(entry.stderr_path).toBeUndefined()
+    expect(entry.output_path).toBeUndefined()
   })
 })

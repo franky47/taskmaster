@@ -43,7 +43,7 @@ type TaskFailureFinding = {
   lastFailureTimestamp: string
   relativeTime: string
   exitCode: number
-  stderr_path: string | undefined
+  output_path: string | undefined
   runDir: string | undefined
 }
 
@@ -198,8 +198,8 @@ export function checkTaskFailures(
     lastFailureTimestamp: first.finished_at.toISOString(),
     relativeTime: formatRelativeTime(first.finished_at, now),
     exitCode: first.exit_code,
-    stderr_path: first.stderr_path,
-    runDir: first.stderr_path ? path.dirname(first.stderr_path) : undefined,
+    output_path: first.output_path,
+    runDir: first.output_path ? path.dirname(first.output_path) : undefined,
   }
 }
 

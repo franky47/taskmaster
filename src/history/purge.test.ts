@@ -34,10 +34,7 @@ async function writeHistoryEntry(
   const dir = path.join(configDir, 'history', taskName)
   await fs.mkdir(dir, { recursive: true })
   await fs.writeFile(path.join(dir, `${timestamp}.meta.json`), makeMeta(meta))
-  await fs.writeFile(path.join(dir, `${timestamp}.stdout.txt`), 'output')
-  if (!meta.success) {
-    await fs.writeFile(path.join(dir, `${timestamp}.stderr.txt`), 'error')
-  }
+  await fs.writeFile(path.join(dir, `${timestamp}.output.txt`), 'output')
 }
 
 describe('purgeHistory', () => {
@@ -57,7 +54,7 @@ describe('purgeHistory', () => {
 
     const dir = path.join(configDir, 'history', 'my-task')
     expect(fs.access(path.join(dir, `${oldTs}.meta.json`))).rejects.toThrow()
-    expect(fs.access(path.join(dir, `${oldTs}.stdout.txt`))).rejects.toThrow()
+    expect(fs.access(path.join(dir, `${oldTs}.output.txt`))).rejects.toThrow()
   })
 
   test('preserves successful entries newer than 30 days', async () => {
@@ -96,17 +93,16 @@ describe('purgeHistory', () => {
     await fs.access(path.join(dir, `${oldTs}.meta.json`)) // should exist
   })
 
-  test('handles missing stderr.txt gracefully', async () => {
+  test('handles missing output.txt gracefully', async () => {
     const configDir = await makeConfigDir()
     const ts = '2026-01-01T00.00.00Z'
-    // Write only meta + stdout (no stderr)
+    // Write only meta (no output file)
     const dir = path.join(configDir, 'history', 'my-task')
     await fs.mkdir(dir, { recursive: true })
     await fs.writeFile(
       path.join(dir, `${ts}.meta.json`),
       makeMeta({ success: true, finished_at: '2026-01-01T00:00:00Z' }),
     )
-    await fs.writeFile(path.join(dir, `${ts}.stdout.txt`), 'out')
 
     const now = new Date('2026-03-01T00:00:00Z')
     const result = await purgeHistory({ configDir, now })

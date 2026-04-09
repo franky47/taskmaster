@@ -1,10 +1,11 @@
 ---
 # tm-w7gs
 title: Merge stdout+stderr into single output
-status: todo
+status: completed
 type: task
+priority: normal
 created_at: 2026-04-09T10:37:26Z
-updated_at: 2026-04-09T10:37:26Z
+updated_at: 2026-04-09T10:49:59Z
 parent: tm-zaph
 ---
 

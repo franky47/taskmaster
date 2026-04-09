@@ -44,8 +44,7 @@ import { cleanupPromptFile, writePromptFile } from './prompt'
 
 type RunResult = {
   exitCode: number
-  stdout: string
-  stderr: string
+  output: string
   timedOut: boolean
   cwd: ResolvedCwd
   prompt: string
@@ -62,8 +61,7 @@ type SpawnAgentOpts = {
 
 type SpawnAgentResult = {
   exitCode: number
-  stdout: string
-  stderr: string
+  output: string
   timedOut: boolean
 }
 
@@ -139,7 +137,7 @@ export async function defaultSpawnAgent(
 
     const pid = child.pid
     if (pid === undefined) {
-      resolve({ exitCode: 1, stdout: '', stderr: '', timedOut: false })
+      resolve({ exitCode: 1, output: '', timedOut: false })
       return
     }
 
@@ -147,11 +145,10 @@ export async function defaultSpawnAgent(
     let timeoutTimer: ReturnType<typeof setTimeout> | undefined
     let graceTimer: ReturnType<typeof setTimeout> | undefined
 
-    const stdoutChunks: Buffer[] = []
-    const stderrChunks: Buffer[] = []
+    const outputChunks: Buffer[] = []
 
-    child.stdout?.on('data', (chunk: Buffer) => stdoutChunks.push(chunk))
-    child.stderr?.on('data', (chunk: Buffer) => stderrChunks.push(chunk))
+    child.stdout?.on('data', (chunk: Buffer) => outputChunks.push(chunk))
+    child.stderr?.on('data', (chunk: Buffer) => outputChunks.push(chunk))
 
     if (opts.timeoutMs !== undefined && opts.timeoutMs > 0) {
       timeoutTimer = setTimeout(() => {
@@ -169,8 +166,7 @@ export async function defaultSpawnAgent(
       clearTimeout(graceTimer)
       resolve({
         exitCode: code ?? 1,
-        stdout: Buffer.concat(stdoutChunks).toString(),
-        stderr: Buffer.concat(stderrChunks).toString(),
+        output: Buffer.concat(outputChunks).toString(),
         timedOut,
       })
     })

@@ -226,7 +226,7 @@ describe('checkTaskFailures', () => {
       duration_ms: 5000,
       exit_code: overrides.success ? 0 : 1,
       timed_out: false,
-      stderr_path: '/history/backup/2026-04-07T11-00-00.stderr.txt',
+      output_path: '/history/backup/2026-04-07T11-00-00.output.txt',
       ...overrides,
     }
   }
@@ -250,7 +250,7 @@ describe('checkTaskFailures', () => {
         success: false,
         exit_code: 2,
         finished_at: new Date('2026-04-07T11:30:00.000Z'),
-        stderr_path: '/history/backup/run1.stderr.txt',
+        output_path: '/history/backup/run1.output.txt',
       }),
       makeEntry({ success: true }),
     ]
@@ -264,7 +264,7 @@ describe('checkTaskFailures', () => {
       consecutiveFailures: 1,
       lastFailureTimestamp: '2026-04-07T11:30:00.000Z',
       exitCode: 2,
-      stderr_path: '/history/backup/run1.stderr.txt',
+      output_path: '/history/backup/run1.output.txt',
     })
     expect(finding!.relativeTime).toBe('30m ago')
     expect(finding!.runDir).toBe('/history/backup')
@@ -295,7 +295,7 @@ describe('checkTaskFailures', () => {
         success: false,
         finished_at: new Date('2026-04-07T11:55:00.000Z'),
         exit_code: 127,
-        stderr_path: '/history/sync/latest.stderr.txt',
+        output_path: '/history/sync/latest.output.txt',
       }),
       makeEntry({ success: false }),
       makeEntry({ success: false }),
@@ -311,7 +311,7 @@ describe('checkTaskFailures', () => {
       consecutiveFailures: 3,
       lastFailureTimestamp: '2026-04-07T11:55:00.000Z',
       exitCode: 127,
-      stderr_path: '/history/sync/latest.stderr.txt',
+      output_path: '/history/sync/latest.output.txt',
       runDir: '/history/sync',
     })
     expect(finding!.relativeTime).toBe('5m ago')
@@ -362,11 +362,11 @@ describe('checkTaskFailures', () => {
     expect(checkTaskFailures('backup', history, now)).toBeNull()
   })
 
-  test('handles undefined stderr_path', () => {
+  test('handles undefined output_path', () => {
     const history: HistoryEntry[] = [
       makeEntry({
         success: false,
-        stderr_path: undefined,
+        output_path: undefined,
       }),
     ]
 
@@ -374,7 +374,7 @@ describe('checkTaskFailures', () => {
 
     expect(finding).toMatchObject({
       kind: 'task-failures',
-      stderr_path: undefined,
+      output_path: undefined,
       runDir: undefined,
     })
   })
@@ -440,7 +440,7 @@ describe('checkTaskTimeouts', () => {
       duration_ms: 5000,
       exit_code: overrides.success ? 0 : 1,
       timed_out: false,
-      stderr_path: undefined,
+      output_path: undefined,
       ...overrides,
     }
   }

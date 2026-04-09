@@ -27,8 +27,7 @@ function makeArtifacts(
 ): RecordArtifacts {
   return {
     task_name: 'daily-audit',
-    stdout: 'all good',
-    stderr: '',
+    output: 'all good',
     prompt: 'Run the audit.',
     cwd: { path: '/tmp/fake', is_temp: false },
     ...overrides,
@@ -97,52 +96,18 @@ describe('recordHistory', () => {
     expect(disk.duration_ms).toBe(42123)
   })
 
-  test('writes stdout.txt always', async () => {
+  test('writes output.txt', async () => {
     const configDir = await makeConfigDir()
 
     await recordHistory(makeMeta(), makeArtifacts(), { configDir })
 
-    const stdoutPath = path.join(
+    const outputPath = path.join(
       configDir,
       'history',
       'daily-audit',
-      '2026-04-04T08.30.00Z.stdout.txt',
+      '2026-04-04T08.30.00Z.output.txt',
     )
-    expect(await fs.readFile(stdoutPath, 'utf-8')).toBe('all good')
-  })
-
-  test('writes stderr.txt when non-empty', async () => {
-    const configDir = await makeConfigDir()
-
-    await recordHistory(
-      makeMeta(),
-      makeArtifacts({ stderr: 'warning: something' }),
-      { configDir },
-    )
-
-    const stderrPath = path.join(
-      configDir,
-      'history',
-      'daily-audit',
-      '2026-04-04T08.30.00Z.stderr.txt',
-    )
-    expect(await fs.readFile(stderrPath, 'utf-8')).toBe('warning: something')
-  })
-
-  test('omits stderr.txt when stderr is empty', async () => {
-    const configDir = await makeConfigDir()
-
-    await recordHistory(makeMeta(), makeArtifacts({ stderr: '' }), {
-      configDir,
-    })
-
-    const stderrPath = path.join(
-      configDir,
-      'history',
-      'daily-audit',
-      '2026-04-04T08.30.00Z.stderr.txt',
-    )
-    expect(fs.access(stderrPath)).rejects.toThrow()
+    expect(await fs.readFile(outputPath, 'utf-8')).toBe('all good')
   })
 
   test('creates history directory if it does not exist', async () => {
@@ -179,8 +144,7 @@ describe('recordHistory', () => {
     await recordHistory(
       makeMeta({ exit_code: 1 }),
       makeArtifacts({
-        stdout: 'partial output',
-        stderr: 'error occurred',
+        output: 'partial output\nerror occurred',
         prompt: 'Do the audit.',
         cwd: { path: tmpDir, is_temp: true },
       }),
@@ -196,11 +160,8 @@ describe('recordHistory', () => {
     expect(await fs.readFile(path.join(runsPath, 'prompt.md'), 'utf-8')).toBe(
       'Do the audit.',
     )
-    expect(await fs.readFile(path.join(runsPath, 'stdout.txt'), 'utf-8')).toBe(
-      'partial output',
-    )
-    expect(await fs.readFile(path.join(runsPath, 'stderr.txt'), 'utf-8')).toBe(
-      'error occurred',
+    expect(await fs.readFile(path.join(runsPath, 'output.txt'), 'utf-8')).toBe(
+      'partial output\nerror occurred',
     )
     expect(await fs.readFile(path.join(runsPath, 'work.txt'), 'utf-8')).toBe(
       'claude work',
