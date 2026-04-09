@@ -4,9 +4,10 @@ import { Command, Option } from 'commander'
 import ms from 'ms'
 import { z } from 'zod'
 
-import { historyDir, tasksDir } from './config'
+import { configDir, historyDir, locksDir, tasksDir } from './config'
 import { doctor } from './doctor'
 import {
+  buildDisplayEntries,
   formatTimestamp,
   manualTimestamp,
   parseTimestampFlag,
@@ -14,7 +15,7 @@ import {
   recordHistory,
 } from './history'
 import { listTasks } from './list'
-import { TaskContentionError } from './lock'
+import { TaskContentionError, readRunningMarker } from './lock'
 import { log } from './logger'
 import { runTask } from './run'
 import { setup, teardown } from './setup'
@@ -194,33 +195,44 @@ async function main(): Promise<void> {
           last = parsed.data
         }
 
+        // Check running marker before querying history to adjust --last
+        const marker = opts.failures ? null : readRunningMarker(name, locksDir)
+        const completedLast =
+          last !== undefined && marker ? Math.max(last - 1, 0) : last
+
         const result = await queryHistory(name, {
           failures: opts.failures,
-          last,
+          last: completedLast,
         })
         if (result instanceof Error) {
           console.error(result.message)
           process.exit(1)
         }
+        const display = buildDisplayEntries(result, {
+          marker,
+          taskName: name,
+          configDir,
+        })
 
         if (opts.json) {
-          const jsonEntries = result.map(
+          const jsonEntries = display.map(
             ({ output_path: _, ...entry }) => entry,
           )
           console.log(JSON.stringify(jsonEntries))
         } else {
-          for (const entry of result) {
+          for (const entry of display) {
             console.log(entry.timestamp)
-            console.log(`  duration  ${entry.duration_ms}ms`)
-            console.log(`  exit_code ${entry.exit_code}`)
-            const status = entry.success
-              ? 'ok'
-              : entry.timed_out
-                ? 'timeout'
-                : 'err'
-            console.log(`  status    ${status}`)
-            if (entry.output_path) {
+            if (entry.status === 'running') {
+              const elapsed = Date.now() - entry.started_at.getTime()
+              console.log(`  status    running (${ms(elapsed)})`)
               console.log(`  output    ${entry.output_path}`)
+            } else {
+              console.log(`  duration  ${entry.duration_ms}ms`)
+              console.log(`  exit_code ${entry.exit_code}`)
+              console.log(`  status    ${entry.status}`)
+              if (entry.output_path) {
+                console.log(`  output    ${entry.output_path}`)
+              }
             }
           }
         }

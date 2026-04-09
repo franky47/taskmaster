@@ -4,6 +4,7 @@ import path from 'node:path'
 import * as errore from 'errore'
 
 import { configDir as defaultConfigDir } from '#src/config'
+import type { RunningMarker } from '#src/lock'
 
 import type { HistoryMeta } from './schema'
 import { historyMetaSchema } from './schema'
@@ -27,13 +28,56 @@ export type HistoryEntry = HistoryMeta & {
   output_path: string | undefined
 }
 
+type CompletedHistoryEntry = HistoryEntry & {
+  status: 'ok' | 'timeout' | 'err'
+}
+
+type RunningHistoryEntry = {
+  status: 'running'
+  timestamp: string
+  started_at: Date
+  pid: number
+  output_path: string
+}
+
+type HistoryDisplayEntry = RunningHistoryEntry | CompletedHistoryEntry
+
 type QueryHistoryOptions = {
   failures?: boolean
   last?: number
   configDir?: string
 }
 
+type DisplayOptions = {
+  marker: RunningMarker | null
+  taskName: string
+  configDir: string
+}
+
 // Public API --
+
+export function buildDisplayEntries(
+  entries: HistoryEntry[],
+  options: DisplayOptions,
+): HistoryDisplayEntry[] {
+  const completed: CompletedHistoryEntry[] = entries.map((e) => ({
+    ...e,
+    status: e.success ? 'ok' : e.timed_out ? 'timeout' : 'err',
+  }))
+
+  if (!options.marker) return completed
+
+  const histDir = path.join(options.configDir, 'history', options.taskName)
+  const running: RunningHistoryEntry = {
+    status: 'running',
+    timestamp: options.marker.timestamp,
+    started_at: new Date(options.marker.started_at),
+    pid: options.marker.pid,
+    output_path: path.join(histDir, `${options.marker.timestamp}.output.txt`),
+  }
+
+  return [running, ...completed]
+}
 
 export async function queryHistory(
   taskName: string,

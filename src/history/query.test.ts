@@ -3,7 +3,7 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 
-import { TaskNotFoundError, queryHistory } from './query'
+import { TaskNotFoundError, buildDisplayEntries, queryHistory } from './query'
 
 async function makeConfigDir(): Promise<string> {
   return fs.mkdtemp(path.join(os.tmpdir(), 'tm-query-'))
@@ -25,6 +25,7 @@ type MetaOverrides = Partial<{
   duration_ms: number
   exit_code: number
   success: boolean
+  timed_out: boolean
 }>
 
 async function writeMeta(
@@ -53,6 +54,9 @@ async function writeMeta(
     duration_ms,
     exit_code: overrides.exit_code ?? 0,
     success: overrides.success ?? true,
+    ...(overrides.timed_out !== undefined && {
+      timed_out: overrides.timed_out,
+    }),
   }
 
   await fs.writeFile(
@@ -295,5 +299,115 @@ describe('queryHistory', () => {
     expect(entry.success).toBe(true)
     expect(entry.timed_out).toBe(false)
     expect(entry.output_path).toBeUndefined()
+  })
+})
+
+describe('buildDisplayEntries', () => {
+  test('prepends running entry when marker is present', async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(configDir, 'daily-audit')
+    await writeMeta(configDir, 'daily-audit', '2026-04-01T08.00.00Z')
+
+    const entries = await queryHistory('daily-audit', { configDir })
+    if (entries instanceof Error) throw entries
+
+    const display = buildDisplayEntries(entries, {
+      marker: {
+        pid: 42,
+        started_at: '2026-04-05T11:50:00.000Z',
+        timestamp: '2026-04-05T11.50.00Z',
+      },
+      taskName: 'daily-audit',
+      configDir,
+    })
+
+    expect(display).toHaveLength(2)
+    const first = display[0]!
+    expect(first.status).toBe('running')
+    if (first.status !== 'running') return
+    expect(first.pid).toBe(42)
+    expect(first.started_at).toEqual(new Date('2026-04-05T11:50:00.000Z'))
+    expect(first.timestamp).toBe('2026-04-05T11.50.00Z')
+    expect(first.output_path).toBe(
+      path.join(
+        configDir,
+        'history',
+        'daily-audit',
+        '2026-04-05T11.50.00Z.output.txt',
+      ),
+    )
+
+    const second = display[1]!
+    expect(second.status).toBe('ok')
+  })
+
+  test('returns only completed entries when no marker', async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(configDir, 'daily-audit')
+    await writeMeta(configDir, 'daily-audit', '2026-04-01T08.00.00Z')
+    await writeMeta(configDir, 'daily-audit', '2026-04-02T08.00.00Z', {
+      exit_code: 1,
+      success: false,
+    })
+
+    const entries = await queryHistory('daily-audit', { configDir })
+    if (entries instanceof Error) throw entries
+
+    const display = buildDisplayEntries(entries, {
+      marker: null,
+      taskName: 'daily-audit',
+      configDir,
+    })
+
+    expect(display).toHaveLength(2)
+    expect(display[0]!.status).toBe('err')
+    expect(display[1]!.status).toBe('ok')
+    expect(display.every((e) => e.status !== 'running')).toBe(true)
+  })
+
+  test('maps completed entry status correctly', async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(configDir, 'daily-audit')
+    await writeMeta(configDir, 'daily-audit', '2026-04-03T08.00.00Z', {
+      exit_code: 0,
+      success: true,
+    })
+    await writeMeta(configDir, 'daily-audit', '2026-04-02T08.00.00Z', {
+      exit_code: 1,
+      success: false,
+    })
+
+    const entries = await queryHistory('daily-audit', { configDir })
+    if (entries instanceof Error) throw entries
+
+    const display = buildDisplayEntries(entries, {
+      marker: null,
+      taskName: 'daily-audit',
+      configDir,
+    })
+
+    expect(display[0]!.status).toBe('ok')
+    expect(display[1]!.status).toBe('err')
+  })
+
+  test('maps timed_out entry to timeout status', async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(configDir, 'daily-audit')
+    await writeMeta(configDir, 'daily-audit', '2026-04-01T08.00.00Z', {
+      exit_code: 124,
+      success: false,
+      timed_out: true,
+    })
+
+    const entries = await queryHistory('daily-audit', { configDir })
+    if (entries instanceof Error) throw entries
+
+    const display = buildDisplayEntries(entries, {
+      marker: null,
+      taskName: 'daily-audit',
+      configDir,
+    })
+
+    expect(display[0]!.status).toBe('timeout')
   })
 })
