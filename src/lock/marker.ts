@@ -25,7 +25,7 @@ export function clearRunningMarker(fd: number): void {
 
 // Read --
 
-type ReadMarkerDeps = {
+export type ReadMarkerDeps = {
   isProcessAlive?: (pid: number) => boolean
 }
 

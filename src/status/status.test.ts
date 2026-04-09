@@ -3,12 +3,27 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 
+import type { RunningMarker } from '#src/lock'
+
 import { getTaskStatuses } from './status'
 
 async function makeConfigDir(): Promise<string> {
   const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'tm-status-'))
   await fs.mkdir(path.join(tmp, 'tasks'), { recursive: true })
   return tmp
+}
+
+async function writeMarker(
+  configDir: string,
+  taskName: string,
+  marker: RunningMarker,
+): Promise<void> {
+  const locksDir = path.join(configDir, 'locks')
+  await fs.mkdir(locksDir, { recursive: true })
+  await fs.writeFile(
+    path.join(locksDir, `${taskName}.lock`),
+    JSON.stringify(marker),
+  )
 }
 
 async function writeTask(
@@ -361,6 +376,71 @@ Task with timeout.
       exit_code: 124,
       duration_ms: 30000,
     })
+  })
+
+  test('includes running state when marker present and PID alive', async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(configDir, 'my-task', ENABLED_TASK)
+    await writeMarker(configDir, 'my-task', {
+      pid: process.pid,
+      started_at: '2026-04-05T11:50:00.000Z',
+      timestamp: '2026-04-05T11.50.00Z',
+    })
+
+    const result = await getTaskStatuses({
+      configDir,
+      now: NOW,
+      markerDeps: { isProcessAlive: () => true },
+    })
+    expect(result).not.toBeInstanceOf(Error)
+    if (result instanceof Error) return
+
+    const first = result[0]
+    expect(first).toBeDefined()
+    if (!first) return
+    expect(first.running).toEqual({
+      started_at: '2026-04-05T11:50:00.000Z',
+      timestamp: '2026-04-05T11.50.00Z',
+      pid: process.pid,
+      duration_ms: 600_000, // 10 minutes: 12:00 - 11:50
+    })
+  })
+
+  test('omits running state when no marker exists', async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(configDir, 'my-task', ENABLED_TASK)
+
+    const result = await getTaskStatuses({ configDir, now: NOW })
+    expect(result).not.toBeInstanceOf(Error)
+    if (result instanceof Error) return
+
+    const first = result[0]
+    expect(first).toBeDefined()
+    if (!first) return
+    expect(first).not.toHaveProperty('running')
+  })
+
+  test('omits running state when PID is dead', async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(configDir, 'my-task', ENABLED_TASK)
+    await writeMarker(configDir, 'my-task', {
+      pid: 999999,
+      started_at: '2026-04-05T11:50:00.000Z',
+      timestamp: '2026-04-05T11.50.00Z',
+    })
+
+    const result = await getTaskStatuses({
+      configDir,
+      now: NOW,
+      markerDeps: { isProcessAlive: () => false },
+    })
+    expect(result).not.toBeInstanceOf(Error)
+    if (result instanceof Error) return
+
+    const first = result[0]
+    expect(first).toBeDefined()
+    if (!first) return
+    expect(first).not.toHaveProperty('running')
   })
 
   test('defaults timeout to 1h for daily schedule', async () => {

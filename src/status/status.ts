@@ -6,6 +6,8 @@ import ms from 'ms'
 import { configDir as defaultConfigDir } from '#src/config'
 import { queryHistory } from '#src/history'
 import { listTasks } from '#src/list'
+import { readRunningMarker } from '#src/lock'
+import type { ReadMarkerDeps } from '#src/lock'
 import type { TasksDirReadError } from '#src/validate'
 
 // Types --
@@ -17,6 +19,13 @@ type LastRun = {
   duration_ms: number
 }
 
+type Running = {
+  started_at: string
+  timestamp: string
+  pid: number
+  duration_ms: number
+}
+
 type TaskStatus = {
   name: string
   schedule: string
@@ -25,11 +34,13 @@ type TaskStatus = {
   timeout: string
   last_run?: LastRun
   next_run?: string
+  running?: Running
 }
 
 type StatusOptions = {
   configDir?: string
   now?: Date
+  markerDeps?: ReadMarkerDeps
 }
 
 // Public API --
@@ -44,6 +55,7 @@ export async function getTaskStatuses(
   const tasks = await listTasks(tasksDir)
   if (tasks instanceof Error) return tasks
 
+  const locksDir = path.join(cfgDir, 'locks')
   const statuses: TaskStatus[] = []
 
   for (const task of tasks) {
@@ -56,6 +68,17 @@ export async function getTaskStatuses(
 
     if (task.timezone) {
       status.timezone = task.timezone
+    }
+
+    // Running state
+    const marker = readRunningMarker(task.name, locksDir, options?.markerDeps)
+    if (marker) {
+      status.running = {
+        started_at: marker.started_at,
+        timestamp: marker.timestamp,
+        pid: marker.pid,
+        duration_ms: now.getTime() - new Date(marker.started_at).getTime(),
+      }
     }
 
     // Last run

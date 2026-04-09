@@ -1,7 +1,10 @@
+import path from 'node:path'
+
 import { Command, Option } from 'commander'
+import ms from 'ms'
 import { z } from 'zod'
 
-import { tasksDir } from './config'
+import { historyDir, tasksDir } from './config'
 import { doctor } from './doctor'
 import {
   formatTimestamp,
@@ -244,6 +247,17 @@ async function main(): Promise<void> {
           console.log(`  enabled   ${task.enabled}`)
           if (task.timeout) {
             console.log(`  timeout   ${task.timeout}`)
+          }
+          if (task.running) {
+            console.log(
+              `  running   since ${task.running.started_at} (${ms(task.running.duration_ms)})`,
+            )
+            const outputPath = path.join(
+              historyDir,
+              task.name,
+              `${task.running.timestamp}.output.txt`,
+            )
+            console.log(`  output    ${outputPath}`)
           }
           if (task.last_run) {
             console.log(

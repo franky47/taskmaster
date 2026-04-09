@@ -1,10 +1,11 @@
 ---
 # tm-q7pz
 title: tm status shows running state
-status: todo
+status: completed
 type: task
+priority: normal
 created_at: 2026-04-09T10:38:01Z
-updated_at: 2026-04-09T10:38:01Z
+updated_at: 2026-04-09T12:54:33Z
 parent: tm-zaph
 blocked_by:
     - tm-fu5m
@@ -20,13 +21,13 @@ See parent PRD (tm-zaph) for full context on the status display format.
 
 ## Acceptance criteria
 
-- [ ] `TaskStatus` type gains optional `running` field: `{ started_at: string, timestamp: string, pid: number, duration_ms: number }`
-- [ ] `getTaskStatuses` calls `readRunningMarker` for each task
-- [ ] CLI plain output shows `running   since <started_at> (<human duration>)` when running
-- [ ] CLI plain output shows `output    <path to .output.txt>` when running
-- [ ] `--json` output includes `running` object (or `null`/absent when not running)
-- [ ] Tests: status includes running state when marker present and PID alive
-- [ ] Tests: status omits running state when no marker or PID dead
+- [x] `TaskStatus` type gains optional `running` field: `{ started_at: string, timestamp: string, pid: number, duration_ms: number }`
+- [x] `getTaskStatuses` calls `readRunningMarker` for each task
+- [x] CLI plain output shows `running   since <started_at> (<human duration>)` when running
+- [x] CLI plain output shows `output    <path to .output.txt>` when running
+- [x] `--json` output includes `running` object (or `null`/absent when not running)
+- [x] Tests: status includes running state when marker present and PID alive
+- [x] Tests: status omits running state when no marker or PID dead
 
 ## User stories addressed
 
