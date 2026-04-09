@@ -155,7 +155,8 @@ async function main(): Promise<void> {
               : task.enabled === 'always'
                 ? 'always'
                 : 'enabled'
-          console.log(`${task.name} ${task.schedule} ${tag}`)
+          const executor = task.agent ?? 'custom'
+          console.log(`${task.name} ${task.schedule} ${executor} ${tag}`)
         }
       }
     })
@@ -329,6 +330,7 @@ async function main(): Promise<void> {
           console.log(task.name)
           console.log(`  schedule  ${task.schedule}`)
           console.log(`  enabled   ${task.enabled}`)
+          console.log(`  executor  ${task.agent ?? 'custom'}`)
           if (task.timeout) {
             console.log(`  timeout   ${task.timeout}`)
           }

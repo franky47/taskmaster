@@ -88,6 +88,7 @@ describe('listTasks', () => {
         schedule: '0 8 * * 1-5',
         enabled: 'when-online',
         timeout: 3_600_000,
+        agent: 'opencode',
       },
     ])
   })
@@ -103,6 +104,7 @@ describe('listTasks', () => {
         timezone: 'America/New_York',
         enabled: 'when-online',
         timeout: 3_600_000,
+        agent: 'opencode',
       },
     ])
   })
@@ -117,6 +119,7 @@ describe('listTasks', () => {
         schedule: '30 6 * * *',
         enabled: false,
         timeout: 3_600_000,
+        agent: 'opencode',
       },
     ])
   })
@@ -155,6 +158,7 @@ Bad.
         schedule: '0 8 * * 1-5',
         enabled: 'when-online',
         timeout: 3_600_000,
+        agent: 'opencode',
       },
     ])
   })
@@ -170,6 +174,7 @@ Bad.
         schedule: '0 8 * * 1-5',
         enabled: 'when-online',
         timeout: 3_600_000,
+        agent: 'opencode',
       },
     ])
   })
@@ -184,6 +189,7 @@ Bad.
         schedule: '0 8 * * 1-5',
         enabled: 'when-online',
         timeout: 300_000,
+        agent: 'opencode',
       },
     ])
   })
@@ -198,6 +204,7 @@ Bad.
         schedule: '0 12 * * *',
         enabled: 'when-online',
         timeout: 3_600_000,
+        run: 'my-cmd $TM_PROMPT_FILE',
       },
     ])
   })

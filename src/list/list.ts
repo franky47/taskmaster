@@ -10,6 +10,8 @@ export type TaskListEntry = Pick<
   'schedule' | 'timezone' | 'enabled' | 'timeout'
 > & {
   name: string
+  agent?: string
+  run?: string
 }
 
 export async function listTasks(
@@ -40,6 +42,12 @@ export async function listTasks(
     }
     if (parsed.timezone) {
       entry.timezone = parsed.timezone
+    }
+    if ('agent' in parsed) {
+      entry.agent = parsed.agent
+    }
+    if ('run' in parsed) {
+      entry.run = parsed.run
     }
     results.push(entry)
   }

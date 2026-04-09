@@ -137,6 +137,7 @@ describe('getTaskStatuses', () => {
       schedule: '0 8 * * 1-5',
       enabled: 'when-online',
       timeout: '1h',
+      agent: 'opencode',
       // Next weekday after Sunday 2026-04-05 is Monday 2026-04-06 at 08:00 UTC
       next_run: '2026-04-06T08:00:00.000Z',
     })
@@ -325,6 +326,7 @@ Local model task.
     expect(first.name).toBe('run-task')
     expect(first.schedule).toBe('0 12 * * *')
     expect(first.enabled).toBe('when-online')
+    expect(first.run).toBe('my-cmd $TM_PROMPT_FILE')
     expect(first.next_run).toBe('2026-04-06T12:00:00.000Z')
   })
 

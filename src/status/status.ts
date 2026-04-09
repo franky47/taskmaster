@@ -32,6 +32,8 @@ type TaskStatus = {
   enabled: false | 'when-online' | 'always'
   timezone?: string
   timeout: string
+  agent?: string
+  run?: string
   last_run?: LastRun
   next_run?: string
   running?: Running
@@ -68,6 +70,12 @@ export async function getTaskStatuses(
 
     if (task.timezone) {
       status.timezone = task.timezone
+    }
+    if (task.agent) {
+      status.agent = task.agent
+    }
+    if (task.run) {
+      status.run = task.run
     }
 
     // Running state
