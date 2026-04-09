@@ -484,6 +484,94 @@ Local only task.
     expect(names).toEqual(['cloud-a', 'cloud-b'])
   })
 
+  describe('dry-run', () => {
+    test('reports due tasks without spawning, writing heartbeat, or purging', async () => {
+      const configDir = await makeConfigDir()
+      await writeTask(configDir, 'task-a', EVERY_MINUTE_TASK)
+      await writeTask(configDir, 'task-b', EVERY_MINUTE_TASK)
+
+      // Write an old history entry that would normally be purged
+      const oldTimestamp = '2025-01-01T00.00.00Z'
+      await writeTask(configDir, 'old-task', EVERY_MINUTE_TASK)
+      await writeMeta(configDir, 'old-task', oldTimestamp, {
+        finished_at: '2025-01-01T00:00:00.000Z',
+        success: true,
+      })
+
+      const spawned: Array<{ name: string; timestamp: string }> = []
+      const result = await tick({
+        configDir,
+        now: NOW,
+        spawnRun: (name, timestamp) => spawned.push({ name, timestamp }),
+        isOnline: async () => true,
+        dryRun: true,
+      })
+
+      expect(result).not.toBeInstanceOf(Error)
+      if (result instanceof Error) return
+
+      // Tasks reported as would-be-dispatched
+      expect(result.dispatched).toContain('task-a')
+      expect(result.dispatched).toContain('task-b')
+      expect(result.dry_run).toBe(true)
+
+      // No actual side effects
+      expect(spawned).toEqual([])
+      expect(result.purged).toBe(0)
+
+      // No heartbeat file written
+      const heartbeatExists = await fs
+        .access(path.join(configDir, 'heartbeat'))
+        .then(() => true)
+        .catch(() => false)
+      expect(heartbeatExists).toBe(false)
+
+      // Old history entry still present (not purged)
+      const files = await fs.readdir(
+        path.join(configDir, 'history', 'old-task'),
+      )
+      expect(files.filter((f) => f.endsWith('.meta.json'))).toHaveLength(1)
+    })
+
+    test('returns empty dispatched when no tasks are due', async () => {
+      const configDir = await makeConfigDir()
+      await writeTask(configDir, 'daily', WEEKDAY_TASK)
+
+      // Sunday — weekday task won't match
+      const now = new Date('2026-04-05T08:00:00.000Z')
+      const result = await tick({
+        configDir,
+        now,
+        spawnRun: () => {},
+        isOnline: async () => true,
+        dryRun: true,
+      })
+
+      expect(result).not.toBeInstanceOf(Error)
+      if (result instanceof Error) return
+
+      expect(result.dispatched).toEqual([])
+      expect(result.dry_run).toBe(true)
+    })
+
+    test('includes dry_run field in result', async () => {
+      const configDir = await makeConfigDir()
+
+      const result = await tick({
+        configDir,
+        now: NOW,
+        spawnRun: () => {},
+        isOnline: async () => true,
+        dryRun: true,
+      })
+
+      expect(result).not.toBeInstanceOf(Error)
+      if (result instanceof Error) return
+
+      expect(result.dry_run).toBe(true)
+    })
+  })
+
   test('does not dispatch on weekends for weekday-only schedule', async () => {
     const configDir = await makeConfigDir()
     await writeTask(configDir, 'weekday', WEEKDAY_TASK)

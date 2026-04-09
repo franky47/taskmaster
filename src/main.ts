@@ -320,8 +320,9 @@ async function main(): Promise<void> {
     .command('tick')
     .description('Scheduler heartbeat: dispatch due tasks')
     .option('--json', 'Output as JSON')
-    .action(async (opts: { json?: boolean }) => {
-      const result = await tick()
+    .option('--dry-run', 'Preview dispatches without executing')
+    .action(async (opts: { json?: boolean; dryRun?: boolean }) => {
+      const result = await tick({ dryRun: opts.dryRun })
       if (result instanceof Error) {
         console.error(result.message)
         process.exit(1)
@@ -330,14 +331,16 @@ async function main(): Promise<void> {
       if (opts.json) {
         console.log(JSON.stringify(result))
       } else {
+        const verb = result.dry_run ? 'would dispatch' : 'dispatched'
+        const col = verb.length + 1
         for (const name of result.dispatched) {
-          console.log(`dispatched ${name}`)
+          console.log(`${verb} ${name}`)
         }
         for (const name of result.skipped) {
-          console.log(`skipped    ${name} (already ran)`)
+          console.log(`${'skipped'.padEnd(col)}${name} (already ran)`)
         }
         if (result.purged > 0) {
-          console.log(`purged     ${result.purged} old entries`)
+          console.log(`${'purged'.padEnd(col)}${result.purged} old entries`)
         }
       }
     })

@@ -18,6 +18,7 @@ type TickOptions = {
   now?: Date
   spawnRun?: (name: string, timestamp: string) => void
   isOnline?: () => Promise<boolean>
+  dryRun?: boolean
 }
 
 type TickResult = {
@@ -25,6 +26,7 @@ type TickResult = {
   skipped: string[]
   heartbeat: string
   purged: number
+  dry_run: boolean
 }
 
 // Helpers --
@@ -79,6 +81,7 @@ export async function tick(
   const now = options?.now ?? new Date()
   const spawnRun = options?.spawnRun ?? defaultSpawnRun
   const checkOnline = options?.isOnline ?? defaultIsOnline
+  const dryRun = options?.dryRun ?? false
 
   const tasksDir = path.join(cfgDir, 'tasks')
   const floored = floorToMinute(now)
@@ -132,10 +135,16 @@ export async function tick(
     }
   }
 
-  // Stage 5: Dispatch
+  // Stage 5: Dispatch (skip in dry-run)
   for (const task of toDispatch) {
-    spawnRun(task.name, timestamp)
+    if (!dryRun) {
+      spawnRun(task.name, timestamp)
+    }
     dispatched.push(task.name)
+  }
+
+  if (dryRun) {
+    return { dispatched, skipped, heartbeat: '', purged: 0, dry_run: true }
   }
 
   // S8.9: Purge history
@@ -146,5 +155,11 @@ export async function tick(
   const heartbeatPath = path.join(cfgDir, 'heartbeat')
   await fs.writeFile(heartbeatPath, now.toISOString())
 
-  return { dispatched, skipped, heartbeat: now.toISOString(), purged }
+  return {
+    dispatched,
+    skipped,
+    heartbeat: now.toISOString(),
+    purged,
+    dry_run: false,
+  }
 }
