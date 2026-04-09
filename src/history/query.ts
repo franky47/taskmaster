@@ -1,3 +1,4 @@
+import type { Dirent } from 'node:fs'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 
@@ -42,6 +43,10 @@ type RunningHistoryEntry = {
 
 type HistoryDisplayEntry = RunningHistoryEntry | CompletedHistoryEntry
 
+type GlobalHistoryEntry = HistoryEntry & {
+  task_name: string
+}
+
 type QueryHistoryOptions = {
   failures?: boolean
   last?: number
@@ -52,6 +57,45 @@ type DisplayOptions = {
   marker: RunningMarker | null
   taskName: string
   configDir: string
+}
+
+// Internals --
+
+async function parseHistoryDir(histDir: string): Promise<HistoryEntry[]> {
+  let files: string[]
+  try {
+    files = await fs.readdir(histDir)
+  } catch {
+    return []
+  }
+
+  const fileSet = new Set(files)
+  const metaFiles = files
+    .filter((f) => f.endsWith('.meta.json'))
+    .sort()
+    .reverse()
+
+  const entries: HistoryEntry[] = []
+  for (const file of metaFiles) {
+    try {
+      const content = await fs.readFile(path.join(histDir, file), 'utf-8')
+      const parsed = historyMetaSchema.decode(JSON.parse(content))
+
+      const outputFile = file.replace(/\.meta\.json$/, '.output.txt')
+      const stdoutFile = file.replace(/\.meta\.json$/, '.stdout.txt')
+      const output_path = fileSet.has(outputFile)
+        ? path.join(histDir, outputFile)
+        : fileSet.has(stdoutFile)
+          ? path.join(histDir, stdoutFile)
+          : undefined
+
+      entries.push({ ...parsed, output_path })
+    } catch {
+      continue
+    }
+  }
+
+  return entries
 }
 
 // Public API --
@@ -93,46 +137,7 @@ export async function queryHistory(
     return new TaskNotFoundError({ taskName })
   }
 
-  // Read history directory
-  const histDir = path.join(cfgDir, 'history', taskName)
-  let files: string[]
-  try {
-    files = await fs.readdir(histDir)
-  } catch (e: unknown) {
-    if (e instanceof Error && 'code' in e && e.code === 'ENOENT') {
-      return [] // Task exists but no history yet
-    }
-    const reason = e instanceof Error ? e.message : String(e)
-    return new HistoryReadError({ taskName, reason })
-  }
-
-  // Parse meta files, sorted newest first
-  const fileSet = new Set(files)
-  const metaFiles = files
-    .filter((f) => f.endsWith('.meta.json'))
-    .sort()
-    .reverse()
-
-  const entries: HistoryEntry[] = []
-  for (const file of metaFiles) {
-    try {
-      const content = await fs.readFile(path.join(histDir, file), 'utf-8')
-      const parsed = historyMetaSchema.decode(JSON.parse(content))
-
-      const outputFile = file.replace(/\.meta\.json$/, '.output.txt')
-      const stdoutFile = file.replace(/\.meta\.json$/, '.stdout.txt')
-      const output_path = fileSet.has(outputFile)
-        ? path.join(histDir, outputFile)
-        : fileSet.has(stdoutFile)
-          ? path.join(histDir, stdoutFile)
-          : undefined
-
-      entries.push({ ...parsed, output_path })
-    } catch {
-      // Skip malformed meta files
-      continue
-    }
-  }
+  const entries = await parseHistoryDir(path.join(cfgDir, 'history', taskName))
 
   // Filter failures (S6.3)
   let result = options?.failures ? entries.filter((e) => !e.success) : entries
@@ -141,6 +146,52 @@ export async function queryHistory(
   if (options?.last !== undefined) {
     result = result.slice(0, options.last)
   }
+
+  return result
+}
+
+const DEFAULT_GLOBAL_LIMIT = 20
+
+export async function queryGlobalHistory(
+  options?: QueryHistoryOptions,
+): Promise<HistoryReadError | GlobalHistoryEntry[]> {
+  const cfgDir = options?.configDir ?? defaultConfigDir
+  const historyRoot = path.join(cfgDir, 'history')
+
+  let dirents: Dirent[]
+  try {
+    dirents = await fs.readdir(historyRoot, { withFileTypes: true })
+  } catch (e: unknown) {
+    if (e instanceof Error && 'code' in e && e.code === 'ENOENT') {
+      return []
+    }
+    const reason = e instanceof Error ? e.message : String(e)
+    return new HistoryReadError({ taskName: '(global)', reason })
+  }
+
+  const allEntries: GlobalHistoryEntry[] = []
+
+  for (const dirent of dirents) {
+    if (!dirent.isDirectory()) continue
+    const taskName = dirent.name
+    const histDir = path.join(historyRoot, taskName)
+    const entries = await parseHistoryDir(histDir)
+    for (const entry of entries) {
+      allEntries.push({ ...entry, task_name: taskName })
+    }
+  }
+
+  // Sort newest first by timestamp
+  allEntries.sort((a, b) => b.timestamp.localeCompare(a.timestamp))
+
+  // Filter failures
+  let result: GlobalHistoryEntry[] = options?.failures
+    ? allEntries.filter((e) => !e.success)
+    : allEntries
+
+  // Limit (default 20)
+  const limit = options?.last ?? DEFAULT_GLOBAL_LIMIT
+  result = result.slice(0, limit)
 
   return result
 }

@@ -12,9 +12,11 @@ import {
   formatTimestamp,
   manualTimestamp,
   parseTimestampFlag,
+  queryGlobalHistory,
   queryHistory,
   recordHistory,
 } from './history'
+import type { HistoryEntry } from './history'
 import { listTasks } from './list'
 import { TaskContentionError, readRunningMarker } from './lock'
 import { log } from './logger'
@@ -24,6 +26,18 @@ import { setup, teardown } from './setup'
 import { getTaskStatuses } from './status'
 import { tick } from './tick'
 import { validateTasks } from './validate'
+
+function printHistoryEntry(entry: HistoryEntry, taskName?: string): void {
+  const header = taskName ? `${taskName}  ${entry.timestamp}` : entry.timestamp
+  console.log(header)
+  console.log(`  duration  ${entry.duration_ms}ms`)
+  console.log(`  exit_code ${entry.exit_code}`)
+  const status = entry.success ? 'ok' : entry.timed_out ? 'timeout' : 'err'
+  console.log(`  status    ${status}`)
+  if (entry.output_path) {
+    console.log(`  output    ${entry.output_path}`)
+  }
+}
 
 async function main(): Promise<void> {
   const program = new Command()
@@ -177,14 +191,16 @@ async function main(): Promise<void> {
     })
 
   program
-    .command('history <name>')
-    .description('Show run history for a task')
+    .command('history [name]')
+    .description(
+      'Show run history for a task, or across all tasks if no name given',
+    )
     .option('--json', 'Output as JSON')
     .option('--failures', 'Show only failed runs')
     .option('--last <n>', 'Limit to N most recent entries')
     .action(
       async (
-        name: string,
+        name: string | undefined,
         opts: { json?: boolean; failures?: boolean; last?: string },
       ) => {
         let last: number | undefined
@@ -195,6 +211,28 @@ async function main(): Promise<void> {
             process.exit(1)
           }
           last = parsed.data
+        }
+
+        if (name === undefined) {
+          const result = await queryGlobalHistory({
+            failures: opts.failures,
+            last,
+          })
+          if (result instanceof Error) {
+            console.error(result.message)
+            process.exit(1)
+          }
+          if (opts.json) {
+            const jsonEntries = result.map(
+              ({ output_path: _, ...entry }) => entry,
+            )
+            console.log(JSON.stringify(jsonEntries))
+          } else {
+            for (const entry of result) {
+              printHistoryEntry(entry, entry.task_name)
+            }
+          }
+          return
         }
 
         // Check running marker before querying history to adjust --last
@@ -210,6 +248,7 @@ async function main(): Promise<void> {
           console.error(result.message)
           process.exit(1)
         }
+
         const display = buildDisplayEntries(result, {
           marker,
           taskName: name,

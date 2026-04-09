@@ -3,7 +3,12 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 
-import { TaskNotFoundError, buildDisplayEntries, queryHistory } from './query'
+import {
+  TaskNotFoundError,
+  buildDisplayEntries,
+  queryGlobalHistory,
+  queryHistory,
+} from './query'
 
 async function makeConfigDir(): Promise<string> {
   return fs.mkdtemp(path.join(os.tmpdir(), 'tm-query-'))
@@ -409,5 +414,148 @@ describe('buildDisplayEntries', () => {
     })
 
     expect(display[0]!.status).toBe('timeout')
+  })
+})
+
+describe('queryGlobalHistory', () => {
+  test('returns entries across all tasks sorted newest-first', async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(configDir, 'task-a')
+    await writeTask(configDir, 'task-b')
+    await writeMeta(configDir, 'task-a', '2026-04-01T08.00.00Z')
+    await writeMeta(configDir, 'task-b', '2026-04-03T08.00.00Z')
+    await writeMeta(configDir, 'task-a', '2026-04-02T08.00.00Z')
+
+    const result = await queryGlobalHistory({ configDir })
+    expect(result).not.toBeInstanceOf(Error)
+    if (result instanceof Error) return
+
+    expect(result.map((e) => e.task_name)).toEqual([
+      'task-b',
+      'task-a',
+      'task-a',
+    ])
+    expect(result.map((e) => e.timestamp)).toEqual([
+      '2026-04-03T08.00.00Z',
+      '2026-04-02T08.00.00Z',
+      '2026-04-01T08.00.00Z',
+    ])
+  })
+
+  test('defaults to 20 entries', async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(configDir, 'task-a')
+    for (let i = 1; i <= 25; i++) {
+      const day = String(i).padStart(2, '0')
+      await writeMeta(configDir, 'task-a', `2026-01-${day}T08.00.00Z`)
+    }
+
+    const result = await queryGlobalHistory({ configDir })
+    expect(result).not.toBeInstanceOf(Error)
+    if (result instanceof Error) return
+
+    expect(result).toHaveLength(20)
+    expect(result[0]!.timestamp).toBe('2026-01-25T08.00.00Z')
+  })
+
+  test('--last overrides default limit', async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(configDir, 'task-a')
+    await writeMeta(configDir, 'task-a', '2026-04-01T08.00.00Z')
+    await writeMeta(configDir, 'task-a', '2026-04-02T08.00.00Z')
+    await writeMeta(configDir, 'task-a', '2026-04-03T08.00.00Z')
+
+    const result = await queryGlobalHistory({ configDir, last: 1 })
+    expect(result).not.toBeInstanceOf(Error)
+    if (result instanceof Error) return
+
+    expect(result).toHaveLength(1)
+    expect(result[0]!.timestamp).toBe('2026-04-03T08.00.00Z')
+  })
+
+  test('--failures filter works in global mode', async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(configDir, 'task-a')
+    await writeTask(configDir, 'task-b')
+    await writeMeta(configDir, 'task-a', '2026-04-01T08.00.00Z', {
+      exit_code: 0,
+      success: true,
+    })
+    await writeMeta(configDir, 'task-b', '2026-04-02T08.00.00Z', {
+      exit_code: 1,
+      success: false,
+    })
+    await writeMeta(configDir, 'task-a', '2026-04-03T08.00.00Z', {
+      exit_code: 1,
+      success: false,
+    })
+
+    const result = await queryGlobalHistory({ configDir, failures: true })
+    expect(result).not.toBeInstanceOf(Error)
+    if (result instanceof Error) return
+
+    expect(result).toHaveLength(2)
+    expect(result[0]!.task_name).toBe('task-a')
+    expect(result[1]!.task_name).toBe('task-b')
+  })
+
+  test('returns empty array when no history exists', async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(configDir, 'task-a')
+
+    const result = await queryGlobalHistory({ configDir })
+    expect(result).not.toBeInstanceOf(Error)
+    if (result instanceof Error) return
+
+    expect(result).toEqual([])
+  })
+
+  test('returns empty array when history dir does not exist', async () => {
+    const configDir = await makeConfigDir()
+
+    const result = await queryGlobalHistory({ configDir })
+    expect(result).not.toBeInstanceOf(Error)
+    if (result instanceof Error) return
+
+    expect(result).toEqual([])
+  })
+
+  test('skips malformed meta files in global mode', async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(configDir, 'task-a')
+    await writeMeta(configDir, 'task-a', '2026-04-01T08.00.00Z')
+
+    const histDir = path.join(configDir, 'history', 'task-a')
+    await fs.writeFile(
+      path.join(histDir, '2026-04-02T08.00.00Z.meta.json'),
+      'not json',
+    )
+
+    const result = await queryGlobalHistory({ configDir })
+    expect(result).not.toBeInstanceOf(Error)
+    if (result instanceof Error) return
+
+    expect(result).toHaveLength(1)
+    expect(result[0]!.timestamp).toBe('2026-04-01T08.00.00Z')
+  })
+
+  test('includes output_path in global entries', async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(configDir, 'task-a')
+    await writeMeta(configDir, 'task-a', '2026-04-01T08.00.00Z')
+    await writeOutput(configDir, 'task-a', '2026-04-01T08.00.00Z', 'output')
+
+    const result = await queryGlobalHistory({ configDir })
+    expect(result).not.toBeInstanceOf(Error)
+    if (result instanceof Error) return
+
+    expect(result[0]!.output_path).toBe(
+      path.join(
+        configDir,
+        'history',
+        'task-a',
+        '2026-04-01T08.00.00Z.output.txt',
+      ),
+    )
   })
 })
