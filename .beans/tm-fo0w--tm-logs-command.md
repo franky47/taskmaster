@@ -1,10 +1,11 @@
 ---
 # tm-fo0w
 title: tm logs command
-status: todo
+status: completed
 type: task
+priority: normal
 created_at: 2026-04-09T10:38:22Z
-updated_at: 2026-04-09T10:38:22Z
+updated_at: 2026-04-09T13:31:38Z
 parent: tm-zaph
 blocked_by:
     - tm-bsm4
@@ -21,13 +22,13 @@ See parent PRD (tm-zaph) for full context on the auto-detection behavior and `ta
 
 ## Acceptance criteria
 
-- [ ] `tm logs <name>` command registered in CLI
-- [ ] Running task: spawns `tail -f` on the streaming output file with inherited stdio (user sees live output)
-- [ ] Completed task: prints the most recent `.output.txt` content to stdout
-- [ ] No history and not running: prints error message and exits with non-zero code
-- [ ] `tail -f` process is killed when `tm logs` receives SIGINT/SIGTERM (clean exit on Ctrl+C)
-- [ ] Integration test: completed task shows output
-- [ ] Integration test: auto-detection routes correctly based on running state
+- [x] `tm logs <name>` command registered in CLI
+- [x] Running task: spawns `tail -f` on the streaming output file with inherited stdio (user sees live output)
+- [x] Completed task: prints the most recent `.output.txt` content to stdout
+- [x] No history and not running: prints error message and exits with non-zero code
+- [x] `tail -f` process is killed when `tm logs` receives SIGINT/SIGTERM (clean exit on Ctrl+C)
+- [x] Integration test: completed task shows output
+- [x] Integration test: auto-detection routes correctly based on running state
 
 ## User stories addressed
 

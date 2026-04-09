@@ -1,3 +1,4 @@
+import { spawn } from 'node:child_process'
 import path from 'node:path'
 
 import { Command, Option } from 'commander'
@@ -17,6 +18,7 @@ import {
 import { listTasks } from './list'
 import { TaskContentionError, readRunningMarker } from './lock'
 import { log } from './logger'
+import { getTaskLogs } from './logs'
 import { runTask } from './run'
 import { setup, teardown } from './setup'
 import { getTaskStatuses } from './status'
@@ -238,6 +240,37 @@ async function main(): Promise<void> {
         }
       },
     )
+
+  program
+    .command('logs <name>')
+    .description(
+      'Show output of a task (live tail if running, last output if completed)',
+    )
+    .action(async (name: string) => {
+      const result = await getTaskLogs(name)
+      if (result instanceof Error) {
+        console.error(result.message)
+        process.exit(1)
+      }
+
+      if (result.mode === 'print') {
+        process.stdout.write(result.content)
+      } else {
+        const tail = spawn('tail', ['-f', result.outputPath], {
+          stdio: 'inherit',
+        })
+        const cleanup = () => {
+          process.off('SIGINT', cleanup)
+          process.off('SIGTERM', cleanup)
+          tail.kill()
+        }
+        process.on('SIGINT', cleanup)
+        process.on('SIGTERM', cleanup)
+        tail.on('exit', (code, signal) => {
+          process.exit(signal ? 130 : (code ?? 0))
+        })
+      }
+    })
 
   program
     .command('status')
