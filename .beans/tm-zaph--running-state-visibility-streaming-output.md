@@ -1,10 +1,11 @@
 ---
 # tm-zaph
 title: Running state visibility & streaming output
-status: todo
+status: completed
 type: feature
+priority: normal
 created_at: 2026-04-09T10:35:07Z
-updated_at: 2026-04-09T10:35:07Z
+updated_at: 2026-04-09T13:38:40Z
 ---
 
 ## Problem Statement
