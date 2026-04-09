@@ -18,6 +18,10 @@ type TickOptions = {
   now?: Date
   spawnRun?: (name: string, timestamp: string) => void
   isOnline?: () => Promise<boolean>
+  queryHistory?: typeof queryHistory
+  purgeHistory?: (
+    deps?: Parameters<typeof purgeHistory>[0],
+  ) => Promise<Error | { deleted: number }>
   dryRun?: boolean
 }
 
@@ -38,6 +42,7 @@ function floorToMinute(date: Date): Date {
 }
 
 function isCronMatch(
+  task: string,
   schedule: string,
   floored: Date,
   timezone?: string,
@@ -54,7 +59,9 @@ function isCronMatch(
     const expr = CronExpressionParser.parse(schedule, cronOpts)
     const next = expr.next().toDate()
     return next.getTime() === floored.getTime()
-  } catch {
+  } catch (e: unknown) {
+    const error = e instanceof Error ? e : new Error(String(e))
+    log({ event: 'error', task, error })
     return false
   }
 }
@@ -84,6 +91,7 @@ export async function tick(
   const now = options?.now ?? new Date()
   const spawnRun = options?.spawnRun ?? defaultSpawnRun
   const checkOnline = options?.isOnline ?? defaultIsOnline
+  const queryHistoryFn = options?.queryHistory ?? queryHistory
   const dryRun = options?.dryRun ?? false
 
   const tasksDir = path.join(cfgDir, 'tasks')
@@ -91,10 +99,14 @@ export async function tick(
   const timestamp = formatTimestamp(floored)
 
   // Stage 1: Read all task files, filter out disabled
-  const tasks = await listTasks(tasksDir)
-  if (tasks instanceof Error) return tasks
+  const listResult = await listTasks(tasksDir)
+  if (listResult instanceof Error) return listResult
 
-  const enabledTasks = tasks.filter((t) => t.enabled !== false)
+  for (const w of listResult.warnings) {
+    log({ event: 'error', task: w.file.replace(/\.md$/, ''), error: w.error })
+  }
+
+  const enabledTasks = listResult.tasks.filter((t) => t.enabled !== false)
 
   const dispatched: string[] = []
   const skipped: string[] = []
@@ -103,17 +115,18 @@ export async function tick(
   const ready: TaskListEntry[] = []
 
   for (const task of enabledTasks) {
-    if (!isCronMatch(task.schedule, floored, task.timezone)) continue
+    if (!isCronMatch(task.name, task.schedule, floored, task.timezone)) continue
 
-    const history = await queryHistory(task.name, {
+    const history = await queryHistoryFn(task.name, {
       configDir: cfgDir,
       last: 1,
     })
-    if (
-      !(history instanceof Error) &&
-      history.length > 0 &&
-      history[0]!.timestamp === timestamp
-    ) {
+    if (history instanceof Error) {
+      log({ event: 'error', task: task.name, error: history })
+      skipped.push(task.name)
+      continue
+    }
+    if (history.length > 0 && history[0]!.timestamp === timestamp) {
       skipped.push(task.name)
       continue
     }
@@ -151,17 +164,29 @@ export async function tick(
   }
 
   // S8.9: Purge history
-  const purgeResult = await purgeHistory({ configDir: cfgDir, now })
+  const purgeFn = options?.purgeHistory ?? purgeHistory
+  const purgeResult = await purgeFn({ configDir: cfgDir, now })
+  if (purgeResult instanceof Error) {
+    log({ event: 'error', task: '(purge)', error: purgeResult })
+  }
   const purged = purgeResult instanceof Error ? 0 : purgeResult.deleted
 
   // S8.7: Write heartbeat
   const heartbeatPath = path.join(cfgDir, 'heartbeat')
-  await fs.writeFile(heartbeatPath, now.toISOString())
+  let heartbeat: string
+  try {
+    await fs.writeFile(heartbeatPath, now.toISOString())
+    heartbeat = now.toISOString()
+  } catch (e: unknown) {
+    const error = e instanceof Error ? e : new Error(String(e))
+    log({ event: 'error', task: '(heartbeat)', error })
+    heartbeat = ''
+  }
 
   return {
     dispatched,
     skipped,
-    heartbeat: now.toISOString(),
+    heartbeat,
     purged,
     dry_run: false,
   }

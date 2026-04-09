@@ -10,6 +10,11 @@ export class UnsupportedPlatformError extends errore.createTaggedError({
   message: 'Unsupported platform: $platform',
 }) {}
 
+export class SchedulerCommandError extends errore.createTaggedError({
+  name: 'SchedulerCommandError',
+  message: '$command failed (exit $exitCode): $stderr',
+}) {}
+
 // Types --
 
 export type ExecResult = {
@@ -166,7 +171,7 @@ async function setupDarwin(
   tmCommand: string[],
   launchAgentsDir: string,
   run: ExecFn,
-): Promise<SetupResult> {
+): Promise<SchedulerCommandError | SetupResult> {
   const plistPath = path.join(launchAgentsDir, PLIST_FILENAME)
   const expected = generatePlist(tmCommand)
 
@@ -182,7 +187,15 @@ async function setupDarwin(
 
   await fs.mkdir(launchAgentsDir, { recursive: true })
   await fs.writeFile(plistPath, expected)
-  await run('launchctl', ['load', plistPath])
+
+  const loadResult = await run('launchctl', ['load', plistPath])
+  if (loadResult.exitCode !== 0) {
+    return new SchedulerCommandError({
+      command: 'launchctl load',
+      exitCode: String(loadResult.exitCode),
+      stderr: loadResult.stderr.trim(),
+    })
+  }
 
   return { method: 'launchd', installed: true }
 }
@@ -197,7 +210,12 @@ async function teardownDarwin(
     return { method: 'launchd', removed: false }
   }
 
-  await run('launchctl', ['unload', plistPath])
+  const unloadResult = await run('launchctl', ['unload', plistPath])
+  if (unloadResult.exitCode !== 0) {
+    process.stderr.write(
+      `warning: launchctl unload failed (exit ${unloadResult.exitCode}): ${unloadResult.stderr.trim()}\n`,
+    )
+  }
   await fs.rm(plistPath)
 
   return { method: 'launchd', removed: true }
@@ -215,7 +233,7 @@ async function readCrontab(run: ExecFn): Promise<string> {
 async function setupLinux(
   tmCommand: string[],
   run: ExecFn,
-): Promise<SetupResult> {
+): Promise<SchedulerCommandError | SetupResult> {
   const existing = await readCrontab(run)
   const entry = crontabLine(tmCommand)
 
@@ -230,7 +248,14 @@ async function setupLinux(
       ? `${existing}${entry}\n`
       : `${existing}\n${entry}\n`
 
-  await run('crontab', ['-'], newCrontab)
+  const writeResult = await run('crontab', ['-'], newCrontab)
+  if (writeResult.exitCode !== 0) {
+    return new SchedulerCommandError({
+      command: 'crontab',
+      exitCode: String(writeResult.exitCode),
+      stderr: writeResult.stderr.trim(),
+    })
+  }
 
   return { method: 'crontab', installed: true }
 }
@@ -254,7 +279,12 @@ async function teardownLinux(
   }
 
   const newCrontab = filtered.join('\n')
-  await run('crontab', ['-'], newCrontab)
+  const writeResult = await run('crontab', ['-'], newCrontab)
+  if (writeResult.exitCode !== 0) {
+    process.stderr.write(
+      `warning: crontab write failed (exit ${writeResult.exitCode}): ${writeResult.stderr.trim()}\n`,
+    )
+  }
 
   return { method: 'crontab', removed: true }
 }
@@ -263,7 +293,7 @@ async function teardownLinux(
 
 export async function setup(
   options?: SchedulerOptions,
-): Promise<UnsupportedPlatformError | SetupResult> {
+): Promise<UnsupportedPlatformError | SchedulerCommandError | SetupResult> {
   const platform = options?.platform ?? process.platform
   const tmCommand = options?.tmCommand ?? defaultTmCommand()
   const run = options?.exec ?? defaultRunCommand

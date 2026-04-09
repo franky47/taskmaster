@@ -85,8 +85,13 @@ export function log(entry: LogInput, target = logFilePath): void {
   try {
     mkdirSync(path.dirname(target), { recursive: true })
     appendFileSync(target, JSON.stringify(serializeEntry(entry)) + '\n')
-  } catch {
-    // best-effort: logging must never break the program
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e)
+    try {
+      process.stderr.write(`tm: log write failed: ${msg}\n`)
+    } catch {
+      // truly hopeless — stderr itself is broken
+    }
   }
 }
 
@@ -95,7 +100,12 @@ export function readLog(since: Date, logPath = logFilePath): LogEntry[] {
   let content: string
   try {
     content = readFileSync(logPath, 'utf-8')
-  } catch {
+  } catch (e: unknown) {
+    if (e instanceof Error && 'code' in e && e.code === 'ENOENT') {
+      return []
+    }
+    const msg = e instanceof Error ? e.message : String(e)
+    process.stderr.write(`tm: log read failed: ${msg}\n`)
     return []
   }
   const entries: LogEntry[] = []

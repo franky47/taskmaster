@@ -60,29 +60,34 @@ Run-based task.
 `
 
 describe('listTasks', () => {
-  test('returns empty array for missing tasks directory', async () => {
+  test('returns empty tasks for missing tasks directory', async () => {
     const result = await listTasks('/tmp/no-such-dir-ever/tasks')
-    expect(result).toEqual([])
+    if (result instanceof Error) throw result
+    expect(result.tasks).toEqual([])
+    expect(result.warnings).toEqual([])
   })
 
-  test('returns empty array for empty tasks directory', async () => {
+  test('returns empty tasks for empty tasks directory', async () => {
     const tasksDir = await makeTmpTasksDir()
     const result = await listTasks(tasksDir)
-    expect(result).toEqual([])
+    if (result instanceof Error) throw result
+    expect(result.tasks).toEqual([])
   })
 
   test('ignores non-.md files', async () => {
     const tasksDir = await makeTmpTasksDir()
     await fs.writeFile(path.join(tasksDir, 'readme.txt'), 'not a task')
     const result = await listTasks(tasksDir)
-    expect(result).toEqual([])
+    if (result instanceof Error) throw result
+    expect(result.tasks).toEqual([])
   })
 
   test('returns task entry for valid task', async () => {
     const tasksDir = await makeTmpTasksDir()
     await writeTask(tasksDir, 'my-task', ENABLED_TASK)
     const result = await listTasks(tasksDir)
-    expect(result).toEqual([
+    if (result instanceof Error) throw result
+    expect(result.tasks).toEqual([
       {
         name: 'my-task',
         schedule: '0 8 * * 1-5',
@@ -97,7 +102,8 @@ describe('listTasks', () => {
     const tasksDir = await makeTmpTasksDir()
     await writeTask(tasksDir, 'weekly', TASK_WITH_TIMEZONE)
     const result = await listTasks(tasksDir)
-    expect(result).toEqual([
+    if (result instanceof Error) throw result
+    expect(result.tasks).toEqual([
       {
         name: 'weekly',
         schedule: '0 9 * * 1',
@@ -113,7 +119,8 @@ describe('listTasks', () => {
     const tasksDir = await makeTmpTasksDir()
     await writeTask(tasksDir, 'off-task', DISABLED_TASK)
     const result = await listTasks(tasksDir)
-    expect(result).toEqual([
+    if (result instanceof Error) throw result
+    expect(result.tasks).toEqual([
       {
         name: 'off-task',
         schedule: '30 6 * * *',
@@ -131,14 +138,14 @@ describe('listTasks', () => {
     await writeTask(tasksDir, 'mm-middle', ENABLED_TASK)
     const result = await listTasks(tasksDir)
     if (result instanceof Error) throw result
-    expect(result.map((t) => t.name)).toEqual([
+    expect(result.tasks.map((t) => t.name)).toEqual([
       'aa-first',
       'mm-middle',
       'zz-last',
     ])
   })
 
-  test('skips invalid task files', async () => {
+  test('returns warnings for invalid task files', async () => {
     const tasksDir = await makeTmpTasksDir()
     await writeTask(tasksDir, 'good-task', ENABLED_TASK)
     await writeTask(
@@ -152,7 +159,8 @@ Bad.
 `,
     )
     const result = await listTasks(tasksDir)
-    expect(result).toEqual([
+    if (result instanceof Error) throw result
+    expect(result.tasks).toEqual([
       {
         name: 'good-task',
         schedule: '0 8 * * 1-5',
@@ -161,14 +169,18 @@ Bad.
         agent: 'opencode',
       },
     ])
+    expect(result.warnings).toHaveLength(1)
+    expect(result.warnings[0]!.file).toBe('bad-task.md')
+    expect(result.warnings[0]!.error).toBeInstanceOf(Error)
   })
 
-  test('skips files with invalid names', async () => {
+  test('returns warnings for files with invalid names', async () => {
     const tasksDir = await makeTmpTasksDir()
     await writeTask(tasksDir, 'good-task', ENABLED_TASK)
     await writeTask(tasksDir, 'Bad_Name', ENABLED_TASK)
     const result = await listTasks(tasksDir)
-    expect(result).toEqual([
+    if (result instanceof Error) throw result
+    expect(result.tasks).toEqual([
       {
         name: 'good-task',
         schedule: '0 8 * * 1-5',
@@ -177,13 +189,16 @@ Bad.
         agent: 'opencode',
       },
     ])
+    expect(result.warnings).toHaveLength(1)
+    expect(result.warnings[0]!.file).toBe('Bad_Name.md')
   })
 
   test('includes timeout when present', async () => {
     const tasksDir = await makeTmpTasksDir()
     await writeTask(tasksDir, 'timed', TASK_WITH_TIMEOUT)
     const result = await listTasks(tasksDir)
-    expect(result).toEqual([
+    if (result instanceof Error) throw result
+    expect(result.tasks).toEqual([
       {
         name: 'timed',
         schedule: '0 8 * * 1-5',
@@ -198,7 +213,8 @@ Bad.
     const tasksDir = await makeTmpTasksDir()
     await writeTask(tasksDir, 'run-task', RUN_TASK)
     const result = await listTasks(tasksDir)
-    expect(result).toEqual([
+    if (result instanceof Error) throw result
+    expect(result.tasks).toEqual([
       {
         name: 'run-task',
         schedule: '0 12 * * *',

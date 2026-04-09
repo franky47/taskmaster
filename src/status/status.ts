@@ -54,13 +54,17 @@ export async function getTaskStatuses(
   const now = options?.now ?? new Date()
   const tasksDir = path.join(cfgDir, 'tasks')
 
-  const tasks = await listTasks(tasksDir)
-  if (tasks instanceof Error) return tasks
+  const listResult = await listTasks(tasksDir)
+  if (listResult instanceof Error) return listResult
+
+  for (const w of listResult.warnings) {
+    process.stderr.write(`warning: ${w.file}: ${w.error.message}\n`)
+  }
 
   const locksDir = path.join(cfgDir, 'locks')
   const statuses: TaskStatus[] = []
 
-  for (const task of tasks) {
+  for (const task of listResult.tasks) {
     const status: TaskStatus = {
       name: task.name,
       schedule: task.schedule,
@@ -94,7 +98,11 @@ export async function getTaskStatuses(
       configDir: cfgDir,
       last: 1,
     })
-    if (!(history instanceof Error)) {
+    if (history instanceof Error) {
+      process.stderr.write(
+        `warning: ${task.name}: could not read history: ${history.message}\n`,
+      )
+    } else {
       const latest = history[0]
       if (latest) {
         status.last_run = {

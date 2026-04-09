@@ -142,13 +142,22 @@ describe('log', () => {
     expect(lines[1]!['task']).toBe('b')
   })
 
-  test('does not throw on unwritable path', () => {
-    expect(() => {
+  test('writes to stderr on unwritable path', () => {
+    const stderrChunks: string[] = []
+    const origWrite = process.stderr.write.bind(process.stderr)
+    process.stderr.write = (chunk: string | Uint8Array) => {
+      stderrChunks.push(String(chunk))
+      return true
+    }
+    try {
       log(
         { event: 'started', task: 'test', trigger: 'manual' },
         '/proc/nonexistent/impossible/taskmaster.log',
       )
-    }).not.toThrow()
+      expect(stderrChunks.join('')).toContain('log write failed')
+    } finally {
+      process.stderr.write = origWrite
+    }
   })
 })
 
@@ -259,9 +268,27 @@ describe('readLog', () => {
     expect(entries[0]!.task).toBe('ok')
   })
 
-  test('returns empty array for missing file', () => {
+  test('returns empty array for missing file (ENOENT)', () => {
     const entries = readLog(new Date(0), '/tmp/nonexistent-tm-log.jsonl')
     expect(entries).toHaveLength(0)
+  })
+
+  test('warns on stderr for non-ENOENT read errors', () => {
+    // Use a directory path — readFileSync on a directory throws EISDIR
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tm-logger-'))
+    const stderrChunks: string[] = []
+    const origWrite = process.stderr.write.bind(process.stderr)
+    process.stderr.write = (chunk: string | Uint8Array) => {
+      stderrChunks.push(String(chunk))
+      return true
+    }
+    try {
+      const entries = readLog(new Date(0), dir)
+      expect(entries).toHaveLength(0)
+      expect(stderrChunks.join('')).toContain('log read failed')
+    } finally {
+      process.stderr.write = origWrite
+    }
   })
 
   test('returns empty array for empty file', () => {

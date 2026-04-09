@@ -168,6 +168,13 @@ function renderFinding(finding: Finding, platform: Platform): string {
         `At: ${finding.ts}`,
       ].join('\n')
     }
+
+    case 'internal-error':
+      return [
+        `## Internal error: ${finding.source} [${finding.severity}]`,
+        '',
+        finding.message,
+      ].join('\n')
   }
 }
 

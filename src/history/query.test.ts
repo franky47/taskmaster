@@ -225,7 +225,7 @@ describe('queryHistory', () => {
     expect(result[0]!.output_path).toBeUndefined()
   })
 
-  test('skips malformed meta.json files', async () => {
+  test('skips malformed meta.json files and warns on stderr', async () => {
     const configDir = await makeConfigDir()
     await writeTask(configDir, 'daily-audit')
     await writeMeta(configDir, 'daily-audit', '2026-04-01T08.00.00Z')
@@ -236,12 +236,25 @@ describe('queryHistory', () => {
       'not json',
     )
 
-    const result = await queryHistory('daily-audit', { configDir })
-    expect(result).not.toBeInstanceOf(Error)
-    if (result instanceof Error) return
+    const stderrChunks: string[] = []
+    const origWrite = process.stderr.write.bind(process.stderr)
+    process.stderr.write = (chunk: string | Uint8Array) => {
+      stderrChunks.push(String(chunk))
+      return true
+    }
+    try {
+      const result = await queryHistory('daily-audit', { configDir })
+      expect(result).not.toBeInstanceOf(Error)
+      if (result instanceof Error) return
 
-    expect(result).toHaveLength(1)
-    expect(result[0]!.timestamp).toBe('2026-04-01T08.00.00Z')
+      expect(result).toHaveLength(1)
+      expect(result[0]!.timestamp).toBe('2026-04-01T08.00.00Z')
+      expect(stderrChunks.join('')).toContain(
+        'skipped 1 malformed history file',
+      )
+    } finally {
+      process.stderr.write = origWrite
+    }
   })
 
   test('decodes started_at and finished_at as Date objects', async () => {

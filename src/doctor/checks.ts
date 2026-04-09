@@ -92,6 +92,13 @@ type OfflineSkipsFinding = {
   skipCount: number
 }
 
+type InternalErrorFinding = {
+  kind: 'internal-error'
+  severity: 'critical'
+  source: string
+  message: string
+}
+
 export type Finding =
   | LogErrorFinding
   | HeartbeatStaleFinding
@@ -104,6 +111,7 @@ export type Finding =
   | TaskTimeoutFinding
   | TimeoutContentionFinding
   | OfflineSkipsFinding
+  | InternalErrorFinding
 
 // Helpers --
 

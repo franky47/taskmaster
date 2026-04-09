@@ -38,7 +38,12 @@ import type {
 } from '#src/task'
 import { parseTaskFile } from '#src/task'
 
-import type { CwdNotDirectoryError, CwdNotFoundError, ResolvedCwd } from './cwd'
+import type {
+  CwdAccessError,
+  CwdNotDirectoryError,
+  CwdNotFoundError,
+  ResolvedCwd,
+} from './cwd'
 import { resolveCwd } from './cwd'
 import type { PromptFileWriteError } from './prompt'
 import { cleanupPromptFile, writePromptFile } from './prompt'
@@ -120,8 +125,14 @@ export const KILL_GRACE_MS = 10_000
 function defaultKillProcessGroup(pid: number, signal: NodeJS.Signals): void {
   try {
     process.kill(-pid, signal)
-  } catch {
-    // Process may already be dead
+  } catch (e: unknown) {
+    if (e instanceof Error && 'code' in e && e.code === 'ESRCH') {
+      return // Process already dead — expected
+    }
+    const msg = e instanceof Error ? e.message : String(e)
+    process.stderr.write(
+      `tm: failed to kill process group ${pid}: ${msg} — process may still be running\n`,
+    )
   }
 }
 
@@ -151,7 +162,11 @@ export async function defaultSpawnAgent(
     const pid = child.pid
     if (pid === undefined) {
       if (outputFd !== undefined) fs.closeSync(outputFd)
-      resolve({ exitCode: 1, output: '', timedOut: false })
+      resolve({
+        exitCode: 127,
+        output: `Failed to spawn process: ${opts.command}`,
+        timedOut: false,
+      })
       return
     }
 
@@ -208,6 +223,7 @@ type ExecuteError =
   | FrontmatterValidationError
   | CwdNotFoundError
   | CwdNotDirectoryError
+  | CwdAccessError
   | AgentNotFoundError
   | AgentsFileReadError
   | AgentsFileValidationError

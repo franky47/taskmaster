@@ -4,6 +4,7 @@ import os from 'node:os'
 import path from 'node:path'
 
 import {
+  CwdAccessError,
   CwdNotDirectoryError,
   CwdNotFoundError,
   expandTilde,
@@ -51,6 +52,20 @@ describe('resolveCwd', () => {
     await fs.writeFile(file, 'hello')
     const result = await resolveCwd(file)
     expect(result).toBeInstanceOf(CwdNotDirectoryError)
+  })
+
+  test('returns CwdAccessError for non-ENOENT fs errors', async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'tm-cwd-'))
+    const file = path.join(dir, 'a-file')
+    await fs.writeFile(file, 'hello')
+    // path/to/a-file/subdir → ENOTDIR (not a directory in path component)
+    const badPath = path.join(file, 'subdir')
+    const result = await resolveCwd(badPath)
+    expect(result).toBeInstanceOf(CwdAccessError)
+    if (result instanceof CwdAccessError) {
+      expect(result.message).toContain(badPath)
+      expect(result.message).not.toContain('does not exist')
+    }
   })
 
   test('creates temp dir when cwd is undefined', async () => {

@@ -74,7 +74,13 @@ export async function doctor(options?: DoctorOptions): Promise<DoctorResult> {
 
   const deps: DoctorDeps = {
     readHeartbeat: options?.deps?.readHeartbeat ?? defaultReadHeartbeat,
-    listTasks: options?.deps?.listTasks ?? (() => listTasks(tasksDir)),
+    listTasks:
+      options?.deps?.listTasks ??
+      (async () => {
+        const result = await listTasks(tasksDir)
+        if (result instanceof Error) return result
+        return result.tasks
+      }),
     validateTasks:
       options?.deps?.validateTasks ?? (() => validateTasks(tasksDir)),
     queryHistory: options?.deps?.queryHistory ?? ((name) => queryHistory(name)),
@@ -112,15 +118,37 @@ export async function doctor(options?: DoctorOptions): Promise<DoctorResult> {
   findings.push(...checkLogErrors(logEntries))
 
   // Task validation
-  if (!(validationResults instanceof Error)) {
+  if (validationResults instanceof Error) {
+    findings.push({
+      kind: 'internal-error',
+      severity: 'critical',
+      source: 'validateTasks',
+      message: validationResults.message,
+    })
+  } else {
     findings.push(...checkTaskValidation(validationResults))
   }
 
   // Per-task checks
-  if (!(tasks instanceof Error)) {
+  if (tasks instanceof Error) {
+    findings.push({
+      kind: 'internal-error',
+      severity: 'critical',
+      source: 'listTasks',
+      message: tasks.message,
+    })
+  } else {
     for (const task of tasks) {
       const history = await deps.queryHistory(task.name)
-      if (history instanceof Error) continue
+      if (history instanceof Error) {
+        findings.push({
+          kind: 'internal-error',
+          severity: 'critical',
+          source: 'queryHistory',
+          message: `${task.name}: ${history.message}`,
+        })
+        continue
+      }
 
       const failureFinding = checkTaskFailures(task.name, history, now)
       if (failureFinding) findings.push(failureFinding)

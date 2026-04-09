@@ -14,9 +14,19 @@ export type TaskListEntry = Pick<
   run?: string
 }
 
+type TaskListWarning = {
+  file: string
+  error: Error
+}
+
+type TaskListResult = {
+  tasks: TaskListEntry[]
+  warnings: TaskListWarning[]
+}
+
 export async function listTasks(
   tasksDir: string,
-): Promise<TasksDirReadError | TaskListEntry[]> {
+): Promise<TasksDirReadError | TaskListResult> {
   const entries = await fs.readdir(tasksDir).catch((e: unknown) => {
     if (e instanceof Error && 'code' in e && e.code === 'ENOENT') {
       return []
@@ -24,15 +34,19 @@ export async function listTasks(
     return new TasksDirReadError({ path: tasksDir, cause: e })
   })
   if (entries instanceof Error) return entries
-  if (entries.length === 0) return []
+  if (entries.length === 0) return { tasks: [], warnings: [] }
 
   const mdFiles = entries.filter((f) => f.endsWith('.md')).sort()
-  const results: TaskListEntry[] = []
+  const tasks: TaskListEntry[] = []
+  const warnings: TaskListWarning[] = []
 
   for (const file of mdFiles) {
     const filePath = path.join(tasksDir, file)
     const parsed = await parseTaskFile(filePath)
-    if (parsed instanceof Error) continue
+    if (parsed instanceof Error) {
+      warnings.push({ file, error: parsed })
+      continue
+    }
 
     const entry: TaskListEntry = {
       name: file.replace(/\.md$/, ''),
@@ -49,8 +63,8 @@ export async function listTasks(
     if ('run' in parsed) {
       entry.run = parsed.run
     }
-    results.push(entry)
+    tasks.push(entry)
   }
 
-  return results
+  return { tasks, warnings }
 }

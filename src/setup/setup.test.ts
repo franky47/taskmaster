@@ -4,6 +4,7 @@ import os from 'node:os'
 import path from 'node:path'
 
 import {
+  SchedulerCommandError,
   UnsupportedPlatformError,
   isSchedulerInstalled,
   setup,
@@ -161,6 +162,25 @@ describe('setup (macOS)', () => {
     expect(result.method).toBe('launchd')
   })
 
+  test('returns SchedulerCommandError when launchctl load fails', async () => {
+    const dir = await makeTmpDir()
+    const exec: ExecFn = async (cmd, args) => {
+      if (cmd === 'launchctl' && args[0] === 'load') {
+        return ok(1, '', 'Could not load plist')
+      }
+      return ok()
+    }
+
+    const result = await setup({
+      platform: 'darwin',
+      tmCommand: TM_COMMAND,
+      launchAgentsDir: dir,
+      exec,
+    })
+
+    expect(result).toBeInstanceOf(SchedulerCommandError)
+  })
+
   test('returns UnsupportedPlatformError for unknown platform', async () => {
     const { exec } = recorder()
     const result = await setup({
@@ -311,6 +331,26 @@ describe('setup (Linux)', () => {
       (c) => c.cmd === 'crontab' && c.args.includes('-'),
     )
     expect(writeCall!.stdin).toContain("'/home/my user/bin/tm'")
+  })
+
+  test('returns SchedulerCommandError when crontab write fails', async () => {
+    const exec: ExecFn = async (cmd, args) => {
+      if (cmd === 'crontab' && args.includes('-l')) {
+        return ok(1, '', 'no crontab for user')
+      }
+      if (cmd === 'crontab' && args.includes('-')) {
+        return ok(1, '', 'permission denied')
+      }
+      return ok()
+    }
+
+    const result = await setup({
+      platform: 'linux',
+      tmCommand: TM_COMMAND,
+      exec,
+    })
+
+    expect(result).toBeInstanceOf(SchedulerCommandError)
   })
 
   test('returns method: crontab', async () => {

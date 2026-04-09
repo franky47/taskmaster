@@ -14,6 +14,11 @@ export class CwdNotDirectoryError extends errore.createTaggedError({
   message: 'Working directory "$path" is not a directory',
 }) {}
 
+export class CwdAccessError extends errore.createTaggedError({
+  name: 'CwdAccessError',
+  message: 'Cannot access working directory "$path": $reason',
+}) {}
+
 export function expandTilde(p: string): string {
   if (p === '~') return os.homedir()
   if (p.startsWith('~/')) return path.join(os.homedir(), p.slice(2))
@@ -27,7 +32,9 @@ export type ResolvedCwd = {
 
 export async function resolveCwd(
   cwd: string | undefined,
-): Promise<CwdNotFoundError | CwdNotDirectoryError | ResolvedCwd> {
+): Promise<
+  CwdNotFoundError | CwdNotDirectoryError | CwdAccessError | ResolvedCwd
+> {
   if (cwd === undefined) {
     const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'taskmaster-'))
     return { path: tmpDir, is_temp: true }
@@ -40,7 +47,11 @@ export async function resolveCwd(
       return new CwdNotDirectoryError({ path: resolved })
     }
     return { path: resolved, is_temp: false }
-  } catch {
-    return new CwdNotFoundError({ path: resolved })
+  } catch (e: unknown) {
+    if (e instanceof Error && 'code' in e && e.code === 'ENOENT') {
+      return new CwdNotFoundError({ path: resolved })
+    }
+    const reason = e instanceof Error ? e.message : String(e)
+    return new CwdAccessError({ path: resolved, reason })
   }
 }

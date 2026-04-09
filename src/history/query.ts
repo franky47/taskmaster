@@ -61,12 +61,17 @@ type DisplayOptions = {
 
 // Internals --
 
-async function parseHistoryDir(histDir: string): Promise<HistoryEntry[]> {
+type ParseHistoryResult = {
+  entries: HistoryEntry[]
+  skipped: number
+}
+
+async function parseHistoryDir(histDir: string): Promise<ParseHistoryResult> {
   let files: string[]
   try {
     files = await fs.readdir(histDir)
   } catch {
-    return []
+    return { entries: [], skipped: 0 }
   }
 
   const fileSet = new Set(files)
@@ -76,6 +81,7 @@ async function parseHistoryDir(histDir: string): Promise<HistoryEntry[]> {
     .reverse()
 
   const entries: HistoryEntry[] = []
+  let skipped = 0
   for (const file of metaFiles) {
     try {
       const content = await fs.readFile(path.join(histDir, file), 'utf-8')
@@ -88,11 +94,12 @@ async function parseHistoryDir(histDir: string): Promise<HistoryEntry[]> {
 
       entries.push({ ...parsed, output_path })
     } catch {
+      skipped++
       continue
     }
   }
 
-  return entries
+  return { entries, skipped }
 }
 
 // Public API --
@@ -134,7 +141,15 @@ export async function queryHistory(
     return new TaskNotFoundError({ taskName })
   }
 
-  const entries = await parseHistoryDir(path.join(cfgDir, 'history', taskName))
+  const { entries, skipped } = await parseHistoryDir(
+    path.join(cfgDir, 'history', taskName),
+  )
+
+  if (skipped > 0) {
+    process.stderr.write(
+      `warning: ${taskName}: skipped ${skipped} malformed history file${skipped > 1 ? 's' : ''}\n`,
+    )
+  }
 
   // Filter failures (S6.3)
   let result = options?.failures ? entries.filter((e) => !e.success) : entries
@@ -168,14 +183,22 @@ export async function queryGlobalHistory(
 
   const allEntries: GlobalHistoryEntry[] = []
 
+  let totalSkipped = 0
   for (const dirent of dirents) {
     if (!dirent.isDirectory()) continue
     const taskName = dirent.name
     const histDir = path.join(historyRoot, taskName)
-    const entries = await parseHistoryDir(histDir)
+    const { entries, skipped } = await parseHistoryDir(histDir)
+    totalSkipped += skipped
     for (const entry of entries) {
       allEntries.push({ ...entry, task_name: taskName })
     }
+  }
+
+  if (totalSkipped > 0) {
+    process.stderr.write(
+      `warning: skipped ${totalSkipped} malformed history file${totalSkipped > 1 ? 's' : ''}\n`,
+    )
   }
 
   allEntries.sort((a, b) => b.timestamp.localeCompare(a.timestamp))

@@ -3,6 +3,7 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 
+import { TaskNotFoundError } from '#src/history/query'
 import { readLog } from '#src/logger'
 
 import { tick } from './tick'
@@ -572,6 +573,130 @@ Local only task.
 
       expect(result.dry_run).toBe(true)
     })
+  })
+
+  test('skips task and logs error when queryHistory fails during dedup', async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(configDir, 'every-min', EVERY_MINUTE_TASK)
+
+    const spawned: Array<{ name: string; timestamp: string }> = []
+    const before = new Date()
+    const result = await tick({
+      configDir,
+      now: NOW,
+      spawnRun: (name, timestamp) => spawned.push({ name, timestamp }),
+      isOnline: async () => true,
+      queryHistory: async () =>
+        new TaskNotFoundError({ taskName: 'every-min' }),
+    })
+
+    expect(result).not.toBeInstanceOf(Error)
+    if (result instanceof Error) return
+
+    // Task should be skipped, not dispatched
+    expect(result.dispatched).toEqual([])
+    expect(result.skipped).toEqual(['every-min'])
+    expect(spawned).toEqual([])
+
+    // Error should be logged
+    const entries = readLog(before)
+    const errors = entries.filter(
+      (e) => e.event === 'error' && e.task === 'every-min',
+    )
+    expect(errors).toHaveLength(1)
+  })
+
+  test('logs error when purgeHistory fails but tick still succeeds', async () => {
+    const configDir = await makeConfigDir()
+
+    const before = new Date()
+    const result = await tick({
+      configDir,
+      now: NOW,
+      spawnRun: () => {},
+      isOnline: async () => true,
+      purgeHistory: async () => new Error('purge failed'),
+    })
+
+    expect(result).not.toBeInstanceOf(Error)
+    if (result instanceof Error) return
+    expect(result.dry_run).toBe(false)
+    if (result.dry_run) return
+
+    expect(result.purged).toBe(0)
+
+    const entries = readLog(before)
+    const errors = entries.filter(
+      (e) => e.event === 'error' && e.task === '(purge)',
+    )
+    expect(errors).toHaveLength(1)
+  })
+
+  test('logs error when heartbeat write fails but tick still succeeds', async () => {
+    const configDir = await makeConfigDir()
+    // Put a directory where the heartbeat file should be — writeFile will fail
+    await fs.mkdir(path.join(configDir, 'heartbeat'))
+
+    const before = new Date()
+    const result = await tick({
+      configDir,
+      now: NOW,
+      spawnRun: () => {},
+      isOnline: async () => true,
+    })
+
+    expect(result).not.toBeInstanceOf(Error)
+    if (result instanceof Error) return
+    expect(result.dry_run).toBe(false)
+    if (result.dry_run) return
+
+    // Heartbeat should be empty string indicating failure
+    expect(result.heartbeat).toBe('')
+
+    const entries = readLog(before)
+    const errors = entries.filter(
+      (e) => e.event === 'error' && e.task === '(heartbeat)',
+    )
+    expect(errors).toHaveLength(1)
+  })
+
+  test('logs error when cron parsing throws and does not dispatch', async () => {
+    const configDir = await makeConfigDir()
+    // Write a task with an intentionally bad timezone to trigger a cron-parser error
+    await writeTask(
+      configDir,
+      'bad-tz',
+      `---
+schedule: "* * * * *"
+agent: opencode
+timezone: "Not/A/Timezone"
+---
+
+Bad timezone task.
+`,
+    )
+
+    const before = new Date()
+    const spawned: Array<{ name: string; timestamp: string }> = []
+    const result = await tick({
+      configDir,
+      now: NOW,
+      spawnRun: (name, timestamp) => spawned.push({ name, timestamp }),
+      isOnline: async () => true,
+    })
+
+    expect(result).not.toBeInstanceOf(Error)
+    if (result instanceof Error) return
+
+    expect(result.dispatched).toEqual([])
+    expect(spawned).toEqual([])
+
+    // Error should be logged
+    const entries = readLog(before)
+    const errors = entries.filter(
+      (e) => e.event === 'error' && e.task === 'bad-tz',
+    )
+    expect(errors).toHaveLength(1)
   })
 
   test('does not dispatch on weekends for weekday-only schedule', async () => {

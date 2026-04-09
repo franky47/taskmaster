@@ -1049,6 +1049,30 @@ describe('defaultSpawnAgent', () => {
     expect(result.output.trim()).toBe('pipe-mode')
   })
 
+  test('returns exit code 127 and diagnostic output when spawn fails (pid undefined)', async () => {
+    const result = await defaultSpawnAgent(
+      {
+        command: 'nonexistent-command',
+        cwd: '/tmp',
+        env: {},
+      },
+      {
+        spawn: () => ({
+          pid: undefined,
+          exitCode: null,
+          stdout: null,
+          stderr: null,
+          on: () => {},
+        }),
+        killProcessGroup: () => {},
+      },
+    )
+
+    expect(result.exitCode).toBe(127)
+    expect(result.output).toBe('Failed to spawn process: nonexistent-command')
+    expect(result.timedOut).toBe(false)
+  })
+
   test('skips kill if process already exited when timeout fires', async () => {
     vi.useFakeTimers()
 

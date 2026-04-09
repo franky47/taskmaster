@@ -175,36 +175,37 @@ describe('doctor', () => {
     expect(calledWith.getTime()).toBe(customSince.getTime())
   })
 
-  test('gracefully handles listTasks error', async () => {
+  test('reports internal error when listTasks fails', async () => {
     const deps = healthyDeps()
     deps.listTasks = async () => new Error('tasks dir missing')
-    // Should still run non-task checks
-    deps.isSchedulerInstalled = async () => false
-    const result = await doctor({ now, platform: 'darwin', deps })
+    const result = await doctor({ now, deps })
     expect(result.ok).toBe(false)
     if (!result.ok) {
-      expect(result.report).toContain('Scheduler not installed')
+      expect(result.report).toContain('Internal error: listTasks')
+      expect(result.report).toContain('tasks dir missing')
     }
   })
 
-  test('gracefully handles validateTasks error', async () => {
+  test('reports internal error when validateTasks fails', async () => {
     const deps = healthyDeps()
-    deps.validateTasks = async () => new Error('tasks dir missing')
-    deps.isSchedulerInstalled = async () => false
-    const result = await doctor({ now, platform: 'darwin', deps })
+    deps.validateTasks = async () => new Error('validate failed')
+    const result = await doctor({ now, deps })
     expect(result.ok).toBe(false)
     if (!result.ok) {
-      expect(result.report).toContain('Scheduler not installed')
-      expect(result.report).not.toContain('Invalid task')
+      expect(result.report).toContain('Internal error: validateTasks')
+      expect(result.report).toContain('validate failed')
     }
   })
 
-  test('gracefully handles queryHistory error for a task', async () => {
+  test('reports internal error when queryHistory fails for a task', async () => {
     const deps = healthyDeps()
     deps.queryHistory = async () => new Error('history read failed')
-    // Should not produce task-failures or task-never-ran findings
     const result = await doctor({ now, deps })
-    expect(result.ok).toBe(true)
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.report).toContain('Internal error: queryHistory')
+      expect(result.report).toContain('history read failed')
+    }
   })
 
   test('filters contention log entries per task', async () => {

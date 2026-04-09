@@ -135,16 +135,20 @@ async function main(): Promise<void> {
     .description('List all tasks')
     .option('--json', 'Output as JSON')
     .action(async (opts: { json?: boolean }) => {
-      const tasks = await listTasks(tasksDir)
-      if (tasks instanceof Error) {
-        console.error(tasks.message)
+      const listResult = await listTasks(tasksDir)
+      if (listResult instanceof Error) {
+        console.error(listResult.message)
         process.exit(1)
       }
 
+      for (const w of listResult.warnings) {
+        console.error(`warning: ${w.file}: ${w.error.message}`)
+      }
+
       if (opts.json) {
-        console.log(JSON.stringify(tasks))
+        console.log(JSON.stringify(listResult.tasks))
       } else {
-        for (const task of tasks) {
+        for (const task of listResult.tasks) {
           const tag =
             task.enabled === false
               ? 'disabled'
@@ -461,5 +465,11 @@ async function main(): Promise<void> {
 
   await program.parseAsync()
 }
+
+process.on('unhandledRejection', (reason: unknown) => {
+  const message = reason instanceof Error ? reason.message : String(reason)
+  console.error(`tm: unhandled rejection: ${message}`)
+  process.exit(1)
+})
 
 await main()
