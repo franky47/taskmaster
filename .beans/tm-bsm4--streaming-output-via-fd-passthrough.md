@@ -1,10 +1,11 @@
 ---
 # tm-bsm4
 title: Streaming output via fd passthrough
-status: todo
+status: completed
 type: task
+priority: normal
 created_at: 2026-04-09T10:37:52Z
-updated_at: 2026-04-09T10:37:52Z
+updated_at: 2026-04-09T12:02:22Z
 parent: tm-zaph
 blocked_by:
     - tm-w7gs
@@ -22,14 +23,14 @@ See parent PRD (tm-zaph) for full context on the fd passthrough approach and `ou
 
 ## Acceptance criteria
 
-- [ ] `SpawnAgentOpts` gains `outputPath?: string`
-- [ ] When `outputPath` provided: `defaultSpawnAgent` opens fd, passes as `stdio: ['ignore', fd, fd]`, closes on exit, reads file back
-- [ ] When `outputPath` not provided: falls back to current pipe-based collection (backward compat for tests)
-- [ ] `executeTask` computes output path from timestamp + config dir, creates history dir, passes to spawnAgent
-- [ ] `recordHistory` accepts `outputPrewritten?: boolean` — when true, skips writing `.output.txt` to history dir
-- [ ] `main.ts` sets `outputPrewritten: true` when calling `recordHistory` (since executeTask already streamed the file)
-- [ ] Integration test: spawn a real child process, verify output file is populated during execution (not just at the end)
-- [ ] Integration test: read-back string matches what the child process wrote
+- [x] `SpawnAgentOpts` gains `outputPath?: string`
+- [x] When `outputPath` provided: `defaultSpawnAgent` opens fd, passes as `stdio: ['ignore', fd, fd]`, closes on exit, reads file back
+- [x] When `outputPath` not provided: falls back to current pipe-based collection (backward compat for tests)
+- [x] `executeTask` computes output path from timestamp + config dir, creates history dir, passes to spawnAgent
+- [x] `recordHistory` accepts `outputPrewritten?: boolean` — when true, skips writing `.output.txt` to history dir
+- [x] `main.ts` sets `outputPrewritten: true` when calling `recordHistory` (since executeTask already streamed the file)
+- [x] Integration test: spawn a real child process, verify output file is populated during execution (not just at the end)
+- [x] Integration test: read-back string matches what the child process wrote
 
 ## User stories addressed
 

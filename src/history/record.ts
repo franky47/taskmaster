@@ -25,6 +25,7 @@ export type RecordArtifacts = {
   output: string
   prompt: string
   cwd: { path: string; is_temp: boolean }
+  outputPrewritten?: boolean
 }
 
 type RecordHistoryDeps = {
@@ -75,10 +76,12 @@ export async function recordHistory(
       JSON.stringify(serialized, null, 2) + '\n',
     )
 
-    await fs.writeFile(
-      path.join(histDir, `${meta.timestamp}.output.txt`),
-      output,
-    )
+    if (!artifacts.outputPrewritten) {
+      await fs.writeFile(
+        path.join(histDir, `${meta.timestamp}.output.txt`),
+        output,
+      )
+    }
 
     // Temp dir lifecycle
     if (cwd.is_temp) {

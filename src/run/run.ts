@@ -1,5 +1,7 @@
 import type { SpawnOptions } from 'node:child_process'
 import { spawn as nodeSpawn } from 'node:child_process'
+import fs from 'node:fs'
+import fsPromises from 'node:fs/promises'
 import path from 'node:path'
 import type { Readable } from 'node:stream'
 
@@ -13,6 +15,7 @@ import {
 } from '#src/agent'
 import {
   agentsFilePath as defaultAgentsFilePath,
+  historyDir as defaultHistoryDir,
   locksDir as defaultLocksDir,
   envFilePath,
   taskFilePath,
@@ -58,6 +61,7 @@ type SpawnAgentOpts = {
   cwd: string
   env: Record<string, string>
   timeoutMs?: number
+  outputPath?: string
 }
 
 type SpawnAgentResult = {
@@ -129,16 +133,25 @@ export async function defaultSpawnAgent(
   const spawnFn = deps?.spawn ?? nodeSpawn
   const killGroup = deps?.killProcessGroup ?? defaultKillProcessGroup
 
+  // fd passthrough: open output file and pass fd for both stdout and stderr
+  const { outputPath } = opts
+  const outputFd =
+    outputPath !== undefined ? fs.openSync(outputPath, 'w') : undefined
+
   return new Promise((resolve) => {
     const child = spawnFn('sh', ['-c', opts.command], {
       cwd: opts.cwd,
       env: opts.env,
       detached: true,
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio:
+        outputFd !== undefined
+          ? ['ignore', outputFd, outputFd]
+          : ['ignore', 'pipe', 'pipe'],
     })
 
     const pid = child.pid
     if (pid === undefined) {
+      if (outputFd !== undefined) fs.closeSync(outputFd)
       resolve({ exitCode: 1, output: '', timedOut: false })
       return
     }
@@ -147,10 +160,12 @@ export async function defaultSpawnAgent(
     let timeoutTimer: ReturnType<typeof setTimeout> | undefined
     let graceTimer: ReturnType<typeof setTimeout> | undefined
 
+    // Pipe-based collection (when no outputPath)
     const outputChunks: Buffer[] = []
-
-    child.stdout?.on('data', (chunk: Buffer) => outputChunks.push(chunk))
-    child.stderr?.on('data', (chunk: Buffer) => outputChunks.push(chunk))
+    if (outputFd === undefined) {
+      child.stdout?.on('data', (chunk: Buffer) => outputChunks.push(chunk))
+      child.stderr?.on('data', (chunk: Buffer) => outputChunks.push(chunk))
+    }
 
     if (opts.timeoutMs !== undefined && opts.timeoutMs > 0) {
       timeoutTimer = setTimeout(() => {
@@ -166,9 +181,18 @@ export async function defaultSpawnAgent(
     child.on('close', (code: number | null) => {
       clearTimeout(timeoutTimer)
       clearTimeout(graceTimer)
+
+      let output: string
+      if (outputPath !== undefined) {
+        if (outputFd !== undefined) fs.closeSync(outputFd)
+        output = fs.readFileSync(outputPath, 'utf-8')
+      } else {
+        output = Buffer.concat(outputChunks).toString()
+      }
+
       resolve({
         exitCode: code ?? 1,
-        output: Buffer.concat(outputChunks).toString(),
+        output,
         timedOut,
       })
     })
@@ -226,6 +250,17 @@ export async function executeTask(
   const promptPath = writePromptFile(name, startedAt, task.prompt)
   if (promptPath instanceof Error) return promptPath
 
+  // When timestamp is available, stream output to history dir via fd passthrough
+  let outputPath: string | undefined
+  if (options?.timestamp) {
+    const histDir = path.join(
+      configRoot ? path.join(configRoot, 'history') : defaultHistoryDir,
+      name,
+    )
+    await fsPromises.mkdir(histDir, { recursive: true })
+    outputPath = path.join(histDir, `${options.timestamp}.output.txt`)
+  }
+
   const spawnAgent = options?.deps?.spawnAgent ?? defaultSpawnAgent
 
   try {
@@ -234,6 +269,7 @@ export async function executeTask(
       cwd: cwd.path,
       env: { ...env, TM_PROMPT_FILE: promptPath },
       timeoutMs: task.timeout,
+      outputPath,
     })
     const finishedAt = new Date()
 

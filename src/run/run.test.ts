@@ -564,6 +564,82 @@ describe('executeTask', () => {
     expect(result.timedOut).toBe(true)
   })
 
+  test('passes outputPath to spawnAgent when timestamp provided', async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(
+      configDir,
+      'fd-test',
+      '---\nschedule: "0 * * * *"\nagent: opencode\n---\nGo',
+    )
+
+    let receivedOutputPath: string | undefined
+    await executeTask('fd-test', {
+      configDir,
+      timestamp: '2026-04-09T10.00.00Z',
+      deps: {
+        spawnAgent: async (opts) => {
+          receivedOutputPath = opts.outputPath
+          return { exitCode: 0, output: '', timedOut: false }
+        },
+      },
+    })
+
+    expect(receivedOutputPath).toBe(
+      path.join(
+        configDir,
+        'history',
+        'fd-test',
+        '2026-04-09T10.00.00Z.output.txt',
+      ),
+    )
+  })
+
+  test('creates history directory before spawning when timestamp provided', async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(
+      configDir,
+      'dir-create',
+      '---\nschedule: "0 * * * *"\nagent: opencode\n---\nGo',
+    )
+
+    let histDirExisted = false
+    await executeTask('dir-create', {
+      configDir,
+      timestamp: '2026-04-09T10.00.00Z',
+      deps: {
+        spawnAgent: async () => {
+          const histDir = path.join(configDir, 'history', 'dir-create')
+          histDirExisted = fs.existsSync(histDir)
+          return { exitCode: 0, output: '', timedOut: false }
+        },
+      },
+    })
+
+    expect(histDirExisted).toBe(true)
+  })
+
+  test('does not pass outputPath when timestamp not provided', async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(
+      configDir,
+      'no-ts',
+      '---\nschedule: "0 * * * *"\nagent: opencode\n---\nGo',
+    )
+
+    let receivedOutputPath: string | undefined
+    await executeTask('no-ts', {
+      configDir,
+      deps: {
+        spawnAgent: async (opts) => {
+          receivedOutputPath = opts.outputPath
+          return { exitCode: 0, output: '', timedOut: false }
+        },
+      },
+    })
+
+    expect(receivedOutputPath).toBeUndefined()
+  })
+
   test('timedOut is false for normal completion', async () => {
     const configDir = await makeConfigDir()
     await writeTask(
@@ -938,6 +1014,39 @@ describe('defaultSpawnAgent', () => {
     expect(kills).toHaveLength(0)
 
     vi.useRealTimers()
+  })
+
+  test('writes output to file and reads it back when outputPath provided', async () => {
+    const outputPath = path.join(
+      await fsPromises.mkdtemp(path.join(os.tmpdir(), 'tm-fd-')),
+      'output.txt',
+    )
+
+    const result = await defaultSpawnAgent({
+      command: 'echo hello && echo world >&2',
+      cwd: '/tmp',
+      env: { PATH: process.env.PATH ?? '' },
+      outputPath,
+    })
+
+    expect(result.exitCode).toBe(0)
+    expect(result.output).toContain('hello')
+    expect(result.output).toContain('world')
+    expect(result.timedOut).toBe(false)
+
+    // Verify the file exists on disk with the same content
+    const onDisk = await fsPromises.readFile(outputPath, 'utf-8')
+    expect(onDisk).toBe(result.output)
+  })
+
+  test('falls back to pipe collection when outputPath not provided', async () => {
+    const result = await defaultSpawnAgent({
+      command: 'echo pipe-mode',
+      cwd: '/tmp',
+      env: { PATH: process.env.PATH ?? '' },
+    })
+
+    expect(result.output.trim()).toBe('pipe-mode')
   })
 
   test('skips kill if process already exited when timeout fires', async () => {

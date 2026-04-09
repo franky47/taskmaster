@@ -88,6 +88,7 @@ async function main(): Promise<void> {
               path: result.cwd.path,
               is_temp: result.cwd.isTemp,
             },
+            outputPrewritten: true,
           },
         )
         if (recordErr instanceof Error) {

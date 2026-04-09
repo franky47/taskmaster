@@ -241,6 +241,28 @@ describe('recordHistory', () => {
     expect(disk.success).toBe(true)
   })
 
+  test('skips writing output.txt when outputPrewritten is true', async () => {
+    const configDir = await makeConfigDir()
+    const histDir = path.join(configDir, 'history', 'daily-audit')
+    await fs.mkdir(histDir, { recursive: true })
+
+    // Pre-write the output file (simulating fd passthrough)
+    const outputPath = path.join(histDir, '2026-04-04T08.30.00Z.output.txt')
+    await fs.writeFile(outputPath, 'streamed content')
+
+    await recordHistory(makeMeta(), makeArtifacts({ outputPrewritten: true }), {
+      configDir,
+    })
+
+    // Output file should still have the pre-written content, not be overwritten
+    expect(await fs.readFile(outputPath, 'utf-8')).toBe('streamed content')
+
+    // Meta file should still be written
+    const metaPath = path.join(histDir, '2026-04-04T08.30.00Z.meta.json')
+    const disk = JSON.parse(await fs.readFile(metaPath, 'utf-8'))
+    expect(disk.timestamp).toBe('2026-04-04T08.30.00Z')
+  })
+
   test('returns HistoryWriteError on filesystem failure', async () => {
     const result = await recordHistory(makeMeta(), makeArtifacts(), {
       configDir: '/nonexistent/path/xyz',
