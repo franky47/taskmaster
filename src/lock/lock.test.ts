@@ -68,6 +68,24 @@ describe('acquireTaskLock', () => {
     if ('fd' in result) releaseLock(result.fd)
   })
 
+  test('[Symbol.dispose] releases the lock', async () => {
+    const dir = await makeTmpDir()
+    const first = acquireTaskLock('dispose-task', dir)
+    expect('fd' in first).toBe(true)
+
+    // Dispose should release the lock
+    if ('fd' in first && Symbol.dispose in first) {
+      first[Symbol.dispose]()
+    }
+
+    // Should be re-acquirable after dispose
+    const second = acquireTaskLock('dispose-task', dir)
+    expect('fd' in second).toBe(true)
+    expect('contended' in second).toBe(false)
+
+    if ('fd' in second) releaseLock(second.fd)
+  })
+
   test('different tasks do not contend', async () => {
     const dir = await makeTmpDir()
 

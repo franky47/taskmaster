@@ -21,13 +21,15 @@ type TickOptions = {
   dryRun?: boolean
 }
 
-type TickResult = {
-  dispatched: string[]
-  skipped: string[]
-  heartbeat: string
-  purged: number
-  dry_run: boolean
-}
+type TickResult =
+  | { dry_run: true; dispatched: string[]; skipped: string[] }
+  | {
+      dry_run: false
+      dispatched: string[]
+      skipped: string[]
+      heartbeat: string
+      purged: number
+    }
 
 // Helpers --
 
@@ -145,7 +147,7 @@ export async function tick(
   }
 
   if (dryRun) {
-    return { dispatched, skipped, heartbeat: '', purged: 0, dry_run: true }
+    return { dry_run: true, dispatched, skipped }
   }
 
   // S8.9: Purge history

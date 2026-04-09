@@ -9,6 +9,7 @@ import * as ffi from './ffi'
 
 type LockAcquired = {
   fd: number
+  [Symbol.dispose](): void
 }
 
 type LockContended = {
@@ -36,7 +37,12 @@ function acquireLock(
 
   const result = ffi.flock(fd, ffi.LOCK_EX | ffi.LOCK_NB)
   if (result === 0) {
-    return { fd }
+    return {
+      fd,
+      [Symbol.dispose]() {
+        fs.closeSync(fd)
+      },
+    }
   }
 
   // flock returned -1: check errno

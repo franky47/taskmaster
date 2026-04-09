@@ -103,10 +103,7 @@ async function main(): Promise<void> {
             task_name: name,
             output: result.output,
             prompt: result.prompt,
-            cwd: {
-              path: result.cwd.path,
-              is_temp: result.cwd.isTemp,
-            },
+            cwd: result.cwd,
             outputPrewritten: true,
           },
         )
@@ -370,17 +367,22 @@ async function main(): Promise<void> {
 
       if (opts.json) {
         console.log(JSON.stringify(result))
-      } else {
-        const verb = result.dry_run ? 'would dispatch' : 'dispatched'
-        const col = verb.length + 1
+      } else if (result.dry_run) {
         for (const name of result.dispatched) {
-          console.log(`${verb} ${name}`)
+          console.log(`would dispatch ${name}`)
         }
         for (const name of result.skipped) {
-          console.log(`${'skipped'.padEnd(col)}${name} (already ran)`)
+          console.log(`skipped        ${name} (already ran)`)
+        }
+      } else {
+        for (const name of result.dispatched) {
+          console.log(`dispatched ${name}`)
+        }
+        for (const name of result.skipped) {
+          console.log(`skipped    ${name} (already ran)`)
         }
         if (result.purged > 0) {
-          console.log(`${'purged'.padEnd(col)}${result.purged} old entries`)
+          console.log(`purged     ${result.purged} old entries`)
         }
       }
     })

@@ -22,7 +22,7 @@ export function expandTilde(p: string): string {
 
 export type ResolvedCwd = {
   path: string
-  isTemp: boolean
+  is_temp: boolean
 }
 
 export async function resolveCwd(
@@ -30,7 +30,7 @@ export async function resolveCwd(
 ): Promise<CwdNotFoundError | CwdNotDirectoryError | ResolvedCwd> {
   if (cwd === undefined) {
     const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'taskmaster-'))
-    return { path: tmpDir, isTemp: true }
+    return { path: tmpDir, is_temp: true }
   }
 
   const resolved = expandTilde(cwd)
@@ -39,7 +39,7 @@ export async function resolveCwd(
     if (!stat.isDirectory()) {
       return new CwdNotDirectoryError({ path: resolved })
     }
-    return { path: resolved, isTemp: false }
+    return { path: resolved, is_temp: false }
   } catch {
     return new CwdNotFoundError({ path: resolved })
   }

@@ -69,7 +69,7 @@ describe('log', () => {
       task: 'my-task',
       trigger: 'manual',
     })
-    expect(lines[0]!.ts).toBeString()
+    expect(lines[0]!['ts']).toBeString()
   })
 
   test('writes skipped event with contention reason', () => {
@@ -138,8 +138,8 @@ describe('log', () => {
 
     const lines = readLines(logFile)
     expect(lines).toHaveLength(2)
-    expect(lines[0]!.task).toBe('a')
-    expect(lines[1]!.task).toBe('b')
+    expect(lines[0]!['task']).toBe('a')
+    expect(lines[1]!['task']).toBe('b')
   })
 
   test('does not throw on unwritable path', () => {
@@ -183,7 +183,7 @@ describe('readLog', () => {
     expect(errorEntry).toMatchObject({ event: 'error', task: 'my-task' })
     expect(errorEntry.ts).toBeString()
     if (errorEntry.event === 'error') {
-      expect(errorEntry.error.message).toBe('boom')
+      expect(errorEntry.error['message']).toBe('boom')
     }
   })
 
@@ -209,6 +209,29 @@ describe('readLog', () => {
     const entries = readLog(new Date('2026-03-01T00:00:00.000Z'), logFile)
     expect(entries).toHaveLength(1)
     expect(entries[0]!.task).toBe('recent')
+  })
+
+  test('rejects non-ISO timestamp', () => {
+    const logFile = makeTempLogFile()
+    fs.mkdirSync(path.dirname(logFile), { recursive: true })
+
+    const nonIso = JSON.stringify({
+      ts: 'last Tuesday',
+      event: 'started',
+      task: 'bad-ts',
+      trigger: 'manual',
+    })
+    const valid = JSON.stringify({
+      ts: '2026-04-01T00:00:00.000Z',
+      event: 'started',
+      task: 'ok',
+      trigger: 'manual',
+    })
+    fs.writeFileSync(logFile, [nonIso, valid].join('\n') + '\n')
+
+    const entries = readLog(new Date(0), logFile)
+    expect(entries).toHaveLength(1)
+    expect(entries[0]!.task).toBe('ok')
   })
 
   test('skips malformed lines', () => {

@@ -3,7 +3,12 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 
-import { isSchedulerInstalled, setup, teardown } from './setup'
+import {
+  UnsupportedPlatformError,
+  isSchedulerInstalled,
+  setup,
+  teardown,
+} from './setup'
 import type { ExecFn, ExecResult } from './setup'
 
 const PLIST_LABEL = 'com.47ng.taskmaster.tick'
@@ -154,6 +159,17 @@ describe('setup (macOS)', () => {
     expect(result).not.toBeInstanceOf(Error)
     if (result instanceof Error) return
     expect(result.method).toBe('launchd')
+  })
+
+  test('returns UnsupportedPlatformError for unknown platform', async () => {
+    const { exec } = recorder()
+    const result = await setup({
+      // @ts-expect-error — intentionally passing invalid platform to test error path
+      platform: 'freebsd',
+      tmCommand: TM_COMMAND,
+      exec,
+    })
+    expect(result).toBeInstanceOf(UnsupportedPlatformError)
   })
 })
 

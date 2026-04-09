@@ -8,21 +8,21 @@ import { logFilePath } from './config'
 // Schema --
 
 const startedEntrySchema = z.object({
-  ts: z.string(),
+  ts: z.iso.datetime(),
   event: z.literal('started'),
   task: z.string(),
   trigger: z.enum(['manual', 'tick']),
 })
 
 const skippedEntrySchema = z.object({
-  ts: z.string(),
+  ts: z.iso.datetime(),
   event: z.literal('skipped'),
   task: z.string(),
   reason: z.enum(['contention', 'offline']),
 })
 
 const errorEntrySchema = z.object({
-  ts: z.string(),
+  ts: z.iso.datetime(),
   event: z.literal('error'),
   task: z.string(),
   error: z.record(z.string(), z.unknown()),

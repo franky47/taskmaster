@@ -211,7 +211,7 @@ describe('executeTask', () => {
       },
     })
 
-    expect(receivedEnv.TM_PROMPT_FILE).toMatch(/^\/tmp\/tm-.*\.prompt\.md$/)
+    expect(receivedEnv['TM_PROMPT_FILE']).toMatch(/^\/tmp\/tm-.*\.prompt\.md$/)
   })
 
   // AC4: Prompt file written before spawn, cleaned up after
@@ -225,7 +225,7 @@ describe('executeTask', () => {
       configDir,
       deps: {
         spawnAgent: async (opts) => {
-          promptPath = opts.env.TM_PROMPT_FILE ?? ''
+          promptPath = opts.env['TM_PROMPT_FILE'] ?? ''
           existedDuringSpawn = fs.existsSync(promptPath)
           return { exitCode: 0, output: '', timedOut: false }
         },
@@ -247,7 +247,7 @@ describe('executeTask', () => {
       configDir,
       deps: {
         spawnAgent: async (opts) => {
-          promptPath = opts.env.TM_PROMPT_FILE ?? ''
+          promptPath = opts.env['TM_PROMPT_FILE'] ?? ''
           return { exitCode: 1, output: 'boom', timedOut: false }
         },
       },
@@ -290,8 +290,8 @@ describe('executeTask', () => {
       },
     })
 
-    expect(receivedEnv.GLOBAL_KEY).toBe('global_val')
-    expect(receivedEnv.PROJECT).toBe('myproject')
+    expect(receivedEnv['GLOBAL_KEY']).toBe('global_val')
+    expect(receivedEnv['PROJECT']).toBe('myproject')
   })
 
   test('resolves cwd from frontmatter', async () => {
@@ -451,7 +451,7 @@ describe('executeTask', () => {
     )
   })
 
-  test('includes cwd with isTemp when cwd omitted', async () => {
+  test('includes cwd with is_temp when cwd omitted', async () => {
     const configDir = await makeConfigDir()
     await writeTask(
       configDir,
@@ -465,11 +465,11 @@ describe('executeTask', () => {
     })
 
     if (result instanceof Error) throw result
-    expect(result.cwd.isTemp).toBe(true)
+    expect(result.cwd.is_temp).toBe(true)
     expect(result.cwd.path).toContain('taskmaster-')
   })
 
-  test('includes cwd with isTemp=false when cwd specified', async () => {
+  test('includes cwd with is_temp=false when cwd specified', async () => {
     const cwdDir = await fsPromises.mkdtemp(path.join(os.tmpdir(), 'tm-cwd-'))
     const configDir = await makeConfigDir()
     const task = `---\nschedule: "0 * * * *"\nagent: opencode\ncwd: "${cwdDir}"\n---\nGo`
@@ -481,7 +481,7 @@ describe('executeTask', () => {
     })
 
     if (result instanceof Error) throw result
-    expect(result.cwd.isTemp).toBe(false)
+    expect(result.cwd.is_temp).toBe(false)
     expect(result.cwd.path).toBe(cwdDir)
   })
 
@@ -824,7 +824,7 @@ describe('defaultSpawnAgent', () => {
     const result = await defaultSpawnAgent({
       command: 'echo hello',
       cwd: '/tmp',
-      env: { PATH: process.env.PATH ?? '' },
+      env: { PATH: process.env['PATH'] ?? '' },
     })
     expect(result.exitCode).toBe(0)
     expect(result.output.trim()).toBe('hello')
@@ -835,7 +835,7 @@ describe('defaultSpawnAgent', () => {
     const result = await defaultSpawnAgent({
       command: 'echo out && echo err >&2',
       cwd: '/tmp',
-      env: { PATH: process.env.PATH ?? '' },
+      env: { PATH: process.env['PATH'] ?? '' },
     })
     expect(result.exitCode).toBe(0)
     expect(result.output).toContain('out')
@@ -1025,7 +1025,7 @@ describe('defaultSpawnAgent', () => {
     const result = await defaultSpawnAgent({
       command: 'echo hello && echo world >&2',
       cwd: '/tmp',
-      env: { PATH: process.env.PATH ?? '' },
+      env: { PATH: process.env['PATH'] ?? '' },
       outputPath,
     })
 
@@ -1043,7 +1043,7 @@ describe('defaultSpawnAgent', () => {
     const result = await defaultSpawnAgent({
       command: 'echo pipe-mode',
       cwd: '/tmp',
-      env: { PATH: process.env.PATH ?? '' },
+      env: { PATH: process.env['PATH'] ?? '' },
     })
 
     expect(result.output.trim()).toBe('pipe-mode')

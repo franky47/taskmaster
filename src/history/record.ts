@@ -7,6 +7,7 @@ import {
   configDir as defaultConfigDir,
   runsDir as defaultRunsDir,
 } from '#src/config'
+import type { ResolvedCwd } from '#src/run/cwd'
 
 import type { HistoryMetaInput } from './schema'
 import { historyMetaSchema } from './schema'
@@ -24,7 +25,7 @@ export type RecordArtifacts = {
   task_name: string
   output: string
   prompt: string
-  cwd: { path: string; is_temp: boolean }
+  cwd: ResolvedCwd
   outputPrewritten?: boolean
 }
 

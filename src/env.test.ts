@@ -44,25 +44,25 @@ describe('loadEnvFile', () => {
 
 describe('buildEnv', () => {
   test('layers process.env -> global -> task (last wins)', () => {
-    const original = process.env.PATH
+    const original = process.env['PATH']
     const result = buildEnv(
       { GLOBAL: 'g', SHARED: 'from-global' },
       { TASK: 't', SHARED: 'from-task' },
     )
-    expect(result.GLOBAL).toBe('g')
-    expect(result.TASK).toBe('t')
-    expect(result.SHARED).toBe('from-task')
+    expect(result['GLOBAL']).toBe('g')
+    expect(result['TASK']).toBe('t')
+    expect(result['SHARED']).toBe('from-task')
     // process.env is the base layer
-    expect(result.PATH).toBe(original)
+    expect(result['PATH']).toBe(original)
   })
 
   test('empty overrides preserve lower layers', () => {
     const result = buildEnv({}, {})
-    expect(result.PATH).toBe(process.env.PATH)
+    expect(result['PATH']).toBe(process.env['PATH'])
   })
 
   test('task env overrides global env', () => {
     const result = buildEnv({ KEY: 'global' }, { KEY: 'task' })
-    expect(result.KEY).toBe('task')
+    expect(result['KEY']).toBe('task')
   })
 })

@@ -26,7 +26,6 @@ import {
   LockAcquireError,
   TaskContentionError,
   acquireTaskLock,
-  releaseLock,
 } from '#src/lock'
 import { clearRunningMarker, writeRunningMarker } from '#src/lock/marker'
 import type {
@@ -292,12 +291,13 @@ export async function runTask(
   const configRoot = options?.configDir
   const lockDir = configRoot ? path.join(configRoot, 'locks') : defaultLocksDir
 
-  const lock = acquireTaskLock(name, lockDir)
-  if (lock instanceof Error) return lock
-  if ('contended' in lock) return new TaskContentionError({ taskName: name })
+  const lockResult = acquireTaskLock(name, lockDir)
+  if (lockResult instanceof Error) return lockResult
+  if ('contended' in lockResult)
+    return new TaskContentionError({ taskName: name })
 
+  using lock = lockResult
   using cleanup = new errore.DisposableStack()
-  cleanup.defer(() => releaseLock(lock.fd))
 
   if (options?.timestamp) {
     writeRunningMarker(lock.fd, {

@@ -22,7 +22,7 @@ describe('defaultSpawnAgent fd passthrough', () => {
     const promise = defaultSpawnAgent({
       command,
       cwd: '/tmp',
-      env: { PATH: process.env.PATH ?? '' },
+      env: { PATH: process.env['PATH'] ?? '' },
       outputPath,
     })
 
@@ -53,7 +53,7 @@ describe('defaultSpawnAgent fd passthrough', () => {
     const result = await defaultSpawnAgent({
       command: 'echo line1 && echo line2 >&2 && echo line3',
       cwd: '/tmp',
-      env: { PATH: process.env.PATH ?? '' },
+      env: { PATH: process.env['PATH'] ?? '' },
       outputPath,
     })
 
@@ -67,7 +67,7 @@ describe('defaultSpawnAgent (integration)', () => {
     const result = await defaultSpawnAgent({
       command: 'sleep 60 & echo $!; wait',
       cwd: '/tmp',
-      env: { PATH: process.env.PATH ?? '' },
+      env: { PATH: process.env['PATH'] ?? '' },
       timeoutMs: 1000,
     })
 

@@ -302,6 +302,8 @@ describe('tick', () => {
 
     expect(result).not.toBeInstanceOf(Error)
     if (result instanceof Error) return
+    expect(result.dry_run).toBe(false)
+    if (result.dry_run) return
 
     expect(result.purged).toBeGreaterThan(0)
 
@@ -517,7 +519,7 @@ Local only task.
 
       // No actual side effects
       expect(spawned).toEqual([])
-      expect(result.purged).toBe(0)
+      expect('purged' in result).toBe(false)
 
       // No heartbeat file written
       const heartbeatExists = await fs

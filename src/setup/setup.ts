@@ -1,6 +1,15 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 
+import * as errore from 'errore'
+
+// Errors --
+
+export class UnsupportedPlatformError extends errore.createTaggedError({
+  name: 'UnsupportedPlatformError',
+  message: 'Unsupported platform: $platform',
+}) {}
+
 // Types --
 
 export type ExecResult = {
@@ -40,7 +49,7 @@ const PLIST_FILENAME = `${PLIST_LABEL}.plist`
 // Helpers --
 
 function defaultLaunchAgentsDir(): string {
-  return path.join(process.env.HOME ?? '~', 'Library', 'LaunchAgents')
+  return path.join(process.env['HOME'] ?? '~', 'Library', 'LaunchAgents')
 }
 
 function defaultTmCommand(): string[] {
@@ -94,9 +103,9 @@ function generatePlist(tmCommand: string[]): string {
   // launchd provides a minimal environment. Pass through variables that
   // child processes (like Claude CLI) need to locate config/auth state.
   const envVars: Record<string, string | undefined> = {
-    HOME: process.env.HOME,
-    USER: process.env.USER,
-    PATH: process.env.PATH,
+    HOME: process.env['HOME'],
+    USER: process.env['USER'],
+    PATH: process.env['PATH'],
   }
   const envEntries = Object.entries(envVars)
     .filter((entry): entry is [string, string] => entry[1] !== undefined)
@@ -254,7 +263,7 @@ async function teardownLinux(
 
 export async function setup(
   options?: SchedulerOptions,
-): Promise<Error | SetupResult> {
+): Promise<UnsupportedPlatformError | SetupResult> {
   const platform = options?.platform ?? process.platform
   const tmCommand = options?.tmCommand ?? defaultTmCommand()
   const run = options?.exec ?? defaultRunCommand
@@ -268,12 +277,12 @@ export async function setup(
     return setupLinux(tmCommand, run)
   }
 
-  return new Error(`Unsupported platform: ${platform}`)
+  return new UnsupportedPlatformError({ platform })
 }
 
 export async function teardown(
   options?: SchedulerOptions,
-): Promise<Error | TeardownResult> {
+): Promise<UnsupportedPlatformError | TeardownResult> {
   const platform = options?.platform ?? process.platform
   const run = options?.exec ?? defaultRunCommand
 
@@ -287,7 +296,7 @@ export async function teardown(
     return teardownLinux(tmCommand, run)
   }
 
-  return new Error(`Unsupported platform: ${platform}`)
+  return new UnsupportedPlatformError({ platform })
 }
 
 export async function isSchedulerInstalled(
