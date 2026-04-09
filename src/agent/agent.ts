@@ -94,7 +94,8 @@ async function loadAgentsFile(
 
   let data: unknown
   try {
-    // Reusing gray-matter to parse frontmatter-style YAML key-value pairs
+    // Wrap plain YAML in frontmatter delimiters so gray-matter (already a
+    // dependency for task file parsing) can parse it as key-value pairs
     const parsed = matter(`---\n${content}\n---`)
     data = parsed.data
   } catch (err) {

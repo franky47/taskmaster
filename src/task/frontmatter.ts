@@ -8,7 +8,7 @@ import { minCronIntervalMs } from '#src/schedule'
 
 const VALID_TIMEZONES = new Set(Intl.supportedValuesOf('timeZone'))
 
-// Duration string schema — mirrors ms.StringValue in lowercase.
+// Duration string schema — subset of ms.StringValue, restricted to lowercase.
 // z.templateLiteral produces a type assignable to ms.StringValue,
 // so ms() accepts it without type assertions.
 const timeUnit = z.enum([
@@ -259,7 +259,8 @@ const frontmatterSchema = rawFrontmatter
       try {
         minInterval = minCronIntervalMs(data.schedule)
       } catch {
-        return // schedule is already invalid; its own refinement reports the error
+        // schedule is already invalid; its own refinement reports the error
+        return
       }
       if (data.timeout >= minInterval) {
         ctx.addIssue({
@@ -285,7 +286,7 @@ const frontmatterSchema = rawFrontmatter
     }
     if (run === undefined) {
       throw new Error(
-        'invariant: superRefine guarantees exactly one of agent/run',
+        'unreachable: superRefine guarantees exactly one of agent/run',
       )
     }
     return { ...common, timeout: effectiveTimeout, run }

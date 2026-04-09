@@ -61,7 +61,6 @@ export async function recordHistory(
   const cfgDir = deps?.configDir ?? defaultConfigDir
 
   try {
-    // Write history files
     const histDir = path.join(cfgDir, 'history', task_name)
     await fs.mkdir(histDir, { recursive: true })
 
@@ -83,7 +82,6 @@ export async function recordHistory(
       )
     }
 
-    // Temp dir lifecycle
     if (cwd.is_temp) {
       if (success) {
         // S4.5: delete temp dir on success

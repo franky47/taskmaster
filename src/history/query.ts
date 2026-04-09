@@ -82,12 +82,9 @@ async function parseHistoryDir(histDir: string): Promise<HistoryEntry[]> {
       const parsed = historyMetaSchema.decode(JSON.parse(content))
 
       const outputFile = file.replace(/\.meta\.json$/, '.output.txt')
-      const stdoutFile = file.replace(/\.meta\.json$/, '.stdout.txt')
       const output_path = fileSet.has(outputFile)
         ? path.join(histDir, outputFile)
-        : fileSet.has(stdoutFile)
-          ? path.join(histDir, stdoutFile)
-          : undefined
+        : undefined
 
       entries.push({ ...parsed, output_path })
     } catch {
@@ -181,7 +178,6 @@ export async function queryGlobalHistory(
     }
   }
 
-  // Sort newest first by timestamp
   allEntries.sort((a, b) => b.timestamp.localeCompare(a.timestamp))
 
   // Filter failures

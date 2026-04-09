@@ -304,7 +304,8 @@ export async function isSchedulerInstalled(
     const run = options?.exec ?? defaultRunCommand
     const tmCommand = options?.tmCommand ?? defaultTmCommand()
     const crontab = await readCrontab(run)
-    return crontab.includes(crontabLine(tmCommand))
+    const lines = crontab.split('\n')
+    return lines.some((line) => line === crontabLine(tmCommand))
   }
 
   return false

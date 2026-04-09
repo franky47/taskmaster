@@ -58,8 +58,9 @@ function isCronMatch(
 }
 
 function defaultSpawnRun(name: string, timestamp: string): void {
-  // Compiled SFE: argv[0] is bare "bun" which isn't in launchd's minimal $PATH.
-  // process.execPath is always the absolute path to the runtime.
+  // Compiled SFE: argv = ['bun', '/$bunfs/root/tm', ...], execPath = real path
+  // Dev mode:     argv = ['/path/to/bun', 'src/main.ts', ...], Bun.main = script
+  // In both cases, process.execPath is the reliable absolute path to the runtime.
   const tmCommand = /\.[jt]s$/.test(Bun.main)
     ? [process.execPath, path.resolve(Bun.main)]
     : [process.execPath]

@@ -126,8 +126,8 @@ export function formatRelativeTime(from: Date, to: Date): string {
 
 // Check functions --
 
-// Heartbeat staleness threshold: tick runs every 60s, so 5 minutes
-// means 5 missed ticks — enough to rule out transient delays.
+// Heartbeat staleness threshold: the scheduler is configured to tick every
+// minute, so 5 minutes means 5 missed ticks — enough to rule out transient delays.
 const HEARTBEAT_STALE_THRESHOLD_MS = 5 * 60_000
 
 export function checkHeartbeat(

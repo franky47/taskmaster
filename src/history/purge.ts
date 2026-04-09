@@ -38,7 +38,7 @@ async function tryUnlink(filePath: string): Promise<void> {
   try {
     await fs.unlink(filePath)
   } catch {
-    // File may not exist (e.g. stderr.txt)
+    // Best-effort: file may not exist (legacy or partial history entries)
   }
 }
 
@@ -82,9 +82,6 @@ export async function purgeHistory(
         const tsPrefix = metaFile.replace('.meta.json', '')
         await fs.unlink(metaPath)
         await tryUnlink(path.join(taskDir, `${tsPrefix}.output.txt`))
-        // Legacy files from before the stdout+stderr merge
-        await tryUnlink(path.join(taskDir, `${tsPrefix}.stdout.txt`))
-        await tryUnlink(path.join(taskDir, `${tsPrefix}.stderr.txt`))
         deleted++
       }
     }

@@ -14,8 +14,9 @@ const flockLib = dlopen(libcName, {
   flock: { args: ['i32', 'i32'], returns: 'i32' },
 })
 
-// Build getErrno per-platform so each branch has properly typed symbols
-// (no computed keys, no type assertions).
+// Thread-local errno access differs by platform: macOS exposes __error(),
+// Linux exposes __errno_location(). Per-platform branches keep symbols
+// properly typed without computed keys or type assertions.
 function makeGetErrno(): () => number {
   if (process.platform === 'darwin') {
     const lib = dlopen('libSystem.B.dylib', {

@@ -3,7 +3,7 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 
-import { setup, teardown } from './setup'
+import { isSchedulerInstalled, setup, teardown } from './setup'
 import type { ExecFn, ExecResult } from './setup'
 
 const PLIST_LABEL = 'com.47ng.taskmaster.tick'
@@ -486,6 +486,46 @@ describe('teardown (Linux)', () => {
     expect(result).not.toBeInstanceOf(Error)
     if (result instanceof Error) return
     expect(result.method).toBe('crontab')
+  })
+})
+
+// -- isSchedulerInstalled --
+
+describe('isSchedulerInstalled (Linux)', () => {
+  test('returns false when crontab line is a superset of expected entry', async () => {
+    const supersetCrontab = `* * * * * /usr/local/bin/tm tick --extra-flag\n`
+    const exec: ExecFn = async (cmd, args) => {
+      if (cmd === 'crontab' && args.includes('-l')) {
+        return ok(0, supersetCrontab)
+      }
+      return ok()
+    }
+
+    const result = await isSchedulerInstalled({
+      platform: 'linux',
+      tmCommand: TM_COMMAND,
+      exec,
+    })
+
+    expect(result).toBe(false)
+  })
+
+  test('returns true when crontab has exact entry', async () => {
+    const exactCrontab = `0 5 * * * /usr/bin/backup\n* * * * * /usr/local/bin/tm tick\n`
+    const exec: ExecFn = async (cmd, args) => {
+      if (cmd === 'crontab' && args.includes('-l')) {
+        return ok(0, exactCrontab)
+      }
+      return ok()
+    }
+
+    const result = await isSchedulerInstalled({
+      platform: 'linux',
+      tmCommand: TM_COMMAND,
+      exec,
+    })
+
+    expect(result).toBe(true)
   })
 })
 

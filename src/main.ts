@@ -55,7 +55,6 @@ async function main(): Promise<void> {
     )
     .action(
       async (name: string, opts: { json?: boolean; timestamp?: string }) => {
-        // Resolve timestamp
         let timestamp: string
         if (opts.timestamp) {
           const parsed = parseTimestampFlag(opts.timestamp)
@@ -91,7 +90,7 @@ async function main(): Promise<void> {
 
         const exitCode = result.timedOut ? 124 : result.exitCode
 
-        // Record history (non-fatal)
+        // non-fatal
         const recordErr = await recordHistory(
           {
             timestamp,
