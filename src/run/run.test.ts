@@ -8,6 +8,7 @@ import { PassThrough } from 'node:stream'
 
 import { AgentNotFoundError } from '#src/agent'
 import { TaskContentionError, acquireTaskLock, releaseLock } from '#src/lock'
+import { type RunningMarker, readRunningMarker } from '#src/lock/marker'
 import {
   FrontmatterValidationError,
   TaskFileNameError,
@@ -662,6 +663,81 @@ describe('runTask', () => {
     const lock = acquireTaskLock('fail-lock', locksDir)
     expect('fd' in lock).toBe(true)
     if ('fd' in lock) releaseLock(lock.fd)
+  })
+
+  test('writes running marker to lock file during execution', async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(configDir, 'marker-write', agentTask)
+    const locksDir = path.join(configDir, 'locks')
+    const timestamp = '2026-04-09T10.00.00Z'
+
+    let markerDuringExec: RunningMarker | null = null
+    const result = await runTask('marker-write', {
+      configDir,
+      timestamp,
+      deps: {
+        spawnAgent: async () => {
+          markerDuringExec = readRunningMarker('marker-write', locksDir)
+          return { exitCode: 0, output: '', timedOut: false }
+        },
+      },
+    })
+
+    if (result instanceof Error) throw result
+    expect(markerDuringExec).not.toBeNull()
+    expect(markerDuringExec!.pid).toBe(process.pid)
+    expect(markerDuringExec!.timestamp).toBe(timestamp)
+    expect(markerDuringExec!.started_at).toMatch(/^\d{4}-\d{2}-\d{2}T/)
+  })
+
+  test('truncates running marker from lock file after completion', async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(configDir, 'marker-clear', agentTask)
+    const locksDir = path.join(configDir, 'locks')
+    const timestamp = '2026-04-09T10.00.00Z'
+
+    const result = await runTask('marker-clear', {
+      configDir,
+      timestamp,
+      deps: { spawnAgent: fakeSpawn() },
+    })
+
+    if (result instanceof Error) throw result
+
+    const lockContent = fs.readFileSync(
+      path.join(locksDir, 'marker-clear.lock'),
+      'utf-8',
+    )
+    expect(lockContent).toBe('')
+  })
+
+  test('truncates running marker even when execution fails', async () => {
+    const configDir = await makeConfigDir()
+    const task = [
+      '---',
+      'schedule: "0 8 * * 1-5"',
+      'agent: opencode',
+      'cwd: "/nonexistent/dir/xyz"',
+      '---',
+      'Prompt.',
+    ].join('\n')
+    await writeTask(configDir, 'marker-fail', task)
+    const locksDir = path.join(configDir, 'locks')
+    const timestamp = '2026-04-09T10.00.00Z'
+
+    const result = await runTask('marker-fail', {
+      configDir,
+      timestamp,
+      deps: { spawnAgent: fakeSpawn() },
+    })
+
+    expect(result).toBeInstanceOf(CwdNotFoundError)
+
+    const lockContent = fs.readFileSync(
+      path.join(locksDir, 'marker-fail.lock'),
+      'utf-8',
+    )
+    expect(lockContent).toBe('')
   })
 })
 

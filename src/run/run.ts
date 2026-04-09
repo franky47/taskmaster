@@ -25,6 +25,7 @@ import {
   acquireTaskLock,
   releaseLock,
 } from '#src/lock'
+import { clearRunningMarker, writeRunningMarker } from '#src/lock/marker'
 import type {
   FrontmatterParseError,
   FrontmatterValidationError,
@@ -84,6 +85,7 @@ export type ExecuteDeps = {
 
 type ExecuteOptions = {
   configDir?: string
+  timestamp?: string
   deps?: Partial<ExecuteDeps>
 }
 
@@ -260,6 +262,15 @@ export async function runTask(
 
   using cleanup = new errore.DisposableStack()
   cleanup.defer(() => releaseLock(lock.fd))
+
+  if (options?.timestamp) {
+    writeRunningMarker(lock.fd, {
+      pid: process.pid,
+      started_at: new Date().toISOString(),
+      timestamp: options.timestamp,
+    })
+    cleanup.defer(() => clearRunningMarker(lock.fd))
+  }
 
   return await executeTask(name, options)
 }

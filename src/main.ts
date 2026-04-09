@@ -51,7 +51,7 @@ async function main(): Promise<void> {
         const trigger = opts.timestamp ? 'tick' : ('manual' as const)
         log({ event: 'started', task: name, trigger })
 
-        const result = await runTask(name)
+        const result = await runTask(name, { timestamp })
 
         if (result instanceof Error) {
           // S5.2: Lock contention — skip gracefully

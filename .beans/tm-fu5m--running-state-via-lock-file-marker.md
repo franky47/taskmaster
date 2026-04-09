@@ -1,10 +1,11 @@
 ---
 # tm-fu5m
 title: Running state via lock file marker
-status: todo
+status: completed
 type: task
+priority: normal
 created_at: 2026-04-09T10:37:38Z
-updated_at: 2026-04-09T10:37:38Z
+updated_at: 2026-04-09T11:47:19Z
 parent: tm-zaph
 ---
 
@@ -20,16 +21,23 @@ See parent PRD (tm-zaph) for full context on the lock file reuse pattern and PID
 
 ## Acceptance criteria
 
-- [ ] Zod schema for running marker: `{ pid: number, started_at: string (ISO datetime), timestamp: string }`
-- [ ] `runTask` writes marker JSON to lock file fd after acquiring the lock
-- [ ] `runTask` truncates lock file content before releasing the lock (via `DisposableStack.defer`)
-- [ ] `timestamp` added to `runTask`/`executeTask` options and threaded from `main.ts`
-- [ ] `readRunningMarker(taskName, locksDir)` returns parsed marker or null
-- [ ] Stale marker detection: if PID is dead, returns null (and optionally logs)
-- [ ] JSON parse failure treated as "not running" (handles partial writes)
-- [ ] Unit tests: marker readable during execution, absent after completion
-- [ ] Unit tests: stale marker detected when PID is dead
+- [x] Zod schema for running marker: `{ pid: number, started_at: string (ISO datetime), timestamp: string }`
+- [x] `runTask` writes marker JSON to lock file fd after acquiring the lock
+- [x] `runTask` truncates lock file content before releasing the lock (via `DisposableStack.defer`)
+- [x] `timestamp` added to `runTask`/`executeTask` options and threaded from `main.ts`
+- [x] `readRunningMarker(taskName, locksDir)` returns parsed marker or null
+- [x] Stale marker detection: if PID is dead, returns null (and optionally logs)
+- [x] JSON parse failure treated as "not running" (handles partial writes)
+- [x] Unit tests: marker readable during execution, absent after completion
+- [x] Unit tests: stale marker detected when PID is dead
 
 ## User stories addressed
 
 - User story 11 (robust crash detection with stale marker cleanup)
+
+## Summary of Changes
+
+- Added `src/lock/marker.ts` with Zod schema, write/clear/read helpers
+- Modified `runTask` in `src/run/run.ts` to write marker after lock acquire and truncate via DisposableStack LIFO cleanup
+- Added `timestamp` to `ExecuteOptions`, threaded from `main.ts`
+- 12 new unit tests (marker schema + readRunningMarker) + 3 integration tests (marker lifecycle in runTask)
