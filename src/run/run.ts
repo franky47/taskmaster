@@ -5,6 +5,8 @@ import fsPromises from 'node:fs/promises'
 import path from 'node:path'
 import type { Readable } from 'node:stream'
 
+import * as errore from 'errore'
+
 import {
   type AgentNotFoundError,
   type AgentsFileReadError,
@@ -14,11 +16,18 @@ import {
 import {
   agentsFilePath as defaultAgentsFilePath,
   historyDir as defaultHistoryDir,
+  locksDir as defaultLocksDir,
   envFilePath,
   taskFilePath,
 } from '#src/config'
 import type { EnvFileParseError, EnvFileReadError } from '#src/env'
 import { buildEnv, loadEnvFile } from '#src/env'
+import {
+  type LockAcquireError,
+  TaskContentionError,
+  acquireTaskLock,
+} from '#src/lock'
+import { clearRunningMarker, writeRunningMarker } from '#src/lock/marker'
 import type {
   FrontmatterParseError,
   FrontmatterValidationError,
@@ -85,6 +94,7 @@ export type ExecuteDeps = {
 type ExecuteOptions = {
   configDir?: string
   timestamp?: string
+  lock?: boolean
   deps?: Partial<ExecuteDeps>
 }
 
@@ -289,9 +299,35 @@ export async function executeTask(
   }
 }
 
+type RunError = ExecuteError | LockAcquireError | TaskContentionError
+
 export async function runTask(
   name: string,
   options?: ExecuteOptions,
-): Promise<ExecuteError | RunResult> {
+): Promise<RunError | RunResult> {
+  if (!options?.lock) {
+    return await executeTask(name, options)
+  }
+
+  const configRoot = options.configDir
+  const lockDir = configRoot ? path.join(configRoot, 'locks') : defaultLocksDir
+
+  const lockResult = acquireTaskLock(name, lockDir)
+  if (lockResult instanceof Error) return lockResult
+  if ('contended' in lockResult)
+    return new TaskContentionError({ taskName: name })
+
+  using lock = lockResult
+  using cleanup = new errore.DisposableStack()
+
+  if (options.timestamp) {
+    writeRunningMarker(lock.fd, {
+      pid: process.pid,
+      started_at: new Date().toISOString(),
+      timestamp: options.timestamp,
+    })
+    cleanup.defer(() => clearRunningMarker(lock.fd))
+  }
+
   return await executeTask(name, options)
 }

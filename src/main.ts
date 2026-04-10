@@ -1,5 +1,4 @@
 import { spawn } from 'node:child_process'
-import fs from 'node:fs'
 import path from 'node:path'
 
 import { Command, Option } from 'commander'
@@ -19,8 +18,7 @@ import {
 } from './history'
 import type { HistoryEntry } from './history'
 import { listTasks } from './list'
-import { TaskContentionError, acquireTaskLock, readRunningMarker } from './lock'
-import { clearRunningMarker, writeRunningMarker } from './lock/marker'
+import { TaskContentionError, readRunningMarker } from './lock'
 import { log } from './logger'
 import { getTaskLogs } from './logs'
 import { runTask } from './run'
@@ -73,87 +71,65 @@ async function main(): Promise<void> {
         const trigger = isTick ? 'tick' : ('manual' as const)
         log({ event: 'started', task: name, trigger })
 
-        // Tick-dispatched runs acquire a lock to prevent concurrent cron runs.
-        // Manual runs (tm run <name>) skip locking — always run.
-        let lockFd: number | undefined
-        if (isTick) {
-          const lockResult = acquireTaskLock(name, locksDir)
-          if (lockResult instanceof Error) {
-            log({ event: 'error', task: name, error: lockResult })
-            console.error(lockResult.message)
-            process.exit(1)
-          }
-          if ('contended' in lockResult) {
+        const result = await runTask(name, {
+          timestamp,
+          lock: isTick,
+        })
+
+        if (result instanceof Error) {
+          if (result instanceof TaskContentionError) {
             log({ event: 'skipped', task: name, reason: 'contention' })
             if (opts.json) {
               console.log(JSON.stringify({ skipped: true, taskName: name }))
             } else {
-              console.error(new TaskContentionError({ taskName: name }).message)
+              console.error(result.message)
             }
             process.exit(0)
           }
-          lockFd = lockResult.fd
-          writeRunningMarker(lockFd, {
-            pid: process.pid,
-            started_at: new Date().toISOString(),
+          log({ event: 'error', task: name, error: result })
+          console.error(result.message)
+          process.exit(1)
+        }
+
+        const exitCode = result.timedOut ? 124 : result.exitCode
+
+        // non-fatal
+        const recordErr = await recordHistory(
+          {
             timestamp,
-          })
+            started_at: result.startedAt,
+            finished_at: result.finishedAt,
+            exit_code: exitCode,
+            timed_out: result.timedOut,
+          },
+          {
+            task_name: name,
+            output: result.output,
+            prompt: result.prompt,
+            cwd: result.cwd,
+            outputPrewritten: true,
+          },
+        )
+        if (recordErr instanceof Error) {
+          console.error(recordErr.message)
         }
 
-        try {
-          const result = await runTask(name, { timestamp })
-
-          if (result instanceof Error) {
-            log({ event: 'error', task: name, error: result })
-            console.error(result.message)
-            process.exit(1)
-          }
-
-          const exitCode = result.timedOut ? 124 : result.exitCode
-
-          // non-fatal
-          const recordErr = await recordHistory(
-            {
-              timestamp,
-              started_at: result.startedAt,
-              finished_at: result.finishedAt,
-              exit_code: exitCode,
-              timed_out: result.timedOut,
-            },
-            {
-              task_name: name,
-              output: result.output,
-              prompt: result.prompt,
-              cwd: result.cwd,
-              outputPrewritten: true,
-            },
+        if (opts.json) {
+          console.log(
+            JSON.stringify({
+              skipped: false,
+              exitCode,
+              timedOut: result.timedOut,
+              duration_ms:
+                result.finishedAt.getTime() - result.startedAt.getTime(),
+            }),
           )
-          if (recordErr instanceof Error) {
-            console.error(recordErr.message)
-          }
-
-          if (opts.json) {
-            console.log(
-              JSON.stringify({
-                skipped: false,
-                exitCode,
-                timedOut: result.timedOut,
-                duration_ms:
-                  result.finishedAt.getTime() - result.startedAt.getTime(),
-              }),
-            )
-          } else {
-            if (result.output) {
-              process.stdout.write(result.output)
-            }
-          }
-          process.exit(exitCode)
-        } finally {
-          if (lockFd !== undefined) {
-            clearRunningMarker(lockFd)
-            fs.closeSync(lockFd)
+        } else {
+          if (result.output) {
+            process.stdout.write(result.output)
           }
         }
+        process.exit(exitCode)
       },
     )
 
