@@ -1,10 +1,11 @@
 ---
 # tm-k9xd
 title: Event-driven task dispatch
-status: todo
+status: completed
 type: feature
+priority: normal
 created_at: 2026-04-10T08:26:07Z
-updated_at: 2026-04-10T08:26:07Z
+updated_at: 2026-04-10T10:45:10Z
 ---
 
 ## Problem Statement
@@ -113,3 +114,17 @@ For modules that refactor existing code (tick dispatcher, task runner, list/stat
 - The `on:` syntax is inspired by GitHub Actions, providing a familiar mental model.
 - Since `schedule` and `event` are mutually exclusive on a task, there is no scenario where a cron run and a dispatch run contend on the same task — this eliminates a class of edge cases.
 - The locking refactor (pulling locks out of runTask into tick) simplifies the task runner and makes the codebase cleaner overall, independent of the event dispatch feature.
+
+
+## Summary of Changes
+
+All 18 user stories implemented across 5 prior commits plus a race-condition fix:
+
+- **Frontmatter schema**: `schedule` replaced with `on: { schedule | event }` discriminated union via Zod
+- **Dispatch module**: `dispatch(eventName, payload?)` scans tasks, filters by enabled/connectivity, spawns matches fire-and-forget
+- **Locking refactor**: Lock acquisition moved from `runTask` into tick dispatcher only; dispatch and manual runs are lock-free
+- **History**: `trigger: 'dispatch'` and `event` field added to history schema with cross-field refinement
+- **Display**: `tm list` shows `event:<name>`, `tm status` shows `-` for next run on event tasks
+- **Doctor**: Skips never-ran and timeout/schedule mismatch checks for event tasks
+- **CLI**: `tm dispatch <event>` reads optional stdin payload, supports `--json`
+- **Bug fix**: Per-task payload files to prevent race condition when multiple tasks fan out from the same event

@@ -294,6 +294,37 @@ describe('dispatch', () => {
     expect(content).toBe('deployment context')
   })
 
+  test('writes a separate payload file per dispatched task', async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(configDir, 'deploy-a', EVENT_TASK)
+    await writeTask(configDir, 'deploy-b', EVENT_TASK_B)
+
+    const spawned: Array<{ name: string; args: string[] }> = []
+    await dispatch('deploy', {
+      configDir,
+      payload: 'shared context',
+      spawnRun: (name, _ts, args) => spawned.push({ name, args }),
+      isOnline: async () => true,
+    })
+
+    expect(spawned).toHaveLength(2)
+
+    const payloadPaths = spawned.map((s) => {
+      const idx = s.args.indexOf('--payload-file')
+      expect(idx).toBeGreaterThanOrEqual(0)
+      return s.args[idx + 1]!
+    })
+
+    // Each task must get its own file so children can safely unlink
+    expect(payloadPaths[0]).not.toBe(payloadPaths[1])
+
+    // Both files should contain the same payload
+    for (const p of payloadPaths) {
+      const content = await fs.readFile(p, 'utf-8')
+      expect(content).toBe('shared context')
+    }
+  })
+
   test('does not pass --payload-file when no payload', async () => {
     const configDir = await makeConfigDir()
     await writeTask(configDir, 'deploy-task', EVENT_TASK)

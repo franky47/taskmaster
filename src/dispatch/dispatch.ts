@@ -55,11 +55,12 @@ function defaultSpawnRun(
 
 async function writePayloadFile(
   eventName: string,
+  taskName: string,
   payload: string,
 ): Promise<string> {
   const payloadPath = path.join(
     os.tmpdir(),
-    `tm-dispatch-${eventName}-${Date.now()}.payload`,
+    `tm-dispatch-${eventName}-${taskName}-${Date.now()}.payload`,
   )
   await fs.writeFile(payloadPath, payload, { mode: 0o600 })
   return payloadPath
@@ -120,17 +121,16 @@ export async function dispatch(
     }
   }
 
-  // Stage 4: Write payload file if present
-  let payloadPath: string | undefined
-  if (options?.payload && toDispatch.length > 0) {
-    payloadPath = await writePayloadFile(eventName, options.payload)
-  }
-
-  // Stage 5: Dispatch
+  // Stage 4: Dispatch (write per-task payload file if present)
   const dispatched: string[] = []
   for (const task of toDispatch) {
     const extraArgs = ['--trigger', 'dispatch', '--event', eventName]
-    if (payloadPath) {
+    if (options?.payload) {
+      const payloadPath = await writePayloadFile(
+        eventName,
+        task.name,
+        options.payload,
+      )
       extraArgs.push('--payload-file', payloadPath)
     }
     spawnRun(task.name, timestamp, extraArgs)
