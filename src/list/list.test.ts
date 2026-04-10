@@ -17,7 +17,8 @@ async function writeTask(tasksDir: string, name: string, content: string) {
 }
 
 const ENABLED_TASK = `---
-schedule: '0 8 * * 1-5'
+on:
+  schedule: '0 8 * * 1-5'
 agent: opencode
 ---
 
@@ -25,7 +26,8 @@ Do something useful.
 `
 
 const DISABLED_TASK = `---
-schedule: '30 6 * * *'
+on:
+  schedule: '30 6 * * *'
 agent: opencode
 enabled: false
 ---
@@ -34,7 +36,8 @@ Disabled task.
 `
 
 const TASK_WITH_TIMEZONE = `---
-schedule: '0 9 * * 1'
+on:
+  schedule: '0 9 * * 1'
 agent: opencode
 timezone: 'America/New_York'
 ---
@@ -43,7 +46,8 @@ Weekly task.
 `
 
 const TASK_WITH_TIMEOUT = `---
-schedule: '0 8 * * 1-5'
+on:
+  schedule: '0 8 * * 1-5'
 agent: opencode
 timeout: '5m'
 ---
@@ -52,7 +56,8 @@ Task with timeout.
 `
 
 const RUN_TASK = `---
-schedule: '0 12 * * *'
+on:
+  schedule: '0 12 * * *'
 run: 'my-cmd $TM_PROMPT_FILE'
 ---
 
@@ -90,7 +95,7 @@ describe('listTasks', () => {
     expect(result.tasks).toEqual([
       {
         name: 'my-task',
-        schedule: '0 8 * * 1-5',
+        on: { schedule: '0 8 * * 1-5' },
         enabled: 'when-online',
         timeout: 3_600_000,
         agent: 'opencode',
@@ -106,7 +111,7 @@ describe('listTasks', () => {
     expect(result.tasks).toEqual([
       {
         name: 'weekly',
-        schedule: '0 9 * * 1',
+        on: { schedule: '0 9 * * 1' },
         timezone: 'America/New_York',
         enabled: 'when-online',
         timeout: 3_600_000,
@@ -123,7 +128,7 @@ describe('listTasks', () => {
     expect(result.tasks).toEqual([
       {
         name: 'off-task',
-        schedule: '30 6 * * *',
+        on: { schedule: '30 6 * * *' },
         enabled: false,
         timeout: 3_600_000,
         agent: 'opencode',
@@ -152,7 +157,8 @@ describe('listTasks', () => {
       tasksDir,
       'bad-task',
       `---
-schedule: 'bad cron'
+on:
+  schedule: 'bad cron'
 ---
 
 Bad.
@@ -163,7 +169,7 @@ Bad.
     expect(result.tasks).toEqual([
       {
         name: 'good-task',
-        schedule: '0 8 * * 1-5',
+        on: { schedule: '0 8 * * 1-5' },
         enabled: 'when-online',
         timeout: 3_600_000,
         agent: 'opencode',
@@ -183,7 +189,7 @@ Bad.
     expect(result.tasks).toEqual([
       {
         name: 'good-task',
-        schedule: '0 8 * * 1-5',
+        on: { schedule: '0 8 * * 1-5' },
         enabled: 'when-online',
         timeout: 3_600_000,
         agent: 'opencode',
@@ -201,7 +207,7 @@ Bad.
     expect(result.tasks).toEqual([
       {
         name: 'timed',
-        schedule: '0 8 * * 1-5',
+        on: { schedule: '0 8 * * 1-5' },
         enabled: 'when-online',
         timeout: 300_000,
         agent: 'opencode',
@@ -217,7 +223,7 @@ Bad.
     expect(result.tasks).toEqual([
       {
         name: 'run-task',
-        schedule: '0 12 * * *',
+        on: { schedule: '0 12 * * *' },
         enabled: 'when-online',
         timeout: 3_600_000,
         run: 'my-cmd $TM_PROMPT_FILE',

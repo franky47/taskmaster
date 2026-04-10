@@ -62,7 +62,8 @@ async function writeMeta(
 
 // Task at 8am on weekdays
 const WEEKDAY_TASK = `---
-schedule: "0 8 * * 1-5"
+on:
+  schedule: "0 8 * * 1-5"
 agent: opencode
 ---
 
@@ -71,7 +72,8 @@ Weekday morning task.
 
 // Task every minute
 const EVERY_MINUTE_TASK = `---
-schedule: "* * * * *"
+on:
+  schedule: "* * * * *"
 agent: opencode
 ---
 
@@ -79,7 +81,8 @@ Every minute task.
 `
 
 const DISABLED_TASK = `---
-schedule: "* * * * *"
+on:
+  schedule: "* * * * *"
 agent: opencode
 enabled: false
 ---
@@ -88,7 +91,8 @@ Disabled task.
 `
 
 const TIMEZONE_TASK = `---
-schedule: "0 9 * * *"
+on:
+  schedule: "0 9 * * *"
 agent: opencode
 timezone: "America/New_York"
 ---
@@ -377,7 +381,8 @@ describe('tick', () => {
       configDir,
       'local-task',
       `---
-schedule: "* * * * *"
+on:
+  schedule: "* * * * *"
 agent: opencode
 enabled: 'always'
 ---
@@ -408,7 +413,8 @@ Local model task.
       configDir,
       'local',
       `---
-schedule: "* * * * *"
+on:
+  schedule: "* * * * *"
 agent: opencode
 enabled: 'always'
 ---
@@ -438,7 +444,8 @@ Local task.
       configDir,
       'local-only',
       `---
-schedule: "* * * * *"
+on:
+  schedule: "* * * * *"
 agent: opencode
 enabled: 'always'
 ---
@@ -667,7 +674,8 @@ Local only task.
       configDir,
       'bad-tz',
       `---
-schedule: "* * * * *"
+on:
+  schedule: "* * * * *"
 agent: opencode
 timezone: "Not/A/Timezone"
 ---

@@ -115,7 +115,9 @@ export async function tick(
   const ready: TaskListEntry[] = []
 
   for (const task of enabledTasks) {
-    if (!isCronMatch(task.name, task.schedule, floored, task.timezone)) continue
+    if (!('schedule' in task.on)) continue // skip event tasks
+    if (!isCronMatch(task.name, task.on.schedule, floored, task.timezone))
+      continue
 
     const history = await queryHistoryFn(task.name, {
       configDir: cfgDir,

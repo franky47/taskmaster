@@ -1,5 +1,6 @@
 ---
-schedule: '30 9 * * *'
+on:
+  schedule: '30 9 * * *'
 timezone: 'Europe/Paris'
 cwd: '~/projects/saas-app'
 agent: opencode

@@ -14,7 +14,7 @@ function healthyDeps(): DoctorDeps {
     listTasks: async () => [
       {
         name: 'backup',
-        schedule: '0 * * * *',
+        on: { schedule: '0 * * * *' },
         enabled: 'when-online',
         timeout: 1_800_000,
       },
@@ -213,13 +213,13 @@ describe('doctor', () => {
     deps.listTasks = async () => [
       {
         name: 'backup',
-        schedule: '0 * * * *',
+        on: { schedule: '0 * * * *' },
         enabled: 'when-online',
         timeout: 3_600_000,
       },
       {
         name: 'sync',
-        schedule: '*/5 * * * *',
+        on: { schedule: '*/5 * * * *' },
         enabled: 'when-online',
         timeout: 300_000,
       },
@@ -245,7 +245,7 @@ describe('doctor', () => {
     deps.listTasks = async () => [
       {
         name: 'backup',
-        schedule: '0 * * * *',
+        on: { schedule: '0 * * * *' },
         enabled: false,
         timeout: 1_800_000,
       },
@@ -272,7 +272,7 @@ describe('doctor', () => {
     deps.listTasks = async () => [
       {
         name: 'backup',
-        schedule: '0 * * * *',
+        on: { schedule: '0 * * * *' },
         enabled: 'when-online',
         timeout: 30_000,
       },
@@ -290,7 +290,7 @@ describe('doctor', () => {
     deps.listTasks = async () => [
       {
         name: 'backup',
-        schedule: '*/5 * * * *',
+        on: { schedule: '*/5 * * * *' },
         enabled: 'when-online',
         timeout: 600_000,
       },
@@ -307,7 +307,7 @@ describe('doctor', () => {
     deps.listTasks = async () => [
       {
         name: 'backup',
-        schedule: '0 * * * *',
+        on: { schedule: '0 * * * *' },
         enabled: 'when-online',
         timeout: 30_000,
       },

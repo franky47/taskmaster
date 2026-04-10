@@ -94,7 +94,8 @@ async function writeTask(
 
 const agentTask = [
   '---',
-  'schedule: "0 8 * * 1-5"',
+  'on:',
+  '  schedule: "0 8 * * 1-5"',
   'agent: opencode',
   'args: "--model opus"',
   'env:',
@@ -105,7 +106,8 @@ const agentTask = [
 
 const claudeTaskWithArgs = [
   '---',
-  'schedule: "0 8 * * 1-5"',
+  'on:',
+  '  schedule: "0 8 * * 1-5"',
   'agent: claude',
   'args: "--model sonnet"',
   '---',
@@ -114,7 +116,8 @@ const claudeTaskWithArgs = [
 
 const runTask_ = [
   '---',
-  'schedule: "0 8 * * 1-5"',
+  'on:',
+  '  schedule: "0 8 * * 1-5"',
   'run: "my-agent $TM_PROMPT_FILE"',
   '---',
   'Do the thing.',
@@ -122,7 +125,8 @@ const runTask_ = [
 
 const unknownAgentTask = [
   '---',
-  'schedule: "0 8 * * 1-5"',
+  'on:',
+  '  schedule: "0 8 * * 1-5"',
   'agent: nonexistent',
   '---',
   'Do the thing.',
@@ -149,7 +153,11 @@ describe('executeTask', () => {
 
   test('returns FrontmatterValidationError for invalid frontmatter', async () => {
     const configDir = await makeConfigDir()
-    await writeTask(configDir, 'bad-task', '---\nschedule: "not cron"\n---\nHi')
+    await writeTask(
+      configDir,
+      'bad-task',
+      '---\non:\n  schedule: "not cron"\n---\nHi',
+    )
     const result = await executeTask('bad-task', {
       configDir,
       deps: { spawnAgent: fakeSpawn() },
@@ -299,7 +307,8 @@ describe('executeTask', () => {
     const configDir = await makeConfigDir()
     const task = [
       '---',
-      'schedule: "0 8 * * 1-5"',
+      'on:',
+      '  schedule: "0 8 * * 1-5"',
       'agent: opencode',
       `cwd: "${cwdDir}"`,
       '---',
@@ -326,7 +335,7 @@ describe('executeTask', () => {
     await writeTask(
       configDir,
       'no-cwd',
-      '---\nschedule: "0 8 * * *"\nagent: opencode\n---\nHi',
+      '---\non:\n  schedule: "0 8 * * *"\nagent: opencode\n---\nHi',
     )
 
     let receivedCwd = ''
@@ -349,7 +358,8 @@ describe('executeTask', () => {
     const configDir = await makeConfigDir()
     const task = [
       '---',
-      'schedule: "0 8 * * 1-5"',
+      'on:',
+      '  schedule: "0 8 * * 1-5"',
       'agent: opencode',
       'cwd: "/nonexistent/dir/xyz"',
       '---',
@@ -368,7 +378,8 @@ describe('executeTask', () => {
     const configDir = await makeConfigDir()
     const task = [
       '---',
-      'schedule: "0 8 * * 1-5"',
+      'on:',
+      '  schedule: "0 8 * * 1-5"',
       'agent: opencode',
       'enabled: false',
       '---',
@@ -395,7 +406,7 @@ describe('executeTask', () => {
     await writeTask(
       configDir,
       'fail-task',
-      '---\nschedule: "0 * * * *"\nagent: opencode\n---\nFail',
+      '---\non:\n  schedule: "0 * * * *"\nagent: opencode\n---\nFail',
     )
 
     const result = await executeTask('fail-task', {
@@ -412,7 +423,7 @@ describe('executeTask', () => {
     await writeTask(
       configDir,
       'output',
-      '---\nschedule: "0 * * * *"\nagent: opencode\n---\nGo',
+      '---\non:\n  schedule: "0 * * * *"\nagent: opencode\n---\nGo',
     )
 
     const result = await executeTask('output', {
@@ -433,7 +444,7 @@ describe('executeTask', () => {
     await writeTask(
       configDir,
       'timing',
-      '---\nschedule: "0 * * * *"\nagent: opencode\n---\nGo',
+      '---\non:\n  schedule: "0 * * * *"\nagent: opencode\n---\nGo',
     )
 
     const before = new Date()
@@ -456,7 +467,7 @@ describe('executeTask', () => {
     await writeTask(
       configDir,
       'temp-cwd',
-      '---\nschedule: "0 * * * *"\nagent: opencode\n---\nGo',
+      '---\non:\n  schedule: "0 * * * *"\nagent: opencode\n---\nGo',
     )
 
     const result = await executeTask('temp-cwd', {
@@ -472,7 +483,7 @@ describe('executeTask', () => {
   test('includes cwd with is_temp=false when cwd specified', async () => {
     const cwdDir = await fsPromises.mkdtemp(path.join(os.tmpdir(), 'tm-cwd-'))
     const configDir = await makeConfigDir()
-    const task = `---\nschedule: "0 * * * *"\nagent: opencode\ncwd: "${cwdDir}"\n---\nGo`
+    const task = `---\non:\n  schedule: "0 * * * *"\nagent: opencode\ncwd: "${cwdDir}"\n---\nGo`
     await writeTask(configDir, 'explicit-cwd', task)
 
     const result = await executeTask('explicit-cwd', {
@@ -490,7 +501,7 @@ describe('executeTask', () => {
     await writeTask(
       configDir,
       'prompt-check',
-      '---\nschedule: "0 * * * *"\nagent: opencode\n---\nDo the thing.',
+      '---\non:\n  schedule: "0 * * * *"\nagent: opencode\n---\nDo the thing.',
     )
 
     const result = await executeTask('prompt-check', {
@@ -507,7 +518,7 @@ describe('executeTask', () => {
     await writeTask(
       configDir,
       'timeout-task',
-      '---\nschedule: "0 * * * *"\nagent: opencode\ntimeout: "30s"\n---\nGo',
+      '---\non:\n  schedule: "0 * * * *"\nagent: opencode\ntimeout: "30s"\n---\nGo',
     )
 
     let receivedTimeoutMs: number | undefined
@@ -529,7 +540,7 @@ describe('executeTask', () => {
     await writeTask(
       configDir,
       'no-timeout',
-      '---\nschedule: "0 * * * *"\nagent: opencode\n---\nGo',
+      '---\non:\n  schedule: "0 * * * *"\nagent: opencode\n---\nGo',
     )
 
     let receivedTimeoutMs: number | undefined
@@ -552,7 +563,7 @@ describe('executeTask', () => {
     await writeTask(
       configDir,
       'timed-out',
-      '---\nschedule: "0 * * * *"\nagent: opencode\ntimeout: "5s"\n---\nGo',
+      '---\non:\n  schedule: "0 * * * *"\nagent: opencode\ntimeout: "5s"\n---\nGo',
     )
 
     const result = await executeTask('timed-out', {
@@ -569,7 +580,7 @@ describe('executeTask', () => {
     await writeTask(
       configDir,
       'fd-test',
-      '---\nschedule: "0 * * * *"\nagent: opencode\n---\nGo',
+      '---\non:\n  schedule: "0 * * * *"\nagent: opencode\n---\nGo',
     )
 
     let receivedOutputPath: string | undefined
@@ -599,7 +610,7 @@ describe('executeTask', () => {
     await writeTask(
       configDir,
       'dir-create',
-      '---\nschedule: "0 * * * *"\nagent: opencode\n---\nGo',
+      '---\non:\n  schedule: "0 * * * *"\nagent: opencode\n---\nGo',
     )
 
     let histDirExisted = false
@@ -623,7 +634,7 @@ describe('executeTask', () => {
     await writeTask(
       configDir,
       'no-ts',
-      '---\nschedule: "0 * * * *"\nagent: opencode\n---\nGo',
+      '---\non:\n  schedule: "0 * * * *"\nagent: opencode\n---\nGo',
     )
 
     let receivedOutputPath: string | undefined
@@ -645,7 +656,7 @@ describe('executeTask', () => {
     await writeTask(
       configDir,
       'normal',
-      '---\nschedule: "0 * * * *"\nagent: opencode\n---\nGo',
+      '---\non:\n  schedule: "0 * * * *"\nagent: opencode\n---\nGo',
     )
 
     const result = await executeTask('normal', {
@@ -720,7 +731,8 @@ describe('runTask', () => {
     const configDir = await makeConfigDir()
     const task = [
       '---',
-      'schedule: "0 8 * * 1-5"',
+      'on:',
+      '  schedule: "0 8 * * 1-5"',
       'agent: opencode',
       'cwd: "/nonexistent/dir/xyz"',
       '---',
@@ -791,7 +803,8 @@ describe('runTask', () => {
     const configDir = await makeConfigDir()
     const task = [
       '---',
-      'schedule: "0 8 * * 1-5"',
+      'on:',
+      '  schedule: "0 8 * * 1-5"',
       'agent: opencode',
       'cwd: "/nonexistent/dir/xyz"',
       '---',

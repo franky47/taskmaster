@@ -161,12 +161,14 @@ export async function doctor(options?: DoctorOptions): Promise<DoctorResult> {
       )
       if (timeoutFinding) findings.push(timeoutFinding)
 
-      const timeoutContentionFinding = checkTimeoutContention(
-        task.name,
-        task.timeout,
-        task.schedule,
-      )
-      if (timeoutContentionFinding) findings.push(timeoutContentionFinding)
+      if ('schedule' in task.on) {
+        const timeoutContentionFinding = checkTimeoutContention(
+          task.name,
+          task.timeout,
+          task.on.schedule,
+        )
+        if (timeoutContentionFinding) findings.push(timeoutContentionFinding)
+      }
 
       const neverRanFinding = checkTaskNeverRan(
         task.name,

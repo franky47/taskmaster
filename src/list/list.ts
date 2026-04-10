@@ -7,7 +7,7 @@ import { TasksDirReadError } from '#src/validate'
 
 export type TaskListEntry = Pick<
   TaskDefinition,
-  'schedule' | 'timezone' | 'enabled' | 'timeout'
+  'on' | 'timezone' | 'enabled' | 'timeout'
 > & {
   name: string
   agent?: string
@@ -50,7 +50,7 @@ export async function listTasks(
 
     const entry: TaskListEntry = {
       name: file.replace(/\.md$/, ''),
-      schedule: parsed.schedule,
+      on: parsed.on,
       enabled: parsed.enabled,
       timeout: parsed.timeout,
     }

@@ -88,7 +88,7 @@ const MIN_TIMEOUT_MS = 1000
 const DEFAULT_TIMEOUT_CAP_MS = 60 * 60_000 // 1 hour
 const SCHEDULE_BUFFER_MS = 10_000 // headroom to avoid overlapping the next run
 
-const UNQUOTED_STAR_RE = /^schedule:\s*[^"']*\*/m
+const UNQUOTED_STAR_RE = /^\s+schedule:\s*[^"']*\*/m
 
 function hasUnquotedStar(content: string): boolean {
   return UNQUOTED_STAR_RE.test(content)
@@ -121,6 +121,20 @@ export function parseMarkdown(
   })
   if (fm instanceof Error) return fm
 
+  // Detect old top-level schedule field and give a helpful migration error
+  const raw = fm.data as Record<string, unknown>
+  if ('schedule' in raw && !('on' in raw)) {
+    return new FrontmatterValidationError({
+      errors: [
+        {
+          key: 'on',
+          message:
+            'top-level "schedule" is no longer supported; use on: { schedule: "..." } instead',
+        },
+      ],
+    })
+  }
+
   const result = frontmatterSchema.safeParse(fm.data)
   if (result.success) {
     return {
@@ -144,32 +158,67 @@ export function parseMarkdown(
 
 // --
 
+const scheduleField = z
+  .string({
+    error: (issue) =>
+      issue.input === undefined || issue.input === null
+        ? 'schedule is required'
+        : 'schedule must be a string',
+  })
+  .superRefine((v, ctx) => {
+    const fields = v.trim().split(/\s+/)
+    if (fields.length !== 5) {
+      ctx.addIssue({
+        code: 'custom',
+        message: `schedule must be a 5-field cron expression, got ${fields.length} fields`,
+      })
+      return
+    }
+    try {
+      CronExpressionParser.parse(v)
+    } catch (e) {
+      ctx.addIssue({
+        code: 'custom',
+        message: `Invalid cron expression: ${e instanceof Error ? e.message : String(e)}`,
+      })
+    }
+  })
+
+const onField = z
+  .object({
+    schedule: scheduleField.optional(),
+    event: z.string({ error: 'event must be a string' }).optional(),
+  })
+  .superRefine((data, ctx) => {
+    const hasSchedule = data.schedule !== undefined
+    const hasEvent = data.event !== undefined
+    if (hasSchedule && hasEvent) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'exactly one of "schedule" or "event" must be set, not both',
+      })
+    }
+    if (!hasSchedule && !hasEvent) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'exactly one of "schedule" or "event" must be set',
+      })
+    }
+  })
+  .transform((data) => {
+    if (data.schedule !== undefined) {
+      return { schedule: data.schedule }
+    }
+    return { event: data.event! }
+  })
+
 const rawFrontmatter = z.object({
-  schedule: z
-    .string({
-      error: (issue) =>
-        issue.input === undefined || issue.input === null
-          ? 'schedule is required'
-          : 'schedule must be a string',
-    })
-    .superRefine((v, ctx) => {
-      const fields = v.trim().split(/\s+/)
-      if (fields.length !== 5) {
-        ctx.addIssue({
-          code: 'custom',
-          message: `schedule must be a 5-field cron expression, got ${fields.length} fields`,
-        })
-        return
-      }
-      try {
-        CronExpressionParser.parse(v)
-      } catch (e) {
-        ctx.addIssue({
-          code: 'custom',
-          message: `Invalid cron expression: ${e instanceof Error ? e.message : String(e)}`,
-        })
-      }
-    }),
+  on: onField.pipe(
+    z.union([
+      z.object({ schedule: z.string() }),
+      z.object({ event: z.string() }),
+    ]),
+  ),
 
   timezone: z
     .string({ error: 'timezone must be a string' })
@@ -254,10 +303,10 @@ const frontmatterSchema = rawFrontmatter
       })
     }
 
-    if (data.timeout !== undefined) {
+    if (data.timeout !== undefined && 'schedule' in data.on) {
       let minInterval: number
       try {
-        minInterval = minCronIntervalMs(data.schedule)
+        minInterval = minCronIntervalMs(data.on.schedule)
       } catch {
         // schedule is already invalid; its own refinement reports the error
         return
@@ -275,11 +324,15 @@ const frontmatterSchema = rawFrontmatter
     const { agent, run, args, timeout, ...common } = data
     let effectiveTimeout = timeout
     if (effectiveTimeout === undefined) {
-      const minInterval = minCronIntervalMs(data.schedule)
-      effectiveTimeout = Math.min(
-        minInterval - SCHEDULE_BUFFER_MS,
-        DEFAULT_TIMEOUT_CAP_MS,
-      )
+      if ('schedule' in data.on) {
+        const minInterval = minCronIntervalMs(data.on.schedule)
+        effectiveTimeout = Math.min(
+          minInterval - SCHEDULE_BUFFER_MS,
+          DEFAULT_TIMEOUT_CAP_MS,
+        )
+      } else {
+        effectiveTimeout = DEFAULT_TIMEOUT_CAP_MS
+      }
     }
     if (agent !== undefined) {
       return { ...common, timeout: effectiveTimeout, agent, args }

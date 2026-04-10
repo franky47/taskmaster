@@ -28,7 +28,7 @@ type Running = {
 
 type TaskStatus = {
   name: string
-  schedule: string
+  on: { schedule: string } | { event: string }
   enabled: false | 'when-online' | 'always'
   timezone?: string
   timeout: string
@@ -67,7 +67,7 @@ export async function getTaskStatuses(
   for (const task of listResult.tasks) {
     const status: TaskStatus = {
       name: task.name,
-      schedule: task.schedule,
+      on: task.on,
       enabled: task.enabled,
       timeout: ms(task.timeout),
     }
@@ -114,13 +114,13 @@ export async function getTaskStatuses(
       }
     }
 
-    // Next run (only for enabled tasks)
-    if (task.enabled !== false) {
+    // Next run (only for enabled scheduled tasks)
+    if (task.enabled !== false && 'schedule' in task.on) {
       const cronOpts: { currentDate: Date; tz?: string } = { currentDate: now }
       if (task.timezone) {
         cronOpts.tz = task.timezone
       }
-      const expr = CronExpressionParser.parse(task.schedule, cronOpts)
+      const expr = CronExpressionParser.parse(task.on.schedule, cronOpts)
       status.next_run = expr.next().toDate().toISOString()
     }
 

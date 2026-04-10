@@ -156,7 +156,9 @@ async function main(): Promise<void> {
                 ? 'always'
                 : 'enabled'
           const executor = task.agent ?? 'custom'
-          console.log(`${task.name} ${task.schedule} ${executor} ${tag}`)
+          const trigger =
+            'schedule' in task.on ? task.on.schedule : `event:${task.on.event}`
+          console.log(`${task.name} ${trigger} ${executor} ${tag}`)
         }
       }
     })
@@ -328,7 +330,9 @@ async function main(): Promise<void> {
       } else {
         for (const task of statuses) {
           console.log(task.name)
-          console.log(`  schedule  ${task.schedule}`)
+          const trigger =
+            'schedule' in task.on ? task.on.schedule : `event:${task.on.event}`
+          console.log(`  trigger   ${trigger}`)
           console.log(`  enabled   ${task.enabled}`)
           console.log(`  executor  ${task.agent ?? 'custom'}`)
           if (task.timeout) {

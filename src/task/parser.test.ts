@@ -20,7 +20,7 @@ describe('parseTaskFile', () => {
       const result = await parseTaskFile(fixture('valid-basic.md'))
       expect(result).not.toBeInstanceOf(Error)
       if (result instanceof Error) return
-      expect(result.schedule).toBe('0 8 * * 1-5')
+      expect(result.on).toEqual({ schedule: '0 8 * * 1-5' })
       expect(result.prompt).toBe(
         'Review open pull requests and summarize status.',
       )
@@ -30,7 +30,7 @@ describe('parseTaskFile', () => {
       const result = await parseTaskFile(fixture('valid-all-fields.md'))
       expect(result).not.toBeInstanceOf(Error)
       if (result instanceof Error) return
-      expect(result.schedule).toBe('30 9 * * *')
+      expect(result.on).toEqual({ schedule: '30 9 * * *' })
       expect(result.timezone).toBe('Europe/Paris')
       expect(result.cwd).toBe('~/projects/saas-app')
       expect(result).toHaveProperty('agent', 'opencode')

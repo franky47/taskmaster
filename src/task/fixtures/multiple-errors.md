@@ -1,5 +1,6 @@
 ---
-schedule: 'bad cron'
+on:
+  schedule: 'bad cron'
 agent: opencode
 timezone: 'Fake/Zone'
 args: 42

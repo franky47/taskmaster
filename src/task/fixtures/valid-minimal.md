@@ -1,4 +1,5 @@
 ---
-schedule: '*/5 * * * *'
+on:
+  schedule: '*/5 * * * *'
 agent: opencode
 ---

@@ -76,7 +76,8 @@ async function writeMeta(
 }
 
 const ENABLED_TASK = `---
-schedule: '0 8 * * 1-5'
+on:
+  schedule: '0 8 * * 1-5'
 agent: opencode
 ---
 
@@ -84,7 +85,8 @@ Do something useful.
 `
 
 const DISABLED_TASK = `---
-schedule: '30 6 * * *'
+on:
+  schedule: '30 6 * * *'
 agent: opencode
 enabled: false
 ---
@@ -93,7 +95,8 @@ Disabled task.
 `
 
 const TIMEZONE_TASK = `---
-schedule: '0 9 * * 1'
+on:
+  schedule: '0 9 * * 1'
 agent: opencode
 timezone: 'America/New_York'
 ---
@@ -102,7 +105,8 @@ Weekly task.
 `
 
 const RUN_TASK = `---
-schedule: '0 12 * * *'
+on:
+  schedule: '0 12 * * *'
 run: 'my-cmd $TM_PROMPT_FILE'
 ---
 
@@ -134,7 +138,7 @@ describe('getTaskStatuses', () => {
     if (!first) return
     expect(first).toEqual({
       name: 'my-task',
-      schedule: '0 8 * * 1-5',
+      on: { schedule: '0 8 * * 1-5' },
       enabled: 'when-online',
       timeout: '1h',
       agent: 'opencode',
@@ -248,7 +252,8 @@ describe('getTaskStatuses', () => {
       configDir,
       'local-task',
       `---
-schedule: '0 8 * * 1-5'
+on:
+  schedule: '0 8 * * 1-5'
 agent: opencode
 enabled: 'always'
 ---
@@ -324,7 +329,7 @@ Local model task.
     expect(first).toBeDefined()
     if (!first) return
     expect(first.name).toBe('run-task')
-    expect(first.schedule).toBe('0 12 * * *')
+    expect(first.on).toEqual({ schedule: '0 12 * * *' })
     expect(first.enabled).toBe('when-online')
     expect(first.run).toBe('my-cmd $TM_PROMPT_FILE')
     expect(first.next_run).toBe('2026-04-06T12:00:00.000Z')
@@ -336,7 +341,8 @@ Local model task.
       configDir,
       'timed-task',
       `---
-schedule: '0 8 * * *'
+on:
+  schedule: '0 8 * * *'
 agent: opencode
 timeout: '5m'
 ---
