@@ -7,8 +7,6 @@ import path from 'node:path'
 import { PassThrough } from 'node:stream'
 
 import { AgentNotFoundError } from '#src/agent'
-import { TaskContentionError, acquireTaskLock, releaseLock } from '#src/lock'
-import { type RunningMarker, readRunningMarker } from '#src/lock/marker'
 import {
   FrontmatterValidationError,
   TaskFileNameError,
@@ -670,163 +668,37 @@ describe('executeTask', () => {
 })
 
 describe('runTask', () => {
-  test('returns TaskContentionError when lock is contended', async () => {
+  test('delegates to executeTask (no locking)', async () => {
     const configDir = await makeConfigDir()
-    await writeTask(configDir, 'locked', agentTask)
+    await writeTask(configDir, 'simple', agentTask)
 
-    const locksDir = path.join(configDir, 'locks')
-    const lock = acquireTaskLock('locked', locksDir)
-    if (lock instanceof Error || 'contended' in lock)
-      throw new Error('test setup failed')
-
-    const result = await runTask('locked', {
-      configDir,
-      deps: { spawnAgent: fakeSpawn() },
-    })
-
-    expect(result).toBeInstanceOf(TaskContentionError)
-    releaseLock(lock.fd)
-  })
-
-  test('holds lock during execution, not just at start', async () => {
-    const configDir = await makeConfigDir()
-    await writeTask(configDir, 'hold-lock', agentTask)
-    const locksDir = path.join(configDir, 'locks')
-
-    let lockHeldDuringExecution = false
-    const result = await runTask('hold-lock', {
-      configDir,
-      deps: {
-        spawnAgent: async () => {
-          const probe = acquireTaskLock('hold-lock', locksDir)
-          lockHeldDuringExecution = 'contended' in probe
-          if ('fd' in probe) releaseLock(probe.fd)
-          return { exitCode: 0, output: '', timedOut: false }
-        },
-      },
-    })
-
-    if (result instanceof Error) throw result
-    expect(lockHeldDuringExecution).toBe(true)
-  })
-
-  test('releases lock after successful run (re-acquire succeeds)', async () => {
-    const configDir = await makeConfigDir()
-    await writeTask(configDir, 'release-ok', agentTask)
-
-    const result = await runTask('release-ok', {
+    const result = await runTask('simple', {
       configDir,
       deps: { spawnAgent: fakeSpawn() },
     })
 
     if (result instanceof Error) throw result
-
-    const locksDir = path.join(configDir, 'locks')
-    const lock = acquireTaskLock('release-ok', locksDir)
-    expect('fd' in lock).toBe(true)
-    if ('fd' in lock) releaseLock(lock.fd)
+    expect(result.exitCode).toBe(0)
   })
 
-  test('releases lock even when execution fails', async () => {
+  test('allows concurrent invocations of the same task', async () => {
     const configDir = await makeConfigDir()
-    const task = [
-      '---',
-      'on:',
-      '  schedule: "0 8 * * 1-5"',
-      'agent: opencode',
-      'cwd: "/nonexistent/dir/xyz"',
-      '---',
-      'Prompt.',
-    ].join('\n')
-    await writeTask(configDir, 'fail-lock', task)
+    await writeTask(configDir, 'concurrent', agentTask)
 
-    const result = await runTask('fail-lock', {
-      configDir,
-      deps: { spawnAgent: fakeSpawn() },
-    })
+    // Both should succeed — no lock contention
+    const [a, b] = await Promise.all([
+      runTask('concurrent', {
+        configDir,
+        deps: { spawnAgent: fakeSpawn() },
+      }),
+      runTask('concurrent', {
+        configDir,
+        deps: { spawnAgent: fakeSpawn() },
+      }),
+    ])
 
-    expect(result).toBeInstanceOf(CwdNotFoundError)
-
-    const locksDir = path.join(configDir, 'locks')
-    const lock = acquireTaskLock('fail-lock', locksDir)
-    expect('fd' in lock).toBe(true)
-    if ('fd' in lock) releaseLock(lock.fd)
-  })
-
-  test('writes running marker to lock file during execution', async () => {
-    const configDir = await makeConfigDir()
-    await writeTask(configDir, 'marker-write', agentTask)
-    const locksDir = path.join(configDir, 'locks')
-    const timestamp = '2026-04-09T10.00.00Z'
-
-    let markerDuringExec: RunningMarker | null = null
-    const result = await runTask('marker-write', {
-      configDir,
-      timestamp,
-      deps: {
-        spawnAgent: async () => {
-          markerDuringExec = readRunningMarker('marker-write', locksDir)
-          return { exitCode: 0, output: '', timedOut: false }
-        },
-      },
-    })
-
-    if (result instanceof Error) throw result
-    expect(markerDuringExec).not.toBeNull()
-    expect(markerDuringExec!.pid).toBe(process.pid)
-    expect(markerDuringExec!.timestamp).toBe(timestamp)
-    expect(markerDuringExec!.started_at).toMatch(/^\d{4}-\d{2}-\d{2}T/)
-  })
-
-  test('truncates running marker from lock file after completion', async () => {
-    const configDir = await makeConfigDir()
-    await writeTask(configDir, 'marker-clear', agentTask)
-    const locksDir = path.join(configDir, 'locks')
-    const timestamp = '2026-04-09T10.00.00Z'
-
-    const result = await runTask('marker-clear', {
-      configDir,
-      timestamp,
-      deps: { spawnAgent: fakeSpawn() },
-    })
-
-    if (result instanceof Error) throw result
-
-    const lockContent = fs.readFileSync(
-      path.join(locksDir, 'marker-clear.lock'),
-      'utf-8',
-    )
-    expect(lockContent).toBe('')
-  })
-
-  test('truncates running marker even when execution fails', async () => {
-    const configDir = await makeConfigDir()
-    const task = [
-      '---',
-      'on:',
-      '  schedule: "0 8 * * 1-5"',
-      'agent: opencode',
-      'cwd: "/nonexistent/dir/xyz"',
-      '---',
-      'Prompt.',
-    ].join('\n')
-    await writeTask(configDir, 'marker-fail', task)
-    const locksDir = path.join(configDir, 'locks')
-    const timestamp = '2026-04-09T10.00.00Z'
-
-    const result = await runTask('marker-fail', {
-      configDir,
-      timestamp,
-      deps: { spawnAgent: fakeSpawn() },
-    })
-
-    expect(result).toBeInstanceOf(CwdNotFoundError)
-
-    const lockContent = fs.readFileSync(
-      path.join(locksDir, 'marker-fail.lock'),
-      'utf-8',
-    )
-    expect(lockContent).toBe('')
+    expect(a).not.toBeInstanceOf(Error)
+    expect(b).not.toBeInstanceOf(Error)
   })
 })
 

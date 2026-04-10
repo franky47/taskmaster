@@ -18,7 +18,7 @@ type LockContended = {
 
 // Errors --
 
-export class LockAcquireError extends errore.createTaggedError({
+class LockAcquireError extends errore.createTaggedError({
   name: 'LockAcquireError',
   message: 'Failed to acquire lock for task "$taskName": $reason',
 }) {}
