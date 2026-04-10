@@ -7,7 +7,6 @@ import { Command, Option } from 'commander'
 import ms from 'ms'
 import { z } from 'zod'
 
-import { configDir, historyDir, locksDir, tasksDir } from './config'
 import { dispatch } from './dispatch'
 import { doctor } from './doctor'
 import {
@@ -20,9 +19,10 @@ import {
   recordHistory,
 } from './history'
 import type { HistoryEntry } from './history'
+import { configDir, historyDir, locksDir, tasksDir } from './lib/config'
+import { TaskContentionError, readRunningMarker } from './lib/lock'
+import { log } from './lib/logger'
 import { listTasks } from './list'
-import { TaskContentionError, readRunningMarker } from './lock'
-import { log } from './logger'
 import { getTaskLogs } from './logs'
 import { runTask } from './run'
 import { setup, teardown } from './setup'

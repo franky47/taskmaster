@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
-import { minCronIntervalMs } from '#src/schedule.js'
+import { minCronIntervalMs } from '#lib/schedule.js'
 
 const MINUTE = 60_000
 const HOUR = 60 * MINUTE

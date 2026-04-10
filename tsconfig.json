@@ -16,6 +16,7 @@
 
     // Path aliases (mirrors package.json "imports" for tooling)
     "paths": {
+      "#lib/*": ["./src/lib/*"],
       "#src/*": ["./src/*"]
     },
 

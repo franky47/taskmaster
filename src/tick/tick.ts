@@ -3,12 +3,12 @@ import path from 'node:path'
 
 import { CronExpressionParser } from 'cron-parser'
 
-import { configDir as defaultConfigDir } from '#src/config'
+import { configDir as defaultConfigDir } from '#lib/config'
+import { log } from '#lib/logger'
+import { isOnline as defaultIsOnline } from '#lib/network'
 import { formatTimestamp, purgeHistory, queryHistory } from '#src/history'
 import type { TaskListEntry } from '#src/list'
 import { listTasks } from '#src/list'
-import { log } from '#src/logger'
-import { isOnline as defaultIsOnline } from '#src/network'
 import type { TasksDirReadError } from '#src/validate'
 
 // Types --

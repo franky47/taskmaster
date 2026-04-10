@@ -3,7 +3,7 @@ import path from 'node:path'
 
 import * as errore from 'errore'
 
-import { historyDir as defaultHistoryDir } from '#src/config'
+import { historyDir as defaultHistoryDir } from '#lib/config'
 
 import { historyMetaSchema } from './schema'
 

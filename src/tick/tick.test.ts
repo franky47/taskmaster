@@ -3,8 +3,8 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 
+import { readLog } from '#lib/logger'
 import { TaskNotFoundError } from '#src/history/query'
-import { readLog } from '#src/logger'
 
 import { tick } from './tick'
 

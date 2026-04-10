@@ -6,12 +6,12 @@ import os from 'node:os'
 import path from 'node:path'
 import { PassThrough } from 'node:stream'
 
-import { AgentNotFoundError } from '#src/agent'
+import { AgentNotFoundError } from '#lib/agent'
 import {
   FrontmatterValidationError,
   TaskFileNameError,
   TaskNotFoundError,
-} from '#src/task'
+} from '#lib/task'
 
 import { CwdNotFoundError } from './cwd'
 import type { ExecuteDeps, SpawnAgentDeps } from './run'

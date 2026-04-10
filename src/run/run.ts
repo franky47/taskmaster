@@ -12,22 +12,22 @@ import {
   type AgentsFileReadError,
   type AgentsFileValidationError,
   resolveAgent,
-} from '#src/agent'
+} from '#lib/agent'
 import {
   agentsFilePath as defaultAgentsFilePath,
   historyDir as defaultHistoryDir,
   locksDir as defaultLocksDir,
   envFilePath,
   taskFilePath,
-} from '#src/config'
-import type { EnvFileParseError, EnvFileReadError } from '#src/env'
-import { buildEnv, loadEnvFile } from '#src/env'
+} from '#lib/config'
+import type { EnvFileParseError, EnvFileReadError } from '#lib/env'
+import { buildEnv, loadEnvFile } from '#lib/env'
 import {
   type LockAcquireError,
   TaskContentionError,
   acquireTaskLock,
-} from '#src/lock'
-import { clearRunningMarker, writeRunningMarker } from '#src/lock/marker'
+} from '#lib/lock'
+import { clearRunningMarker, writeRunningMarker } from '#lib/lock/marker'
 import type {
   FrontmatterParseError,
   FrontmatterValidationError,
@@ -35,8 +35,8 @@ import type {
   TaskFileNameError,
   TaskFileReadError,
   TaskNotFoundError,
-} from '#src/task'
-import { parseTaskFile } from '#src/task'
+} from '#lib/task'
+import { parseTaskFile } from '#lib/task'
 
 import type {
   CwdAccessError,

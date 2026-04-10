@@ -4,8 +4,8 @@ import path from 'node:path'
 
 import * as errore from 'errore'
 
-import { configDir as defaultConfigDir } from '#src/config'
-import type { RunningMarker } from '#src/lock'
+import { configDir as defaultConfigDir } from '#lib/config'
+import type { RunningMarker } from '#lib/lock'
 
 import type { HistoryMeta } from './schema'
 import { historyMetaSchema } from './schema'

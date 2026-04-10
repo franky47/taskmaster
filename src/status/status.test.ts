@@ -3,7 +3,7 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 
-import type { RunningMarker } from '#src/lock'
+import type { RunningMarker } from '#lib/lock'
 
 import { getTaskStatuses } from './status'
 

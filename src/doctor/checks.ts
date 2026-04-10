@@ -2,9 +2,9 @@ import path from 'node:path'
 
 import ms from 'ms'
 
+import type { LogEntry } from '#lib/logger'
+import { minCronIntervalMs } from '#lib/schedule'
 import type { HistoryEntry } from '#src/history'
-import type { LogEntry } from '#src/logger'
-import { minCronIntervalMs } from '#src/schedule'
 import type { ValidationResult } from '#src/validate'
 
 // Finding types --

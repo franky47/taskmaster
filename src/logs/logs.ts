@@ -3,10 +3,10 @@ import path from 'node:path'
 
 import * as errore from 'errore'
 
-import { configDir as defaultConfigDir } from '#src/config'
+import { configDir as defaultConfigDir } from '#lib/config'
+import { readRunningMarker } from '#lib/lock'
+import type { ReadMarkerDeps } from '#lib/lock'
 import { queryHistory } from '#src/history'
-import { readRunningMarker } from '#src/lock'
-import type { ReadMarkerDeps } from '#src/lock'
 
 // Errors --
 

@@ -6,7 +6,7 @@ import * as errore from 'errore'
 import {
   configDir as defaultConfigDir,
   runsDir as defaultRunsDir,
-} from '#src/config'
+} from '#lib/config'
 import type { ResolvedCwd } from '#src/run/cwd'
 
 import type { HistoryMetaInput } from './schema'

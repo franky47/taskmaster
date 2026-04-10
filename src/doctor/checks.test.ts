@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 
+import type { LogEntry } from '#lib/logger'
 import type { HistoryEntry } from '#src/history'
-import type { LogEntry } from '#src/logger'
 import type { ValidationResult } from '#src/validate'
 
 import {
