@@ -2,7 +2,7 @@
 
 Schedule recurring AI agent tasks from markdown files.
 
-Each task is a `.md` file with YAML frontmatter (schedule, agent, options) and a markdown prompt body. A per-minute heartbeat evaluates which tasks are due and dispatches them.
+Each task is a `.md` file with YAML frontmatter (`on`, executor, options) and a markdown prompt body. A per-minute heartbeat evaluates which scheduled tasks are due and dispatches them.
 
 ## Install
 
@@ -23,7 +23,8 @@ tm setup
 mkdir -p ~/.config/taskmaster/tasks
 cat > ~/.config/taskmaster/tasks/daily-audit.md << 'EOF'
 ---
-schedule: '0 8 * * 1-5'
+on:
+  schedule: '0 8 * * 1-5'
 agent: claude
 timezone: 'Europe/Paris'
 cwd: '~/projects/saas-app'
@@ -50,28 +51,48 @@ The filename (minus `.md`) is the task ID and must match `[a-z0-9-]+`.
 
 | Field | Required | Default | Description |
 |---|---|---|---|
-| `schedule` | **yes** | | 5-field cron expression (must be quoted in YAML) |
+| `on` | **yes** | | Trigger definition. Exactly one of `schedule` or `event` must be set inside it |
 | `agent` | one of `agent` or `run` | | Agent name (built-in: `claude`, `codex`, `opencode`, `pi`; or custom from `agents.yml`) |
 | `run` | one of `agent` or `run` | | Custom shell command (must reference `$TM_PROMPT_FILE`) |
 | `args` | no | `''` | Extra CLI flags appended to the agent command (only with `agent`) |
 | `cwd` | no | temp dir | Working directory (`~` is expanded) |
 | `timezone` | no | system local | IANA timezone for cron evaluation |
 | `env` | no | `{}` | Environment variables (string key-value pairs) |
-| `timeout` | no | min(interval, 1h) | Max runtime as duration string (`30s`, `5m`). Must be < schedule interval |
+| `timeout` | no | scheduled: `min(interval, 1h)`; event: `1h` | Max runtime as duration string (`30s`, `5m`). For scheduled tasks it must be shorter than the schedule interval |
 | `enabled` | no | `'when-online'` | `false` = never auto-scheduled. `'when-online'` = skip when offline. `'always'` = run regardless |
 
 **Constraints:**
 
+- `on` must contain exactly one of `schedule` or `event`.
 - Exactly one of `agent` or `run` must be set.
 - `args` can only be used with `agent`, not `run`.
 - `run` must contain `$TM_PROMPT_FILE`.
-- `timeout` minimum is `1s` and must be shorter than the schedule interval. Defaults to min(interval, 1h) when omitted.
+- `timeout` minimum is `1s`.
+- For scheduled tasks, `timeout` must be shorter than the schedule interval. When omitted it defaults to `min(interval, 1h)`.
+- For event tasks, `timeout` defaults to `1h` when omitted.
+
+### Trigger Shapes
+
+Scheduled task:
+
+```yaml
+on:
+  schedule: '*/5 * * * *'
+```
+
+Event-driven task:
+
+```yaml
+on:
+  event: deploy
+```
 
 ### Minimal Example
 
 ```markdown
 ---
-schedule: '*/5 * * * *'
+on:
+  schedule: '*/5 * * * *'
 agent: claude
 ---
 
@@ -82,7 +103,8 @@ Check disk usage and report if any partition exceeds 90%.
 
 ```markdown
 ---
-schedule: '*/30 9-17 * * 1-5'
+on:
+  schedule: '*/30 9-17 * * 1-5'
 timezone: 'America/New_York'
 agent: claude
 args: '--model sonnet'
@@ -103,11 +125,27 @@ Use `run` instead of `agent` for arbitrary commands:
 
 ```markdown
 ---
-schedule: '0 8 * * 1-5'
+on:
+  schedule: '0 8 * * 1-5'
 run: 'my-tool --prompt $TM_PROMPT_FILE'
 ---
 
 Generate the weekly status report.
+```
+
+### Event Task Example
+
+Use `tm dispatch <event>` to trigger tasks subscribed to an event:
+
+```markdown
+---
+on:
+  event: deploy
+agent: claude
+enabled: 'always'
+---
+
+Summarize the deployment payload and post release notes.
 ```
 
 ## CLI Reference
@@ -116,9 +154,10 @@ All commands except `doctor` support `--json` for structured output.
 
 ```
 tm run <name>                    Execute a task immediately (ignores enabled flag)
-tm list                          One line per task: name, schedule, enabled status
+tm list                          One line per task: name, trigger, executor, enabled status
 tm status                        Rich view with last run, next scheduled time
 tm history <name>                Show run history (--failures, --last <n>)
+tm dispatch <event>              Dispatch all tasks subscribed to an event
 tm validate                      Check all task files for errors
 tm doctor                        Run diagnostics (--since <iso8601>, default: 7 days)
 tm setup                         Install system scheduler (launchd/crontab)
@@ -178,7 +217,7 @@ Variables resolve in order (last wins):
 ~/.config/taskmaster/
   tasks/              Task markdown files (*.md)
   history/            Per-task run history
-    <task>/           <timestamp>.meta.json + .stdout.txt + .stderr.txt
+    <task>/           <timestamp>.meta.json + .output.txt
   locks/              Per-task lock files (runtime)
   runs/               Preserved temp dirs from failed runs
   log.jsonl           Structured event log
@@ -190,6 +229,8 @@ Variables resolve in order (last wins):
 ## Connectivity
 
 Tasks default to `enabled: 'when-online'`. During each tick, if any due task requires connectivity, taskmaster probes DNS (Cloudflare and Google, 2s timeout). If offline, only `enabled: 'always'` tasks run; `'when-online'` tasks are skipped and logged.
+
+Event-driven tasks dispatched with `tm dispatch` use the same enabled semantics: `'when-online'` tasks are skipped while offline, and `'always'` tasks still run.
 
 ## Development
 
