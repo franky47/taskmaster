@@ -464,4 +464,32 @@ Task with timeout.
     if (!first) return
     expect(first.timeout).toBe('1h')
   })
+
+  test('event task omits next_run', async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(
+      configDir,
+      'on-deploy',
+      `---
+on:
+  event: deploy
+agent: opencode
+---
+
+Post-deploy checks.
+`,
+    )
+
+    const result = await getTaskStatuses({ configDir, now: NOW })
+    expect(result).not.toBeInstanceOf(Error)
+    if (result instanceof Error) return
+
+    expect(result).toHaveLength(1)
+    const first = result[0]
+    expect(first).toBeDefined()
+    if (!first) return
+    expect(first.on).toEqual({ event: 'deploy' })
+    expect(first).not.toHaveProperty('next_run')
+    expect(first.timeout).toBe('1h')
+  })
 })

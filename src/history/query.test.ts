@@ -31,6 +31,8 @@ type MetaOverrides = Partial<{
   exit_code: number
   success: boolean
   timed_out: boolean
+  trigger: 'manual' | 'tick' | 'dispatch'
+  event: string
 }>
 
 async function writeMeta(
@@ -62,6 +64,8 @@ async function writeMeta(
     ...(overrides.timed_out !== undefined && {
       timed_out: overrides.timed_out,
     }),
+    ...(overrides.trigger !== undefined && { trigger: overrides.trigger }),
+    ...(overrides.event !== undefined && { event: overrides.event }),
   }
 
   await fs.writeFile(
@@ -515,6 +519,41 @@ describe('queryGlobalHistory', () => {
 
     expect(result).toHaveLength(1)
     expect(result[0]!.timestamp).toBe('2026-04-01T08.00.00Z')
+  })
+
+  test('includes trigger and event fields for dispatch entries', async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(configDir, 'on-deploy')
+    await writeMeta(configDir, 'on-deploy', '2026-04-01T08.00.00Z', {
+      trigger: 'dispatch',
+      event: 'deploy',
+    })
+
+    const result = await queryHistory('on-deploy', { configDir })
+    expect(result).not.toBeInstanceOf(Error)
+    if (result instanceof Error) return
+
+    expect(result).toHaveLength(1)
+    expect(result[0]!.trigger).toBe('dispatch')
+    expect(result[0]!.event).toBe('deploy')
+  })
+
+  test('includes trigger and event in global history entries', async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(configDir, 'on-deploy')
+    await writeMeta(configDir, 'on-deploy', '2026-04-01T08.00.00Z', {
+      trigger: 'dispatch',
+      event: 'deploy',
+    })
+
+    const result = await queryGlobalHistory({ configDir })
+    expect(result).not.toBeInstanceOf(Error)
+    if (result instanceof Error) return
+
+    expect(result).toHaveLength(1)
+    expect(result[0]!.trigger).toBe('dispatch')
+    expect(result[0]!.event).toBe('deploy')
+    expect(result[0]!.task_name).toBe('on-deploy')
   })
 
   test('includes output_path in global entries', async () => {

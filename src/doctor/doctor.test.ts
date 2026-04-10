@@ -316,6 +316,64 @@ describe('doctor', () => {
     expect(result.ok).toBe(true)
   })
 
+  test('skips never-ran check for event tasks', async () => {
+    const deps = healthyDeps()
+    deps.listTasks = async () => [
+      {
+        name: 'on-deploy',
+        on: { event: 'deploy' },
+        enabled: 'when-online',
+        timeout: 3_600_000,
+      },
+    ]
+    deps.queryHistory = async () => []
+    const result = await doctor({ now, deps })
+    expect(result.ok).toBe(true)
+  })
+
+  test('skips timeout contention check for event tasks', async () => {
+    const deps = healthyDeps()
+    deps.listTasks = async () => [
+      {
+        name: 'on-deploy',
+        on: { event: 'deploy' },
+        enabled: 'when-online',
+        timeout: 3_600_000,
+      },
+    ]
+    const result = await doctor({ now, deps })
+    expect(result.ok).toBe(true)
+  })
+
+  test('still reports consecutive failures for event tasks', async () => {
+    const deps = healthyDeps()
+    deps.listTasks = async () => [
+      {
+        name: 'on-deploy',
+        on: { event: 'deploy' },
+        enabled: 'when-online',
+        timeout: 3_600_000,
+      },
+    ]
+    deps.queryHistory = async () => [
+      {
+        timestamp: '2026-04-07T11.00.00Z',
+        started_at: new Date('2026-04-07T11:00:00.000Z'),
+        finished_at: new Date('2026-04-07T11:00:05.000Z'),
+        duration_ms: 5000,
+        exit_code: 1,
+        success: false,
+        timed_out: false,
+        output_path: '/tmp/output.txt',
+      },
+    ]
+    const result = await doctor({ now, deps })
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.report).toContain('Task failing: on-deploy')
+    }
+  })
+
   test('reports offline skip diagnostic', async () => {
     const offlineEntries: LogEntry[] = [
       {

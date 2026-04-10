@@ -1,11 +1,11 @@
 ---
 # tm-f6f5
 title: Display + doctor updates for event tasks
-status: todo
+status: completed
 type: task
 priority: normal
 created_at: 2026-04-10T08:36:43Z
-updated_at: 2026-04-10T08:36:43Z
+updated_at: 2026-04-10T10:15:09Z
 parent: tm-k9xd
 blocked_by:
     - tm-g3h4
@@ -22,13 +22,13 @@ Doctor: skip the "never-ran" check for event tasks (they may legitimately never 
 
 ## Acceptance criteria
 
-- [ ] `tm list` shows `event:<name>` for event-driven tasks in place of cron expression
-- [ ] `tm status` shows `-` or equivalent for "next run" on event tasks
-- [ ] `tm history` displays event name when `event` field is present in history entry
-- [ ] `tm doctor` skips "never-ran" check for event tasks
-- [ ] `tm doctor` skips "timeout/schedule mismatch" check for event tasks
-- [ ] All other doctor checks still apply to event tasks (consecutive failures, etc.)
-- [ ] JSON output for list/status/history includes event information
+- [x] `tm list` shows `event:<name>` for event-driven tasks in place of cron expression
+- [x] `tm status` shows `-` or equivalent for "next run" on event tasks
+- [x] `tm history` displays event name when `event` field is present in history entry
+- [x] `tm doctor` skips "never-ran" check for event tasks
+- [x] `tm doctor` skips "timeout/schedule mismatch" check for event tasks
+- [x] All other doctor checks still apply to event tasks (consecutive failures, etc.)
+- [x] JSON output for list/status/history includes event information
 
 ## TDD approach
 

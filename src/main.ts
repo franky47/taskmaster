@@ -37,6 +37,12 @@ function printHistoryEntry(entry: HistoryEntry, taskName?: string): void {
   console.log(`  exit_code ${entry.exit_code}`)
   const status = entry.success ? 'ok' : entry.timed_out ? 'timeout' : 'err'
   console.log(`  status    ${status}`)
+  if (entry.trigger) {
+    console.log(`  trigger   ${entry.trigger}`)
+  }
+  if (entry.event) {
+    console.log(`  event     ${entry.event}`)
+  }
   if (entry.output_path) {
     console.log(`  output    ${entry.output_path}`)
   }
@@ -324,6 +330,12 @@ async function main(): Promise<void> {
               console.log(`  duration  ${entry.duration_ms}ms`)
               console.log(`  exit_code ${entry.exit_code}`)
               console.log(`  status    ${entry.status}`)
+              if (entry.trigger) {
+                console.log(`  trigger   ${entry.trigger}`)
+              }
+              if (entry.event) {
+                console.log(`  event     ${entry.event}`)
+              }
               if (entry.output_path) {
                 console.log(`  output    ${entry.output_path}`)
               }

@@ -230,4 +230,31 @@ Bad.
       },
     ])
   })
+
+  test('returns task entry for event-driven task', async () => {
+    const tasksDir = await makeTmpTasksDir()
+    await writeTask(
+      tasksDir,
+      'on-deploy',
+      `---
+on:
+  event: deploy
+agent: opencode
+---
+
+Post-deploy checks.
+`,
+    )
+    const result = await listTasks(tasksDir)
+    if (result instanceof Error) throw result
+    expect(result.tasks).toEqual([
+      {
+        name: 'on-deploy',
+        on: { event: 'deploy' },
+        enabled: 'when-online',
+        timeout: 3_600_000,
+        agent: 'opencode',
+      },
+    ])
+  })
 })

@@ -170,12 +170,14 @@ export async function doctor(options?: DoctorOptions): Promise<DoctorResult> {
         if (timeoutContentionFinding) findings.push(timeoutContentionFinding)
       }
 
-      const neverRanFinding = checkTaskNeverRan(
-        task.name,
-        task.enabled,
-        history.length,
-      )
-      if (neverRanFinding) findings.push(neverRanFinding)
+      if ('schedule' in task.on) {
+        const neverRanFinding = checkTaskNeverRan(
+          task.name,
+          task.enabled,
+          history.length,
+        )
+        if (neverRanFinding) findings.push(neverRanFinding)
+      }
 
       const taskLogEntries = logEntries.filter((e) => e.task === task.name)
       const contentionFinding = checkContention(task.name, taskLogEntries)
