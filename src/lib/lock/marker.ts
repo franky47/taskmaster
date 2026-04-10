@@ -7,7 +7,7 @@ import { z } from 'zod'
 
 export const RunningMarkerSchema = z.object({
   pid: z.number().int().positive(),
-  started_at: z.string().datetime(),
+  started_at: z.iso.datetime(),
   timestamp: z.string(),
 })
 
