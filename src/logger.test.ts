@@ -130,6 +130,34 @@ describe('log', () => {
     })
   })
 
+  test('writes started event with dispatch trigger', () => {
+    const logFile = makeTempLogFile()
+
+    log({ event: 'started', task: 'my-task', trigger: 'dispatch' }, logFile)
+
+    const entries = readLog(new Date(0), logFile)
+    expect(entries).toHaveLength(1)
+    expect(entries[0]).toMatchObject({
+      event: 'started',
+      task: 'my-task',
+      trigger: 'dispatch',
+    })
+  })
+
+  test('writes skipped event with disabled reason', () => {
+    const logFile = makeTempLogFile()
+
+    log({ event: 'skipped', task: 'my-task', reason: 'disabled' }, logFile)
+
+    const entries = readLog(new Date(0), logFile)
+    expect(entries).toHaveLength(1)
+    expect(entries[0]).toMatchObject({
+      event: 'skipped',
+      task: 'my-task',
+      reason: 'disabled',
+    })
+  })
+
   test('appends multiple entries', () => {
     const logFile = makeTempLogFile()
 

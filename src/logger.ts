@@ -11,14 +11,14 @@ const startedEntrySchema = z.object({
   ts: z.iso.datetime(),
   event: z.literal('started'),
   task: z.string(),
-  trigger: z.enum(['manual', 'tick']),
+  trigger: z.enum(['manual', 'tick', 'dispatch']),
 })
 
 const skippedEntrySchema = z.object({
   ts: z.iso.datetime(),
   event: z.literal('skipped'),
   task: z.string(),
-  reason: z.enum(['contention', 'offline']),
+  reason: z.enum(['contention', 'offline', 'disabled']),
 })
 
 const errorEntrySchema = z.object({
@@ -39,8 +39,12 @@ export const logEntrySchema = z.discriminatedUnion('event', [
 export type LogEntry = z.infer<typeof logEntrySchema>
 
 type LogInput =
-  | { event: 'started'; task: string; trigger: 'manual' | 'tick' }
-  | { event: 'skipped'; task: string; reason: 'contention' | 'offline' }
+  | { event: 'started'; task: string; trigger: 'manual' | 'tick' | 'dispatch' }
+  | {
+      event: 'skipped'
+      task: string
+      reason: 'contention' | 'offline' | 'disabled'
+    }
   | { event: 'error'; task: string; error: Error }
 
 // Serialization --

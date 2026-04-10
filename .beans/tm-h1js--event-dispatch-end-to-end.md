@@ -1,11 +1,11 @@
 ---
 # tm-h1js
 title: Event dispatch end-to-end
-status: todo
+status: completed
 type: task
 priority: high
 created_at: 2026-04-10T08:36:29Z
-updated_at: 2026-04-10T08:36:29Z
+updated_at: 2026-04-10T10:06:30Z
 parent: tm-k9xd
 blocked_by:
     - tm-g3h4
@@ -31,19 +31,19 @@ Key behaviors:
 
 ## Acceptance criteria
 
-- [ ] New dispatch module with interface: `dispatch(eventName, payload?) => DispatchResult`
-- [ ] `tm dispatch <event>` finds all tasks with `on.event` matching `<event>`
-- [ ] Multiple tasks subscribing to the same event are all dispatched
-- [ ] Stdin is read when piped and appended to task body with `---` separator
-- [ ] No separator appended when stdin is empty / TTY
-- [ ] Tasks spawned as detached processes (fire-and-forget)
-- [ ] `enabled: false` tasks are skipped with reason
-- [ ] `enabled: 'when-online'` tasks check connectivity and skip if offline
-- [ ] History entries include `trigger: 'dispatch'` and `event: '<name>'`
-- [ ] Event tasks default to 1 hour timeout when no explicit `timeout` set
-- [ ] `--json` outputs `{ event, dispatched, skipped }` structure
-- [ ] Human-readable output lists dispatched and skipped task names
-- [ ] `tm dispatch` for an event with no subscribers reports empty result (not an error)
+- [x] New dispatch module with interface: `dispatch(eventName, payload?) => DispatchResult`
+- [x] `tm dispatch <event>` finds all tasks with `on.event` matching `<event>`
+- [x] Multiple tasks subscribing to the same event are all dispatched
+- [x] Stdin is read when piped and appended to task body with `---` separator
+- [x] No separator appended when stdin is empty / TTY
+- [x] Tasks spawned as detached processes (fire-and-forget)
+- [x] `enabled: false` tasks are skipped with reason
+- [x] `enabled: 'when-online'` tasks check connectivity and skip if offline
+- [x] History entries include `trigger: 'dispatch'` and `event: '<name>'`
+- [x] Event tasks default to 1 hour timeout when no explicit `timeout` set
+- [x] `--json` outputs `{ event, dispatched, skipped }` structure
+- [x] Human-readable output lists dispatched and skipped task names
+- [x] `tm dispatch` for an event with no subscribers reports empty result (not an error)
 
 ## User stories addressed
 
@@ -59,3 +59,7 @@ Key behaviors:
 - User story 14 (1hr default timeout)
 - User story 17 (stdin optional)
 - User story 18 (payload with --- separator)
+
+## Summary of Changes
+
+New dispatch module (src/dispatch/) mirrors tick's architecture: list tasks, filter by event match + enabled + connectivity, spawn detached children via `tm run` with hidden `--trigger dispatch --event <name>` flags. Extended history schema with optional trigger/event fields (with cross-field refinement). Added payload support to executeTask — appends to prompt with `---` separator via temp files. Extended logger for dispatch trigger and disabled skip reason.

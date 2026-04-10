@@ -1,11 +1,14 @@
 import { spawn } from 'node:child_process'
+import fsPromises from 'node:fs/promises'
 import path from 'node:path'
+import { isatty } from 'node:tty'
 
 import { Command, Option } from 'commander'
 import ms from 'ms'
 import { z } from 'zod'
 
 import { configDir, historyDir, locksDir, tasksDir } from './config'
+import { dispatch } from './dispatch'
 import { doctor } from './doctor'
 import {
   buildDisplayEntries,
@@ -53,8 +56,29 @@ async function main(): Promise<void> {
         'UTC timestamp for this run',
       ).hideHelp(),
     )
+    .addOption(
+      new Option('--trigger <value>', 'How this run was triggered').hideHelp(),
+    )
+    .addOption(
+      new Option('--event <value>', 'Event name for dispatch').hideHelp(),
+    )
+    .addOption(
+      new Option(
+        '--payload-file <path>',
+        'Path to payload file to append to prompt',
+      ).hideHelp(),
+    )
     .action(
-      async (name: string, opts: { json?: boolean; timestamp?: string }) => {
+      async (
+        name: string,
+        opts: {
+          json?: boolean
+          timestamp?: string
+          trigger?: string
+          event?: string
+          payloadFile?: string
+        },
+      ) => {
         let timestamp: string
         if (opts.timestamp) {
           const parsed = parseTimestampFlag(opts.timestamp)
@@ -67,13 +91,34 @@ async function main(): Promise<void> {
           timestamp = manualTimestamp()
         }
 
-        const isTick = opts.timestamp !== undefined
-        const trigger = isTick ? 'tick' : ('manual' as const)
+        const rawTrigger = opts.trigger ?? (opts.timestamp ? 'tick' : 'manual')
+        const triggerResult = z
+          .enum(['manual', 'tick', 'dispatch'])
+          .safeParse(rawTrigger)
+        if (!triggerResult.success) {
+          console.error(`Invalid --trigger value: ${rawTrigger}`)
+          process.exit(1)
+        }
+        const trigger = triggerResult.data
         log({ event: 'started', task: name, trigger })
+
+        let payload: string | undefined
+        if (opts.payloadFile) {
+          try {
+            payload = await fsPromises.readFile(opts.payloadFile, 'utf-8')
+          } catch (e: unknown) {
+            const msg = e instanceof Error ? e.message : String(e)
+            console.error(`Failed to read payload file: ${msg}`)
+            process.exit(1)
+          }
+          // Best-effort cleanup — ENOENT is fine if another child already deleted it
+          await fsPromises.unlink(opts.payloadFile).catch(() => {})
+        }
 
         const result = await runTask(name, {
           timestamp,
-          lock: isTick,
+          lock: trigger === 'tick',
+          payload,
         })
 
         if (result instanceof Error) {
@@ -101,6 +146,8 @@ async function main(): Promise<void> {
             finished_at: result.finishedAt,
             exit_code: exitCode,
             timed_out: result.timedOut,
+            trigger,
+            event: trigger === 'dispatch' ? opts.event : undefined,
           },
           {
             task_name: name,
@@ -394,6 +441,41 @@ async function main(): Promise<void> {
         }
         if (result.purged > 0) {
           console.log(`purged     ${result.purged} old entries`)
+        }
+      }
+    })
+
+  program
+    .command('dispatch <event>')
+    .description('Dispatch all tasks subscribed to an event')
+    .option('--json', 'Output as JSON')
+    .action(async (eventName: string, opts: { json?: boolean }) => {
+      let payload: string | undefined
+      if (!isatty(0)) {
+        payload = await Bun.stdin.text()
+        if (payload.length === 0) {
+          payload = undefined
+        }
+      }
+
+      const result = await dispatch(eventName, { payload })
+      if (result instanceof Error) {
+        console.error(result.message)
+        process.exit(1)
+      }
+
+      if (opts.json) {
+        console.log(JSON.stringify(result))
+      } else {
+        if (result.dispatched.length === 0 && result.skipped.length === 0) {
+          console.log(`no tasks subscribe to event '${eventName}'`)
+        } else {
+          for (const name of result.dispatched) {
+            console.log(`dispatched ${name}`)
+          }
+          for (const entry of result.skipped) {
+            console.log(`skipped    ${entry.name} (${entry.reason})`)
+          }
         }
       }
     })

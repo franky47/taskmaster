@@ -74,4 +74,72 @@ describe('historyMetaSchema', () => {
       historyMetaSchema.decode({ ...baseMeta, duration_ms: 9999 }),
     ).toThrow()
   })
+
+  test('parses record without trigger/event (backwards compat)', () => {
+    const result = historyMetaSchema.decode(baseMeta)
+    expect(result.trigger).toBeUndefined()
+    expect(result.event).toBeUndefined()
+  })
+
+  test('parses record with trigger: dispatch and event', () => {
+    const result = historyMetaSchema.decode({
+      ...baseMeta,
+      trigger: 'dispatch',
+      event: 'deploy',
+    })
+    expect(result.trigger).toBe('dispatch')
+    expect(result.event).toBe('deploy')
+  })
+
+  test('parses record with trigger: tick (no event)', () => {
+    const result = historyMetaSchema.decode({
+      ...baseMeta,
+      trigger: 'tick',
+    })
+    expect(result.trigger).toBe('tick')
+    expect(result.event).toBeUndefined()
+  })
+
+  test('parses record with trigger: manual (no event)', () => {
+    const result = historyMetaSchema.decode({
+      ...baseMeta,
+      trigger: 'manual',
+    })
+    expect(result.trigger).toBe('manual')
+    expect(result.event).toBeUndefined()
+  })
+
+  test('encode preserves trigger and event fields', () => {
+    const decoded = historyMetaSchema.decode({
+      ...baseMeta,
+      trigger: 'dispatch',
+      event: 'deploy',
+    })
+    const encoded = historyMetaSchema.encode(decoded)
+    expect(encoded.trigger).toBe('dispatch')
+    expect(encoded.event).toBe('deploy')
+  })
+
+  test('encode omits trigger/event when not set', () => {
+    const decoded = historyMetaSchema.decode(baseMeta)
+    const encoded = historyMetaSchema.encode(decoded)
+    expect('trigger' in encoded).toBe(false)
+    expect('event' in encoded).toBe(false)
+  })
+
+  test('rejects event without trigger: dispatch', () => {
+    expect(() =>
+      historyMetaSchema.decode({
+        ...baseMeta,
+        trigger: 'manual',
+        event: 'deploy',
+      }),
+    ).toThrow()
+  })
+
+  test('rejects event with no trigger', () => {
+    expect(() =>
+      historyMetaSchema.decode({ ...baseMeta, event: 'deploy' }),
+    ).toThrow()
+  })
 })

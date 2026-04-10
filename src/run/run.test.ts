@@ -649,6 +649,55 @@ describe('executeTask', () => {
     expect(receivedOutputPath).toBeUndefined()
   })
 
+  test('appends payload to prompt with --- separator', async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(
+      configDir,
+      'payload-task',
+      '---\non:\n  event: deploy\nagent: opencode\n---\nBase prompt.',
+    )
+
+    let promptContent = ''
+    const result = await executeTask('payload-task', {
+      configDir,
+      payload: 'deploy context here',
+      deps: {
+        spawnAgent: async (opts) => {
+          promptContent = fs.readFileSync(opts.env['TM_PROMPT_FILE']!, 'utf-8')
+          return { exitCode: 0, output: '', timedOut: false }
+        },
+      },
+    })
+
+    if (result instanceof Error) throw result
+    expect(promptContent).toBe('Base prompt.\n---\ndeploy context here')
+    expect(result.prompt).toBe('Base prompt.\n---\ndeploy context here')
+  })
+
+  test('does not append separator when payload is absent', async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(
+      configDir,
+      'no-payload',
+      '---\non:\n  event: deploy\nagent: opencode\n---\nBase prompt.',
+    )
+
+    let promptContent = ''
+    const result = await executeTask('no-payload', {
+      configDir,
+      deps: {
+        spawnAgent: async (opts) => {
+          promptContent = fs.readFileSync(opts.env['TM_PROMPT_FILE']!, 'utf-8')
+          return { exitCode: 0, output: '', timedOut: false }
+        },
+      },
+    })
+
+    if (result instanceof Error) throw result
+    expect(promptContent).toBe('Base prompt.')
+    expect(result.prompt).toBe('Base prompt.')
+  })
+
   test('timedOut is false for normal completion', async () => {
     const configDir = await makeConfigDir()
     await writeTask(

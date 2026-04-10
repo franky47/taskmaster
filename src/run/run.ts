@@ -95,6 +95,7 @@ type ExecuteOptions = {
   configDir?: string
   timestamp?: string
   lock?: boolean
+  payload?: string
   deps?: Partial<ExecuteDeps>
 }
 
@@ -261,7 +262,11 @@ export async function executeTask(
 
   const startedAt = new Date()
 
-  const promptPath = writePromptFile(name, startedAt, task.prompt)
+  const prompt = options?.payload
+    ? `${task.prompt}\n---\n${options.payload}`
+    : task.prompt
+
+  const promptPath = writePromptFile(name, startedAt, prompt)
   if (promptPath instanceof Error) return promptPath
 
   // When timestamp is available, stream output to history dir via fd passthrough
@@ -290,7 +295,7 @@ export async function executeTask(
     return {
       ...result,
       cwd,
-      prompt: task.prompt,
+      prompt,
       startedAt,
       finishedAt,
     }
