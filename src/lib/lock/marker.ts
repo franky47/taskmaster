@@ -16,7 +16,8 @@ export type RunningMarker = z.infer<typeof RunningMarkerSchema>
 // Write / clear --
 
 export function writeRunningMarker(fd: number, marker: RunningMarker): void {
-  fs.writeSync(fd, JSON.stringify(marker))
+  fs.ftruncateSync(fd, 0)
+  fs.writeSync(fd, JSON.stringify(marker), 0)
 }
 
 export function clearRunningMarker(fd: number): void {

@@ -1,3 +1,4 @@
+import { constants as fsConstants } from 'node:fs'
 import fs from 'node:fs'
 import path from 'node:path'
 
@@ -33,7 +34,14 @@ export class TaskContentionError extends errore.createTaggedError({
 function acquireLock(
   lockPath: string,
 ): LockAcquireError | LockContended | LockAcquired {
-  const fd = fs.openSync(lockPath, 'w')
+  // O_RDWR | O_CREAT without O_TRUNC: truncating on open would wipe the
+  // running marker written by the current lock holder when a contending
+  // process opens the file before flock rejects it.
+  const fd = fs.openSync(
+    lockPath,
+    fsConstants.O_RDWR | fsConstants.O_CREAT,
+    0o600,
+  )
 
   const result = ffi.flock(fd, ffi.LOCK_EX | ffi.LOCK_NB)
   if (result === 0) {

@@ -5,6 +5,7 @@ import os from 'node:os'
 import path from 'node:path'
 
 import { acquireTaskLock, releaseLock } from './lock'
+import { readRunningMarker, writeRunningMarker } from './marker'
 
 async function makeTmpDir(): Promise<string> {
   return fsa.mkdtemp(path.join(os.tmpdir(), 'tm-lock-'))
@@ -97,5 +98,36 @@ describe('acquireTaskLock', () => {
 
     if ('fd' in a) releaseLock(a.fd)
     if ('fd' in b) releaseLock(b.fd)
+  })
+
+  test('contending acquire does not wipe the running marker', async () => {
+    const dir = await makeTmpDir()
+    const taskName = 'long-task'
+
+    // Simulate process A acquiring the lock and writing a marker
+    const holder = acquireTaskLock(taskName, dir)
+    expect('fd' in holder).toBe(true)
+    if (!('fd' in holder)) return
+
+    const marker = {
+      pid: process.pid,
+      started_at: '2026-04-09T10:00:00.000Z',
+      timestamp: '2026-04-09T10.00.00Z',
+    }
+    writeRunningMarker(holder.fd, marker)
+
+    // Verify marker is readable before contention
+    const before = readRunningMarker(taskName, dir)
+    expect(before).toEqual(marker)
+
+    // Simulate process B trying (and failing) to acquire the same lock
+    const contender = acquireTaskLock(taskName, dir)
+    expect('contended' in contender).toBe(true)
+
+    // The marker written by process A must still be readable
+    const after = readRunningMarker(taskName, dir)
+    expect(after).toEqual(marker)
+
+    releaseLock(holder.fd)
   })
 })
