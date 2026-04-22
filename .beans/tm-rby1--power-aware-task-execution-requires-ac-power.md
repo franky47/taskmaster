@@ -1,11 +1,11 @@
 ---
 # tm-rby1
 title: 'Power-aware task execution (requires: ac-power)'
-status: todo
+status: completed
 type: epic
 priority: normal
 created_at: 2026-04-22T13:15:15Z
-updated_at: 2026-04-22T13:15:15Z
+updated_at: 2026-04-22T14:19:24Z
 ---
 
 ## Problem Statement
@@ -99,3 +99,13 @@ Good tests in this codebase exercise external behavior (inputs → outputs, side
 - The probe for AC power is designed to be cheap enough to run on every tick that needs it. Both macOS and Linux paths complete in well under 10ms in the common case.
 - Desktops without batteries are correctly handled on Linux by the "no Mains source → fail open" rule, and on macOS by `pmset -g ps` reporting "AC Power" regardless.
 - Because probes are fail-open, a broken probe biases toward running tasks rather than skipping them. This aligns with the project's bias against silent failures that suppress user work.
+
+## Summary of Changes
+
+All three child slices shipped:
+
+- `tm-47m1` — Schema reshape (orthogonal `enabled: boolean` + `requires: Requirement[]`) and requirements filter with network-only tokens.
+- `tm-s072` — `ac-power` requirement end-to-end: `isOnAcPower` probe (macOS `pmset -g ps`, Linux `/sys/class/power_supply/*/online`, fail-open), registry wiring, tick/dispatch integration, docs.
+- `tm-ezda` — Doctor diagnostic `consecutive-requirement-skips` (warning at 3+ same-requirement tail streak, per-requirement tracking, coexists with offline-skips count check).
+
+Manual `tm run` bypasses both `enabled` and `requires` as specified. Out-of-scope items (deferred execution, Windows, battery-percentage thresholds, power-transition event triggers) remain deferred — no follow-up beans created.
