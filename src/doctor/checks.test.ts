@@ -979,6 +979,34 @@ describe('checkConsecutiveRequirementSkips', () => {
     })
   })
 
+  test('non-requirement-unmet events between skips do not break the streak', () => {
+    const entries: LogEntry[] = [
+      skip('2026-04-07T09:00:00.000Z', ['ac-power']),
+      {
+        ts: '2026-04-07T09:30:00.000Z',
+        event: 'started',
+        task: 'llm-digest',
+        trigger: 'manual',
+      },
+      skip('2026-04-07T10:00:00.000Z', ['ac-power']),
+      {
+        ts: '2026-04-07T10:30:00.000Z',
+        event: 'skipped',
+        task: 'llm-digest',
+        reason: 'contention',
+      },
+      skip('2026-04-07T11:00:00.000Z', ['ac-power']),
+    ]
+
+    const findings = checkConsecutiveRequirementSkips('llm-digest', entries)
+
+    expect(findings).toHaveLength(1)
+    expect(findings[0]).toMatchObject({
+      requirement: 'ac-power',
+      consecutiveSkips: 3,
+    })
+  })
+
   test('only counts the most recent tail — earlier broken streaks are ignored', () => {
     const entries: LogEntry[] = [
       // Older run of 3: would qualify on its own but a different requirement
