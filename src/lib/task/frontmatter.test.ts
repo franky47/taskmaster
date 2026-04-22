@@ -660,6 +660,28 @@ describe('parseMarkdown', () => {
       expect(result.errors.some((e) => e.key === 'requires')).toBe(true)
     })
 
+    test("accepts ['ac-power']", () => {
+      const result = parseMarkdown(
+        md(
+          `on:\n  schedule: '0 8 * * *'\n${VALID_AGENT}\nrequires: ['ac-power']`,
+        ),
+      )
+      expect(result).not.toBeInstanceOf(Error)
+      if (result instanceof Error) return
+      expect(result.requires).toEqual(['ac-power'])
+    })
+
+    test("accepts ['network', 'ac-power']", () => {
+      const result = parseMarkdown(
+        md(
+          `on:\n  schedule: '0 8 * * *'\n${VALID_AGENT}\nrequires: ['network', 'ac-power']`,
+        ),
+      )
+      expect(result).not.toBeInstanceOf(Error)
+      if (result instanceof Error) return
+      expect(result.requires).toEqual(['network', 'ac-power'])
+    })
+
     test('accepts enabled: false alongside requires', () => {
       const result = parseMarkdown(
         md(

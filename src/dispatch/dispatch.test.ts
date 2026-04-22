@@ -392,4 +392,76 @@ describe('dispatch', () => {
       },
     ])
   })
+
+  test('skips tasks requiring ac-power when on battery', async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(
+      configDir,
+      'power-hungry',
+      `---
+on:
+  event: deploy
+agent: opencode
+requires: ['ac-power']
+---
+
+Power-hungry deploy task.
+`,
+    )
+
+    const result = await dispatch('deploy', {
+      configDir,
+      spawnRun: () => {},
+      probes: {
+        network: async () => true,
+        'ac-power': async () => false,
+      },
+    })
+
+    expect(result).not.toBeInstanceOf(Error)
+    if (result instanceof Error) return
+    expect(result.dispatched).toEqual([])
+    expect(result.skipped).toEqual([
+      {
+        name: 'power-hungry',
+        reason: 'requirement-unmet',
+        requirement: ['ac-power'],
+      },
+    ])
+  })
+
+  test('combined requires: reports all unmet requirements when both probes fail', async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(
+      configDir,
+      'cloud-ai',
+      `---
+on:
+  event: deploy
+agent: opencode
+requires: ['network', 'ac-power']
+---
+
+Cloud AI deploy task.
+`,
+    )
+
+    const result = await dispatch('deploy', {
+      configDir,
+      spawnRun: () => {},
+      probes: {
+        network: async () => false,
+        'ac-power': async () => false,
+      },
+    })
+
+    expect(result).not.toBeInstanceOf(Error)
+    if (result instanceof Error) return
+    expect(result.dispatched).toEqual([])
+    expect(result.skipped).toHaveLength(1)
+    const entry = result.skipped[0]!
+    expect(entry.reason).toBe('requirement-unmet')
+    if (entry.reason !== 'requirement-unmet') return
+    expect([...entry.requirement].sort()).toEqual(['ac-power', 'network'])
+  })
 })

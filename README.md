@@ -134,6 +134,21 @@ run: 'my-tool --prompt $TM_PROMPT_FILE'
 Generate the weekly status report.
 ```
 
+### Power-Aware Example
+
+Gate a power-hungry local-model task on wall power so it does not drain the battery:
+
+```markdown
+---
+on:
+  schedule: '0 */2 * * *'
+agent: opencode
+requires: ['ac-power']
+---
+
+Run the expensive local embedding pass over the inbox.
+```
+
 ### Event Task Example
 
 Use `tm dispatch <event>` to trigger tasks subscribed to an event:
@@ -236,6 +251,7 @@ Tasks declare what the environment must provide via `requires`. Each token has a
 | Token | Meaning | Probe |
 |---|---|---|
 | `network` | Internet reachable | DNS lookup against Cloudflare (`1.1.1.1`) and Google (`8.8.8.8`), 2s timeout |
+| `ac-power` | Running on wall power (not battery) | macOS: `pmset -g ps`; Linux: `/sys/class/power_supply/*/online` for `type=Mains`. Fails open: probe errors, unexpected output, or absent Mains source (desktops) all count as satisfied. Windows is not supported — fails open. |
 
 Defaults and semantics:
 

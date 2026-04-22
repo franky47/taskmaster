@@ -500,6 +500,116 @@ Local only task.
     }
   })
 
+  test('on-battery: skips tasks requiring ac-power', async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(
+      configDir,
+      'power-hungry',
+      `---
+on:
+  schedule: "* * * * *"
+agent: opencode
+requires: ['ac-power']
+---
+
+Power-hungry task.
+`,
+    )
+
+    const spawned: Array<{ name: string }> = []
+    const result = await tick({
+      configDir,
+      now: NOW,
+      spawnRun: (name) => spawned.push({ name }),
+      probes: {
+        network: async () => true,
+        'ac-power': async () => false,
+      },
+    })
+
+    expect(result).not.toBeInstanceOf(Error)
+    if (result instanceof Error) return
+
+    expect(result.dispatched).toEqual([])
+    expect(result.skipped).toEqual(['power-hungry'])
+    expect(spawned).toEqual([])
+  })
+
+  test('on-ac: dispatches tasks requiring ac-power', async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(
+      configDir,
+      'power-hungry',
+      `---
+on:
+  schedule: "* * * * *"
+agent: opencode
+requires: ['ac-power']
+---
+
+Power-hungry task.
+`,
+    )
+
+    const spawned: Array<{ name: string }> = []
+    const result = await tick({
+      configDir,
+      now: NOW,
+      spawnRun: (name) => spawned.push({ name }),
+      probes: {
+        network: async () => false,
+        'ac-power': async () => true,
+      },
+    })
+
+    expect(result).not.toBeInstanceOf(Error)
+    if (result instanceof Error) return
+
+    expect(result.dispatched).toEqual(['power-hungry'])
+    expect(spawned).toHaveLength(1)
+  })
+
+  test('skips combined network+ac-power task if either is unmet, logs all unmet', async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(
+      configDir,
+      'cloud-ai',
+      `---
+on:
+  schedule: "* * * * *"
+agent: opencode
+requires: ['network', 'ac-power']
+---
+
+Cloud AI task.
+`,
+    )
+
+    const before = new Date()
+    const result = await tick({
+      configDir,
+      now: NOW,
+      spawnRun: () => {},
+      probes: {
+        network: async () => false,
+        'ac-power': async () => false,
+      },
+    })
+
+    expect(result).not.toBeInstanceOf(Error)
+    if (result instanceof Error) return
+    expect(result.skipped).toEqual(['cloud-ai'])
+
+    const skips = readLog(before).filter(
+      (e) => e.event === 'skipped' && e.reason === 'requirement-unmet',
+    )
+    expect(skips).toHaveLength(1)
+    const entry = skips[0]!
+    if (entry.event !== 'skipped' || entry.reason !== 'requirement-unmet')
+      return
+    expect(entry.requirement.sort()).toEqual(['ac-power', 'network'])
+  })
+
   describe('dry-run', () => {
     test('reports due tasks without spawning, writing heartbeat, or purging', async () => {
       const configDir = await makeConfigDir()

@@ -49,7 +49,7 @@ const durationString = z.templateLiteral([z.number(), timeUnit], {
   error: 'invalid duration string',
 })
 
-export const REQUIREMENT_TOKENS = ['network'] as const
+export const REQUIREMENT_TOKENS = ['network', 'ac-power'] as const
 export type Requirement = (typeof REQUIREMENT_TOKENS)[number]
 
 export type Frontmatter = z.output<typeof frontmatterSchema>
