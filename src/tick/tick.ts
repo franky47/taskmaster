@@ -46,6 +46,7 @@ function isCronMatch(
   task: string,
   schedule: string,
   floored: Date,
+  logPath: string,
   timezone?: string,
 ): boolean {
   try {
@@ -62,7 +63,7 @@ function isCronMatch(
     return next.getTime() === floored.getTime()
   } catch (e: unknown) {
     const error = e instanceof Error ? e : new Error(String(e))
-    log({ event: 'error', task, error })
+    log({ event: 'error', task, error }, logPath)
     return false
   }
 }
@@ -96,6 +97,7 @@ export async function tick(
   const dryRun = options?.dryRun ?? false
 
   const tasksDir = path.join(cfgDir, 'tasks')
+  const logPath = path.join(cfgDir, 'log.jsonl')
   const floored = floorToMinute(now)
   const timestamp = formatTimestamp(floored)
 
@@ -104,7 +106,10 @@ export async function tick(
   if (listResult instanceof Error) return listResult
 
   for (const w of listResult.warnings) {
-    log({ event: 'error', task: w.file.replace(/\.md$/, ''), error: w.error })
+    log(
+      { event: 'error', task: w.file.replace(/\.md$/, ''), error: w.error },
+      logPath,
+    )
   }
 
   const enabledTasks = listResult.tasks.filter((t) => t.enabled !== false)
@@ -117,7 +122,9 @@ export async function tick(
 
   for (const task of enabledTasks) {
     if (!('schedule' in task.on)) continue // skip event tasks
-    if (!isCronMatch(task.name, task.on.schedule, floored, task.timezone))
+    if (
+      !isCronMatch(task.name, task.on.schedule, floored, logPath, task.timezone)
+    )
       continue
 
     const history = await queryHistoryFn(task.name, {
@@ -125,7 +132,7 @@ export async function tick(
       last: 1,
     })
     if (history instanceof Error) {
-      log({ event: 'error', task: task.name, error: history })
+      log({ event: 'error', task: task.name, error: history }, logPath)
       skipped.push(task.name)
       continue
     }
@@ -140,12 +147,15 @@ export async function tick(
   // Stage 4: Requirements filter
   const filtered = await filterByRequirements(ready, probes)
   for (const { task, unmet } of filtered.skipped) {
-    log({
-      event: 'skipped',
-      task: task.name,
-      reason: 'requirement-unmet',
-      requirement: unmet,
-    })
+    log(
+      {
+        event: 'skipped',
+        task: task.name,
+        reason: 'requirement-unmet',
+        requirement: unmet,
+      },
+      logPath,
+    )
     skipped.push(task.name)
   }
   const toDispatch = filtered.ready
@@ -166,7 +176,7 @@ export async function tick(
   const purgeFn = options?.purgeHistory ?? purgeHistory
   const purgeResult = await purgeFn({ configDir: cfgDir, now })
   if (purgeResult instanceof Error) {
-    log({ event: 'error', task: '(purge)', error: purgeResult })
+    log({ event: 'error', task: '(purge)', error: purgeResult }, logPath)
   }
   const purged = purgeResult instanceof Error ? 0 : purgeResult.deleted
 
@@ -178,7 +188,7 @@ export async function tick(
     heartbeat = now.toISOString()
   } catch (e: unknown) {
     const error = e instanceof Error ? e : new Error(String(e))
-    log({ event: 'error', task: '(heartbeat)', error })
+    log({ event: 'error', task: '(heartbeat)', error }, logPath)
     heartbeat = ''
   }
 

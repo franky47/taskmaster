@@ -19,7 +19,13 @@ import {
   recordHistory,
 } from './history'
 import type { HistoryEntry } from './history'
-import { configDir, historyDir, locksDir, tasksDir } from './lib/config'
+import {
+  configDir,
+  historyDir,
+  locksDir,
+  logFilePath,
+  tasksDir,
+} from './lib/config'
 import { TaskContentionError, readRunningMarker } from './lib/lock'
 import { log } from './lib/logger'
 import { listTasks } from './list'
@@ -106,7 +112,7 @@ async function main(): Promise<void> {
           process.exit(1)
         }
         const trigger = triggerResult.data
-        log({ event: 'started', task: name, trigger })
+        log({ event: 'started', task: name, trigger }, logFilePath)
 
         let payload: string | undefined
         if (opts.payloadFile) {
@@ -129,7 +135,10 @@ async function main(): Promise<void> {
 
         if (result instanceof Error) {
           if (result instanceof TaskContentionError) {
-            log({ event: 'skipped', task: name, reason: 'contention' })
+            log(
+              { event: 'skipped', task: name, reason: 'contention' },
+              logFilePath,
+            )
             if (opts.json) {
               console.log(JSON.stringify({ skipped: true, taskName: name }))
             } else {
@@ -137,7 +146,7 @@ async function main(): Promise<void> {
             }
             process.exit(0)
           }
-          log({ event: 'error', task: name, error: result })
+          log({ event: 'error', task: name, error: result }, logFilePath)
           console.error(result.message)
           process.exit(1)
         }

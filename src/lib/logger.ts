@@ -6,8 +6,6 @@ import { z } from 'zod'
 import { REQUIREMENT_TOKENS } from '#lib/task'
 import type { Requirement } from '#lib/task'
 
-import { logFilePath } from './config'
-
 // Schema --
 
 const startedEntrySchema = z.object({
@@ -103,7 +101,7 @@ function serializeEntry(entry: LogInput): Record<string, unknown> {
 
 // Public API --
 
-export function log(entry: LogInput, target = logFilePath): void {
+export function log(entry: LogInput, target: string): void {
   try {
     mkdirSync(path.dirname(target), { recursive: true })
     appendFileSync(target, JSON.stringify(serializeEntry(entry)) + '\n')
@@ -117,7 +115,7 @@ export function log(entry: LogInput, target = logFilePath): void {
   }
 }
 
-export function readLog(since: Date, logPath = logFilePath): LogEntry[] {
+export function readLog(since: Date, logPath: string): LogEntry[] {
   const sinceISO = since.toISOString()
   let content: string
   try {

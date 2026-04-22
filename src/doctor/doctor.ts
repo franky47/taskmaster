@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 
-import { configDir, tasksDir } from '#lib/config'
+import { configDir, logFilePath, tasksDir } from '#lib/config'
 import { readLog } from '#lib/logger'
 import type { LogEntry } from '#lib/logger'
 import { queryHistory } from '#src/history'
@@ -85,7 +85,7 @@ export async function doctor(options?: DoctorOptions): Promise<DoctorResult> {
     validateTasks:
       options?.deps?.validateTasks ?? (() => validateTasks(tasksDir)),
     queryHistory: options?.deps?.queryHistory ?? ((name) => queryHistory(name)),
-    readLog: options?.deps?.readLog ?? readLog,
+    readLog: options?.deps?.readLog ?? ((since) => readLog(since, logFilePath)),
     isSchedulerInstalled:
       options?.deps?.isSchedulerInstalled ?? isSchedulerInstalled,
   }

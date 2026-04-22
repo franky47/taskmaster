@@ -198,6 +198,18 @@ describe('log', () => {
   })
 })
 
+describe('log path is always explicit', () => {
+  test('logger module does not import or default to logFilePath', async () => {
+    // Guards against re-introducing a hardcoded default that would let
+    // production callers silently write to the user's real ~/.config/taskmaster/log.jsonl
+    // from tests. See bean tm-35bd.
+    const src = await Bun.file(
+      new URL('./logger.ts', import.meta.url).pathname,
+    ).text()
+    expect(src).not.toContain('logFilePath')
+  })
+})
+
 describe('readLog', () => {
   test('parses valid JSONL entries', () => {
     const logFile = makeTempLogFile()

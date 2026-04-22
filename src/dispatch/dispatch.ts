@@ -81,6 +81,7 @@ export async function dispatch(
   const probes = { ...defaultProbes, ...options?.probes }
 
   const tasksDir = path.join(cfgDir, 'tasks')
+  const logPath = path.join(cfgDir, 'log.jsonl')
   const timestamp = manualTimestamp()
 
   // Stage 1: List all tasks, find event matches
@@ -88,7 +89,10 @@ export async function dispatch(
   if (listResult instanceof Error) return listResult
 
   for (const w of listResult.warnings) {
-    log({ event: 'error', task: w.file.replace(/\.md$/, ''), error: w.error })
+    log(
+      { event: 'error', task: w.file.replace(/\.md$/, ''), error: w.error },
+      logPath,
+    )
   }
 
   const matching = listResult.tasks.filter(
@@ -101,7 +105,7 @@ export async function dispatch(
 
   for (const task of matching) {
     if (task.enabled === false) {
-      log({ event: 'skipped', task: task.name, reason: 'disabled' })
+      log({ event: 'skipped', task: task.name, reason: 'disabled' }, logPath)
       skipped.push({ name: task.name, reason: 'disabled' })
     } else {
       enabled.push(task)
@@ -111,12 +115,15 @@ export async function dispatch(
   // Stage 3: Requirements filter
   const filtered = await filterByRequirements(enabled, probes)
   for (const { task, unmet } of filtered.skipped) {
-    log({
-      event: 'skipped',
-      task: task.name,
-      reason: 'requirement-unmet',
-      requirement: unmet,
-    })
+    log(
+      {
+        event: 'skipped',
+        task: task.name,
+        reason: 'requirement-unmet',
+        requirement: unmet,
+      },
+      logPath,
+    )
     skipped.push({
       name: task.name,
       reason: 'requirement-unmet',
@@ -138,7 +145,7 @@ export async function dispatch(
       extraArgs.push('--payload-file', payloadPath)
     }
     spawnRun(task.name, timestamp, extraArgs)
-    log({ event: 'started', task: task.name, trigger: 'dispatch' })
+    log({ event: 'started', task: task.name, trigger: 'dispatch' }, logPath)
     dispatched.push(task.name)
   }
 

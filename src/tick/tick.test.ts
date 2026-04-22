@@ -487,7 +487,7 @@ Local only task.
       probes: { network: async () => false },
     })
 
-    const entries = readLog(before)
+    const entries = readLog(before, path.join(configDir, 'log.jsonl'))
     const skips = entries.filter(
       (e) => e.event === 'skipped' && e.reason === 'requirement-unmet',
     )
@@ -600,7 +600,7 @@ Cloud AI task.
     if (result instanceof Error) return
     expect(result.skipped).toEqual(['cloud-ai'])
 
-    const skips = readLog(before).filter(
+    const skips = readLog(before, path.join(configDir, 'log.jsonl')).filter(
       (e) => e.event === 'skipped' && e.reason === 'requirement-unmet',
     )
     expect(skips).toHaveLength(1)
@@ -721,8 +721,8 @@ Cloud AI task.
     expect(result.skipped).toEqual(['every-min'])
     expect(spawned).toEqual([])
 
-    // Error should be logged
-    const entries = readLog(before)
+    // Error should be logged into the configDir's log, not the user's real log.
+    const entries = readLog(before, path.join(configDir, 'log.jsonl'))
     const errors = entries.filter(
       (e) => e.event === 'error' && e.task === 'every-min',
     )
@@ -748,7 +748,7 @@ Cloud AI task.
 
     expect(result.purged).toBe(0)
 
-    const entries = readLog(before)
+    const entries = readLog(before, path.join(configDir, 'log.jsonl'))
     const errors = entries.filter(
       (e) => e.event === 'error' && e.task === '(purge)',
     )
@@ -776,7 +776,7 @@ Cloud AI task.
     // Heartbeat should be empty string indicating failure
     expect(result.heartbeat).toBe('')
 
-    const entries = readLog(before)
+    const entries = readLog(before, path.join(configDir, 'log.jsonl'))
     const errors = entries.filter(
       (e) => e.event === 'error' && e.task === '(heartbeat)',
     )
@@ -816,7 +816,7 @@ Bad timezone task.
     expect(spawned).toEqual([])
 
     // Error should be logged
-    const entries = readLog(before)
+    const entries = readLog(before, path.join(configDir, 'log.jsonl'))
     const errors = entries.filter(
       (e) => e.event === 'error' && e.task === 'bad-tz',
     )
