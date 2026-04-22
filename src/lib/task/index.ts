@@ -1,7 +1,8 @@
-export type { TaskDefinition } from './frontmatter'
+export type { Requirement, TaskDefinition } from './frontmatter'
 export {
   FrontmatterParseError,
   FrontmatterValidationError,
+  REQUIREMENT_TOKENS,
 } from './frontmatter'
 export {
   parseTaskFile,

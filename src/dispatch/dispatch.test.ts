@@ -60,7 +60,7 @@ const ALWAYS_EVENT = `---
 on:
   event: deploy
 agent: opencode
-enabled: 'always'
+requires: []
 ---
 
 Always-on deploy task.
@@ -86,7 +86,7 @@ describe('dispatch', () => {
       configDir,
       spawnRun: (name, timestamp, args) =>
         spawned.push({ name, timestamp, args }),
-      isOnline: async () => true,
+      probes: { network: async () => true },
     })
 
     expect(result).not.toBeInstanceOf(Error)
@@ -107,7 +107,7 @@ describe('dispatch', () => {
     const result = await dispatch('deploy', {
       configDir,
       spawnRun: (name) => spawned.push({ name }),
-      isOnline: async () => true,
+      probes: { network: async () => true },
     })
 
     expect(result).not.toBeInstanceOf(Error)
@@ -125,7 +125,7 @@ describe('dispatch', () => {
     const result = await dispatch('deploy', {
       configDir,
       spawnRun: (name) => spawned.push({ name }),
-      isOnline: async () => true,
+      probes: { network: async () => true },
     })
 
     expect(result).not.toBeInstanceOf(Error)
@@ -144,7 +144,7 @@ describe('dispatch', () => {
     const result = await dispatch('deploy', {
       configDir,
       spawnRun: (name) => spawned.push({ name }),
-      isOnline: async () => true,
+      probes: { network: async () => true },
     })
 
     expect(result).not.toBeInstanceOf(Error)
@@ -162,7 +162,7 @@ describe('dispatch', () => {
     const result = await dispatch('deploy', {
       configDir,
       spawnRun: (name) => spawned.push({ name }),
-      isOnline: async () => true,
+      probes: { network: async () => true },
     })
 
     expect(result).not.toBeInstanceOf(Error)
@@ -175,15 +175,15 @@ describe('dispatch', () => {
     expect(spawned).toEqual([])
   })
 
-  test('skips when-online tasks when offline', async () => {
+  test('skips network-requiring tasks when offline', async () => {
     const configDir = await makeConfigDir()
-    await writeTask(configDir, 'cloud-deploy', EVENT_TASK) // defaults to 'when-online'
+    await writeTask(configDir, 'cloud-deploy', EVENT_TASK) // defaults to requires: ['network']
 
     const spawned: Array<{ name: string }> = []
     const result = await dispatch('deploy', {
       configDir,
       spawnRun: (name) => spawned.push({ name }),
-      isOnline: async () => false,
+      probes: { network: async () => false },
     })
 
     expect(result).not.toBeInstanceOf(Error)
@@ -191,12 +191,16 @@ describe('dispatch', () => {
 
     expect(result.dispatched).toEqual([])
     expect(result.skipped).toEqual([
-      { name: 'cloud-deploy', reason: 'offline' },
+      {
+        name: 'cloud-deploy',
+        reason: 'requirement-unmet',
+        requirement: ['network'],
+      },
     ])
     expect(spawned).toEqual([])
   })
 
-  test("dispatches 'always' tasks even when offline", async () => {
+  test('dispatches tasks with no network requirement even when offline', async () => {
     const configDir = await makeConfigDir()
     await writeTask(configDir, 'always-deploy', ALWAYS_EVENT)
 
@@ -204,7 +208,7 @@ describe('dispatch', () => {
     const result = await dispatch('deploy', {
       configDir,
       spawnRun: (name) => spawned.push({ name }),
-      isOnline: async () => false,
+      probes: { network: async () => false },
     })
 
     expect(result).not.toBeInstanceOf(Error)
@@ -215,7 +219,7 @@ describe('dispatch', () => {
     expect(spawned).toHaveLength(1)
   })
 
-  test('skips DNS probe when all matching tasks are always-enabled', async () => {
+  test('skips network probe when no matching task requires network', async () => {
     const configDir = await makeConfigDir()
     await writeTask(configDir, 'always-deploy', ALWAYS_EVENT)
 
@@ -223,9 +227,11 @@ describe('dispatch', () => {
     const result = await dispatch('deploy', {
       configDir,
       spawnRun: () => {},
-      isOnline: async () => {
-        probeCalled = true
-        return false
+      probes: {
+        network: async () => {
+          probeCalled = true
+          return false
+        },
       },
     })
 
@@ -242,7 +248,7 @@ describe('dispatch', () => {
     const result = await dispatch('nonexistent', {
       configDir,
       spawnRun: () => {},
-      isOnline: async () => true,
+      probes: { network: async () => true },
     })
 
     expect(result).not.toBeInstanceOf(Error)
@@ -261,7 +267,7 @@ describe('dispatch', () => {
     await dispatch('deploy', {
       configDir,
       spawnRun: (name, _ts, args) => spawned.push({ name, args }),
-      isOnline: async () => true,
+      probes: { network: async () => true },
     })
 
     expect(spawned).toHaveLength(1)
@@ -280,7 +286,7 @@ describe('dispatch', () => {
       configDir,
       payload: 'deployment context',
       spawnRun: (name, _ts, args) => spawned.push({ name, args }),
-      isOnline: async () => true,
+      probes: { network: async () => true },
     })
 
     expect(spawned).toHaveLength(1)
@@ -304,7 +310,7 @@ describe('dispatch', () => {
       configDir,
       payload: 'shared context',
       spawnRun: (name, _ts, args) => spawned.push({ name, args }),
-      isOnline: async () => true,
+      probes: { network: async () => true },
     })
 
     expect(spawned).toHaveLength(2)
@@ -333,7 +339,7 @@ describe('dispatch', () => {
     await dispatch('deploy', {
       configDir,
       spawnRun: (_name, _ts, args) => spawned.push({ args }),
-      isOnline: async () => true,
+      probes: { network: async () => true },
     })
 
     expect(spawned).toHaveLength(1)
@@ -349,7 +355,7 @@ describe('dispatch', () => {
     const result = await dispatch('deploy', {
       configDir,
       spawnRun: (name) => spawned.push({ name }),
-      isOnline: async () => true,
+      probes: { network: async () => true },
     })
 
     expect(result).not.toBeInstanceOf(Error)
@@ -362,22 +368,28 @@ describe('dispatch', () => {
     expect(spawned).toHaveLength(1)
   })
 
-  test('mixed online/offline: dispatches always, skips when-online', async () => {
+  test('mixed offline: dispatches no-requirement tasks, skips network-required', async () => {
     const configDir = await makeConfigDir()
     await writeTask(configDir, 'always-task', ALWAYS_EVENT)
-    await writeTask(configDir, 'online-task', EVENT_TASK) // defaults to when-online
+    await writeTask(configDir, 'online-task', EVENT_TASK)
 
     const spawned: Array<{ name: string }> = []
     const result = await dispatch('deploy', {
       configDir,
       spawnRun: (name) => spawned.push({ name }),
-      isOnline: async () => false,
+      probes: { network: async () => false },
     })
 
     expect(result).not.toBeInstanceOf(Error)
     if (result instanceof Error) return
 
     expect(result.dispatched).toEqual(['always-task'])
-    expect(result.skipped).toEqual([{ name: 'online-task', reason: 'offline' }])
+    expect(result.skipped).toEqual([
+      {
+        name: 'online-task',
+        reason: 'requirement-unmet',
+        requirement: ['network'],
+      },
+    ])
   })
 })

@@ -15,7 +15,8 @@ function healthyDeps(): DoctorDeps {
       {
         name: 'backup',
         on: { schedule: '0 * * * *' },
-        enabled: 'when-online',
+        enabled: true,
+        requires: ['network'],
         timeout: 1_800_000,
       },
     ],
@@ -214,13 +215,15 @@ describe('doctor', () => {
       {
         name: 'backup',
         on: { schedule: '0 * * * *' },
-        enabled: 'when-online',
+        enabled: true,
+        requires: ['network'],
         timeout: 3_600_000,
       },
       {
         name: 'sync',
         on: { schedule: '*/5 * * * *' },
-        enabled: 'when-online',
+        enabled: true,
+        requires: ['network'],
         timeout: 300_000,
       },
     ]
@@ -247,6 +250,7 @@ describe('doctor', () => {
         name: 'backup',
         on: { schedule: '0 * * * *' },
         enabled: false,
+        requires: ['network'],
         timeout: 1_800_000,
       },
     ]
@@ -273,7 +277,8 @@ describe('doctor', () => {
       {
         name: 'backup',
         on: { schedule: '0 * * * *' },
-        enabled: 'when-online',
+        enabled: true,
+        requires: ['network'],
         timeout: 30_000,
       },
     ]
@@ -291,7 +296,8 @@ describe('doctor', () => {
       {
         name: 'backup',
         on: { schedule: '*/5 * * * *' },
-        enabled: 'when-online',
+        enabled: true,
+        requires: ['network'],
         timeout: 600_000,
       },
     ]
@@ -308,7 +314,8 @@ describe('doctor', () => {
       {
         name: 'backup',
         on: { schedule: '0 * * * *' },
-        enabled: 'when-online',
+        enabled: true,
+        requires: ['network'],
         timeout: 30_000,
       },
     ]
@@ -322,7 +329,8 @@ describe('doctor', () => {
       {
         name: 'on-deploy',
         on: { event: 'deploy' },
-        enabled: 'when-online',
+        enabled: true,
+        requires: ['network'],
         timeout: 3_600_000,
       },
     ]
@@ -337,7 +345,8 @@ describe('doctor', () => {
       {
         name: 'on-deploy',
         on: { event: 'deploy' },
-        enabled: 'when-online',
+        enabled: true,
+        requires: ['network'],
         timeout: 3_600_000,
       },
     ]
@@ -351,7 +360,8 @@ describe('doctor', () => {
       {
         name: 'on-deploy',
         on: { event: 'deploy' },
-        enabled: 'when-online',
+        enabled: true,
+        requires: ['network'],
         timeout: 3_600_000,
       },
     ]
@@ -380,13 +390,15 @@ describe('doctor', () => {
         ts: '2026-04-06T10:00:00.000Z',
         event: 'skipped',
         task: 'backup',
-        reason: 'offline',
+        reason: 'requirement-unmet',
+        requirement: ['network'],
       },
       {
         ts: '2026-04-06T11:00:00.000Z',
         event: 'skipped',
         task: 'backup',
-        reason: 'offline',
+        reason: 'requirement-unmet',
+        requirement: ['network'],
       },
     ]
     const deps = healthyDeps()
@@ -398,6 +410,6 @@ describe('doctor', () => {
     expect(result.report).toContain('offline')
     expect(result.report).toContain('backup')
     expect(result.report).toContain('2')
-    expect(result.report).toContain("enabled: 'always'")
+    expect(result.report).toContain('requires: []')
   })
 })

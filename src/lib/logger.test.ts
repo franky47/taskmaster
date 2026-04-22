@@ -86,17 +86,26 @@ describe('log', () => {
     })
   })
 
-  test('writes skipped event with offline reason', () => {
+  test('writes skipped event with requirement-unmet reason', () => {
     const logFile = makeTempLogFile()
 
-    log({ event: 'skipped', task: 'my-task', reason: 'offline' }, logFile)
+    log(
+      {
+        event: 'skipped',
+        task: 'my-task',
+        reason: 'requirement-unmet',
+        requirement: ['network'],
+      },
+      logFile,
+    )
 
     const entries = readLog(new Date(0), logFile)
     expect(entries).toHaveLength(1)
     expect(entries[0]).toMatchObject({
       event: 'skipped',
       task: 'my-task',
-      reason: 'offline',
+      reason: 'requirement-unmet',
+      requirement: ['network'],
     })
   })
 

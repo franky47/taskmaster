@@ -59,7 +59,8 @@ The filename (minus `.md`) is the task ID and must match `[a-z0-9-]+`.
 | `timezone` | no | system local | IANA timezone for cron evaluation |
 | `env` | no | `{}` | Environment variables (string key-value pairs) |
 | `timeout` | no | scheduled: `min(interval, 1h)`; event: `1h` | Max runtime as duration string (`30s`, `5m`). For scheduled tasks it must be shorter than the schedule interval |
-| `enabled` | no | `'when-online'` | `false` = never auto-scheduled. `'when-online'` = skip when offline. `'always'` = run regardless |
+| `enabled` | no | `true` | Lifecycle switch. `false` = never auto-scheduled. `true` = eligible to run (subject to `requires`) |
+| `requires` | no | `['network']` | Runtime requirements that must be satisfied for the task to run. Empty array `[]` means no requirements |
 
 **Constraints:**
 
@@ -110,7 +111,7 @@ agent: claude
 args: '--model sonnet'
 cwd: '~/projects/api'
 timeout: '5m'
-enabled: 'always'
+requires: []
 env:
   GITHUB_TOKEN_SCOPE: 'read'
 ---
@@ -142,7 +143,7 @@ Use `tm dispatch <event>` to trigger tasks subscribed to an event:
 on:
   event: deploy
 agent: claude
-enabled: 'always'
+requires: []
 ---
 
 Summarize the deployment payload and post release notes.
@@ -153,7 +154,7 @@ Summarize the deployment payload and post release notes.
 All commands except `doctor` support `--json` for structured output.
 
 ```
-tm run <name>                    Execute a task immediately (ignores enabled flag)
+tm run <name>                    Execute a task immediately (bypasses enabled and requires)
 tm list                          One line per task: name, trigger, executor, enabled status
 tm status                        Rich view with last run, next scheduled time
 tm history <name>                Show run history (--failures, --last <n>)
@@ -226,11 +227,26 @@ Variables resolve in order (last wins):
   heartbeat           Timestamp of last tick
 ```
 
-## Connectivity
+## Runtime Requirements
 
-Tasks default to `enabled: 'when-online'`. During each tick, if any due task requires connectivity, taskmaster probes DNS (Cloudflare and Google, 2s timeout). If offline, only `enabled: 'always'` tasks run; `'when-online'` tasks are skipped and logged.
+Tasks declare what the environment must provide via `requires`. Each token has a matching probe; the scheduler probes each referenced requirement at most once per tick, in parallel, and only when at least one ready task references it.
 
-Event-driven tasks dispatched with `tm dispatch` use the same enabled semantics: `'when-online'` tasks are skipped while offline, and `'always'` tasks still run.
+**Valid tokens:**
+
+| Token | Meaning | Probe |
+|---|---|---|
+| `network` | Internet reachable | DNS lookup against Cloudflare (`1.1.1.1`) and Google (`8.8.8.8`), 2s timeout |
+
+Defaults and semantics:
+
+- Omitting `requires` defaults to `['network']` — preserves today's behavior.
+- Explicit `requires: []` means "no runtime requirements — always runs" (still subject to `enabled`).
+- Unknown tokens fail validation at parse time.
+- Entries are deduplicated automatically.
+- Tasks with unmet requirements are skipped for the tick and logged as `{ event: 'skipped', reason: 'requirement-unmet', requirement: [...] }`.
+- `tm run <name>` bypasses both `enabled` and `requires`.
+
+Event-driven tasks dispatched with `tm dispatch` honor `requires` identically to scheduled tasks.
 
 ## Development
 

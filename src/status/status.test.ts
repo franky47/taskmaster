@@ -139,7 +139,8 @@ describe('getTaskStatuses', () => {
     expect(first).toEqual({
       name: 'my-task',
       on: { schedule: '0 8 * * 1-5' },
-      enabled: 'when-online',
+      enabled: true,
+      requires: ['network'],
       timeout: '1h',
       agent: 'opencode',
       // Next weekday after Sunday 2026-04-05 is Monday 2026-04-06 at 08:00 UTC
@@ -246,7 +247,7 @@ describe('getTaskStatuses', () => {
     expect(first.last_run?.timestamp).toBe('2026-04-04T08:00:00.000Z')
   })
 
-  test("'always' task computes next_run", async () => {
+  test('always-run task (requires: []) computes next_run', async () => {
     const configDir = await makeConfigDir()
     await writeTask(
       configDir,
@@ -255,7 +256,7 @@ describe('getTaskStatuses', () => {
 on:
   schedule: '0 8 * * 1-5'
 agent: opencode
-enabled: 'always'
+requires: []
 ---
 
 Local model task.
@@ -269,7 +270,8 @@ Local model task.
     const first = result[0]
     expect(first).toBeDefined()
     if (!first) return
-    expect(first.enabled).toBe('always')
+    expect(first.enabled).toBe(true)
+    expect(first.requires).toEqual([])
     expect(first.next_run).toBe('2026-04-06T08:00:00.000Z')
   })
 
@@ -330,7 +332,7 @@ Local model task.
     if (!first) return
     expect(first.name).toBe('run-task')
     expect(first.on).toEqual({ schedule: '0 12 * * *' })
-    expect(first.enabled).toBe('when-online')
+    expect(first.enabled).toBe(true)
     expect(first.run).toBe('my-cmd $TM_PROMPT_FILE')
     expect(first.next_run).toBe('2026-04-06T12:00:00.000Z')
   })

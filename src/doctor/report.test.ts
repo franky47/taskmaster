@@ -415,7 +415,7 @@ describe('renderReport', () => {
     const report = renderReport(findings, checkedAt, 'darwin')
     expect(report).toContain('## Offline skips: sync [warning]')
     expect(report).toContain('5 skipped executions')
-    expect(report).toContain("enabled: 'always'")
+    expect(report).toContain('requires: []')
   })
 
   test('renders offline-skips with singular form for 1 skip', () => {

@@ -50,11 +50,11 @@ describe('parseTaskFile', () => {
       expect(result.prompt).toBe('')
     })
 
-    test("defaults enabled to 'when-online' when omitted", async () => {
+    test('defaults enabled to true when omitted', async () => {
       const result = await parseTaskFile(fixture('valid-basic.md'))
       expect(result).not.toBeInstanceOf(Error)
       if (result instanceof Error) return
-      expect(result.enabled).toBe('when-online')
+      expect(result.enabled).toBe(true)
     })
 
     test('defaults args to empty string when omitted', async () => {

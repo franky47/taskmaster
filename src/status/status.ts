@@ -6,6 +6,7 @@ import ms from 'ms'
 import { configDir as defaultConfigDir } from '#lib/config'
 import { readRunningMarker } from '#lib/lock'
 import type { ReadMarkerDeps } from '#lib/lock'
+import type { Requirement } from '#lib/task'
 import { queryHistory } from '#src/history'
 import { listTasks } from '#src/list'
 import type { TasksDirReadError } from '#src/validate'
@@ -29,7 +30,8 @@ type Running = {
 type TaskStatus = {
   name: string
   on: { schedule: string } | { event: string }
-  enabled: false | 'when-online' | 'always'
+  enabled: boolean
+  requires: Requirement[]
   timezone?: string
   timeout: string
   agent?: string
@@ -69,6 +71,7 @@ export async function getTaskStatuses(
       name: task.name,
       on: task.on,
       enabled: task.enabled,
+      requires: task.requires,
       timeout: ms(task.timeout),
     }
 
@@ -115,7 +118,7 @@ export async function getTaskStatuses(
     }
 
     // Next run (only for enabled scheduled tasks)
-    if (task.enabled !== false && 'schedule' in task.on) {
+    if (task.enabled && 'schedule' in task.on) {
       const cronOpts: { currentDate: Date; tz?: string } = { currentDate: now }
       if (task.timezone) {
         cronOpts.tz = task.timezone

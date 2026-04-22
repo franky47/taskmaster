@@ -49,6 +49,9 @@ const durationString = z.templateLiteral([z.number(), timeUnit], {
   error: 'invalid duration string',
 })
 
+export const REQUIREMENT_TOKENS = ['network'] as const
+export type Requirement = (typeof REQUIREMENT_TOKENS)[number]
+
 export type Frontmatter = z.output<typeof frontmatterSchema>
 
 export type TaskDefinition = Frontmatter & {
@@ -243,11 +246,21 @@ const rawFrontmatter = z.object({
     .default({}),
 
   enabled: z
-    .union([z.literal(false), z.literal('when-online'), z.literal('always')], {
-      error: "enabled must be false, 'when-online', or 'always'",
-    })
+    .boolean({ error: 'enabled must be a boolean' })
     .optional()
-    .default('when-online'),
+    .default(true),
+
+  requires: z
+    .array(
+      z.enum(REQUIREMENT_TOKENS, {
+        error: (issue) =>
+          `"${String(issue.input)}" is not a valid requirement token (valid: ${REQUIREMENT_TOKENS.join(', ')})`,
+      }),
+      { error: 'requires must be an array' },
+    )
+    .transform((arr) => Array.from(new Set(arr)))
+    .optional()
+    .default(['network']),
 
   timeout: z
     .string({ error: 'timeout must be a string' })

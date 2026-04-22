@@ -205,16 +205,15 @@ async function main(): Promise<void> {
         console.log(JSON.stringify(listResult.tasks))
       } else {
         for (const task of listResult.tasks) {
-          const tag =
-            task.enabled === false
-              ? 'disabled'
-              : task.enabled === 'always'
-                ? 'always'
-                : 'enabled'
+          const tag = task.enabled ? 'enabled' : 'disabled'
+          const reqs =
+            task.requires.length > 0
+              ? ` requires:${task.requires.join(',')}`
+              : ''
           const executor = task.agent ?? 'custom'
           const trigger =
             'schedule' in task.on ? task.on.schedule : `event:${task.on.event}`
-          console.log(`${task.name} ${trigger} ${executor} ${tag}`)
+          console.log(`${task.name} ${trigger} ${executor} ${tag}${reqs}`)
         }
       }
     })
@@ -396,6 +395,9 @@ async function main(): Promise<void> {
             'schedule' in task.on ? task.on.schedule : `event:${task.on.event}`
           console.log(`  trigger   ${trigger}`)
           console.log(`  enabled   ${task.enabled}`)
+          if (task.requires.length > 0) {
+            console.log(`  requires  ${task.requires.join(', ')}`)
+          }
           console.log(`  executor  ${task.agent ?? 'custom'}`)
           if (task.timeout) {
             console.log(`  timeout   ${task.timeout}`)

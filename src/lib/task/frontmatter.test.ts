@@ -549,33 +549,22 @@ describe('parseMarkdown', () => {
   })
 
   describe('enabled', () => {
-    test("defaults to 'when-online' when missing", () => {
+    test('defaults to true when missing', () => {
       const result = parseMarkdown(
         md(`on:\n  schedule: '0 8 * * *'\n${VALID_AGENT}`),
       )
       expect(result).not.toBeInstanceOf(Error)
       if (result instanceof Error) return
-      expect(result.enabled).toBe('when-online')
+      expect(result.enabled).toBe(true)
     })
 
-    test("accepts 'when-online'", () => {
+    test('accepts true', () => {
       const result = parseMarkdown(
-        md(
-          `on:\n  schedule: '0 8 * * *'\n${VALID_AGENT}\nenabled: 'when-online'`,
-        ),
+        md(`on:\n  schedule: '0 8 * * *'\n${VALID_AGENT}\nenabled: true`),
       )
       expect(result).not.toBeInstanceOf(Error)
       if (result instanceof Error) return
-      expect(result.enabled).toBe('when-online')
-    })
-
-    test("accepts 'always'", () => {
-      const result = parseMarkdown(
-        md(`on:\n  schedule: '0 8 * * *'\n${VALID_AGENT}\nenabled: 'always'`),
-      )
-      expect(result).not.toBeInstanceOf(Error)
-      if (result instanceof Error) return
-      expect(result.enabled).toBe('always')
+      expect(result.enabled).toBe(true)
     })
 
     test('accepts false', () => {
@@ -587,22 +576,100 @@ describe('parseMarkdown', () => {
       expect(result.enabled).toBe(false)
     })
 
-    test('rejects true', () => {
-      const result = parseMarkdown(
-        md(`on:\n  schedule: '0 8 * * *'\n${VALID_AGENT}\nenabled: true`),
-      )
-      expect(result).toBeInstanceOf(FrontmatterValidationError)
-      if (!(result instanceof FrontmatterValidationError)) return
-      expect(result.errors.some((e) => e.key === 'enabled')).toBe(true)
-    })
-
-    test('rejects invalid string', () => {
+    test('rejects non-boolean string', () => {
       const result = parseMarkdown(
         md(`on:\n  schedule: '0 8 * * *'\n${VALID_AGENT}\nenabled: 'yes'`),
       )
       expect(result).toBeInstanceOf(FrontmatterValidationError)
       if (!(result instanceof FrontmatterValidationError)) return
       expect(result.errors.some((e) => e.key === 'enabled')).toBe(true)
+    })
+
+    test('rejects numeric', () => {
+      const result = parseMarkdown(
+        md(`on:\n  schedule: '0 8 * * *'\n${VALID_AGENT}\nenabled: 1`),
+      )
+      expect(result).toBeInstanceOf(FrontmatterValidationError)
+      if (!(result instanceof FrontmatterValidationError)) return
+      expect(result.errors.some((e) => e.key === 'enabled')).toBe(true)
+    })
+  })
+
+  describe('requires', () => {
+    test("defaults to ['network'] when missing", () => {
+      const result = parseMarkdown(
+        md(`on:\n  schedule: '0 8 * * *'\n${VALID_AGENT}`),
+      )
+      expect(result).not.toBeInstanceOf(Error)
+      if (result instanceof Error) return
+      expect(result.requires).toEqual(['network'])
+    })
+
+    test("accepts explicit ['network']", () => {
+      const result = parseMarkdown(
+        md(
+          `on:\n  schedule: '0 8 * * *'\n${VALID_AGENT}\nrequires: ['network']`,
+        ),
+      )
+      expect(result).not.toBeInstanceOf(Error)
+      if (result instanceof Error) return
+      expect(result.requires).toEqual(['network'])
+    })
+
+    test('accepts empty array (always-run)', () => {
+      const result = parseMarkdown(
+        md(`on:\n  schedule: '0 8 * * *'\n${VALID_AGENT}\nrequires: []`),
+      )
+      expect(result).not.toBeInstanceOf(Error)
+      if (result instanceof Error) return
+      expect(result.requires).toEqual([])
+    })
+
+    test('rejects unknown token', () => {
+      const result = parseMarkdown(
+        md(
+          `on:\n  schedule: '0 8 * * *'\n${VALID_AGENT}\nrequires: ['weather']`,
+        ),
+      )
+      expect(result).toBeInstanceOf(FrontmatterValidationError)
+      if (!(result instanceof FrontmatterValidationError)) return
+      expect(
+        result.errors.some(
+          (e) => e.key === 'requires' && e.message.includes('weather'),
+        ),
+      ).toBe(true)
+    })
+
+    test('deduplicates entries', () => {
+      const result = parseMarkdown(
+        md(
+          `on:\n  schedule: '0 8 * * *'\n${VALID_AGENT}\nrequires: ['network', 'network']`,
+        ),
+      )
+      expect(result).not.toBeInstanceOf(Error)
+      if (result instanceof Error) return
+      expect(result.requires).toEqual(['network'])
+    })
+
+    test('rejects non-array', () => {
+      const result = parseMarkdown(
+        md(`on:\n  schedule: '0 8 * * *'\n${VALID_AGENT}\nrequires: 'network'`),
+      )
+      expect(result).toBeInstanceOf(FrontmatterValidationError)
+      if (!(result instanceof FrontmatterValidationError)) return
+      expect(result.errors.some((e) => e.key === 'requires')).toBe(true)
+    })
+
+    test('accepts enabled: false alongside requires', () => {
+      const result = parseMarkdown(
+        md(
+          `on:\n  schedule: '0 8 * * *'\n${VALID_AGENT}\nenabled: false\nrequires: ['network']`,
+        ),
+      )
+      expect(result).not.toBeInstanceOf(Error)
+      if (result instanceof Error) return
+      expect(result.enabled).toBe(false)
+      expect(result.requires).toEqual(['network'])
     })
   })
 
@@ -743,7 +810,7 @@ describe('parseMarkdown', () => {
     test('reports errors for multiple fields at once', () => {
       const result = parseMarkdown(
         md(
-          `on:\n  schedule: 'bad'\nagent: opencode\ntimezone: 'Fake/Zone'\nargs: 42\nenabled: 'nope'`,
+          `on:\n  schedule: 'bad'\nagent: opencode\ntimezone: 'Fake/Zone'\nargs: 42\nenabled: 'nope'\nrequires: ['bogus']`,
         ),
       )
       expect(result).toBeInstanceOf(FrontmatterValidationError)

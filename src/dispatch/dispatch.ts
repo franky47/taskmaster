@@ -4,7 +4,9 @@ import path from 'node:path'
 
 import { configDir as defaultConfigDir } from '#lib/config'
 import { log } from '#lib/logger'
-import { isOnline as defaultIsOnline } from '#lib/network'
+import type { Probes } from '#lib/requirements'
+import { defaultProbes, filterByRequirements } from '#lib/requirements'
+import type { Requirement } from '#lib/task'
 import { manualTimestamp } from '#src/history'
 import type { TaskListEntry } from '#src/list'
 import { listTasks } from '#src/list'
@@ -12,7 +14,9 @@ import type { TasksDirReadError } from '#src/validate'
 
 // Types --
 
-type SkippedTask = { name: string; reason: 'disabled' | 'offline' }
+type SkippedTask =
+  | { name: string; reason: 'disabled' }
+  | { name: string; reason: 'requirement-unmet'; requirement: Requirement[] }
 
 type DispatchResult = {
   event: string
@@ -24,7 +28,7 @@ type DispatchOptions = {
   payload?: string
   configDir?: string
   spawnRun?: (name: string, timestamp: string, extraArgs: string[]) => void
-  isOnline?: () => Promise<boolean>
+  probes?: Probes
 }
 
 // Helpers --
@@ -74,7 +78,7 @@ export async function dispatch(
 ): Promise<TasksDirReadError | DispatchResult> {
   const cfgDir = options?.configDir ?? defaultConfigDir
   const spawnRun = options?.spawnRun ?? defaultSpawnRun
-  const checkOnline = options?.isOnline ?? defaultIsOnline
+  const probes = { ...defaultProbes, ...options?.probes }
 
   const tasksDir = path.join(cfgDir, 'tasks')
   const timestamp = manualTimestamp()
@@ -104,22 +108,22 @@ export async function dispatch(
     }
   }
 
-  // Stage 3: Connectivity filter
-  let toDispatch = enabled
-  if (enabled.some((t) => t.enabled === 'when-online')) {
-    const online = await checkOnline()
-    if (!online) {
-      toDispatch = []
-      for (const task of enabled) {
-        if (task.enabled === 'when-online') {
-          log({ event: 'skipped', task: task.name, reason: 'offline' })
-          skipped.push({ name: task.name, reason: 'offline' })
-        } else {
-          toDispatch.push(task)
-        }
-      }
-    }
+  // Stage 3: Requirements filter
+  const filtered = await filterByRequirements(enabled, probes)
+  for (const { task, unmet } of filtered.skipped) {
+    log({
+      event: 'skipped',
+      task: task.name,
+      reason: 'requirement-unmet',
+      requirement: unmet,
+    })
+    skipped.push({
+      name: task.name,
+      reason: 'requirement-unmet',
+      requirement: unmet,
+    })
   }
+  const toDispatch = filtered.ready
 
   // Stage 4: Dispatch (write per-task payload file if present)
   const dispatched: string[] = []

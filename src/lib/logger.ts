@@ -3,6 +3,9 @@ import path from 'node:path'
 
 import { z } from 'zod'
 
+import { REQUIREMENT_TOKENS } from '#lib/task'
+import type { Requirement } from '#lib/task'
+
 import { logFilePath } from './config'
 
 // Schema --
@@ -14,11 +17,19 @@ const startedEntrySchema = z.object({
   trigger: z.enum(['manual', 'tick', 'dispatch']),
 })
 
-const skippedEntrySchema = z.object({
+const skippedPlainEntrySchema = z.object({
   ts: z.iso.datetime(),
   event: z.literal('skipped'),
   task: z.string(),
-  reason: z.enum(['contention', 'offline', 'disabled']),
+  reason: z.enum(['contention', 'disabled']),
+})
+
+const skippedRequirementEntrySchema = z.object({
+  ts: z.iso.datetime(),
+  event: z.literal('skipped'),
+  task: z.string(),
+  reason: z.literal('requirement-unmet'),
+  requirement: z.array(z.enum(REQUIREMENT_TOKENS)),
 })
 
 const errorEntrySchema = z.object({
@@ -28,9 +39,10 @@ const errorEntrySchema = z.object({
   error: z.record(z.string(), z.unknown()),
 })
 
-export const logEntrySchema = z.discriminatedUnion('event', [
+export const logEntrySchema = z.union([
   startedEntrySchema,
-  skippedEntrySchema,
+  skippedPlainEntrySchema,
+  skippedRequirementEntrySchema,
   errorEntrySchema,
 ])
 
@@ -43,7 +55,13 @@ type LogInput =
   | {
       event: 'skipped'
       task: string
-      reason: 'contention' | 'offline' | 'disabled'
+      reason: 'contention' | 'disabled'
+    }
+  | {
+      event: 'skipped'
+      task: string
+      reason: 'requirement-unmet'
+      requirement: Requirement[]
     }
   | { event: 'error'; task: string; error: Error }
 

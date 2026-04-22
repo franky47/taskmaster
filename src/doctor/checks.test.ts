@@ -676,7 +676,7 @@ describe('checkTaskValidation', () => {
 
 describe('checkTaskNeverRan', () => {
   test('returns warning for enabled task with zero history', () => {
-    const finding = checkTaskNeverRan('backup', 'when-online', 0)
+    const finding = checkTaskNeverRan('backup', true, 0)
 
     expect(finding).toMatchObject({
       kind: 'task-never-ran',
@@ -690,7 +690,7 @@ describe('checkTaskNeverRan', () => {
   })
 
   test('returns null for tasks with history', () => {
-    expect(checkTaskNeverRan('backup', 'when-online', 3)).toBeNull()
+    expect(checkTaskNeverRan('backup', true, 3)).toBeNull()
   })
 
   test('returns null for disabled tasks even with zero history', () => {
@@ -790,19 +790,22 @@ describe('checkOfflineSkips', () => {
         ts: '2026-04-07T10:00:00.000Z',
         event: 'skipped',
         task: 'sync',
-        reason: 'offline',
+        reason: 'requirement-unmet',
+        requirement: ['network'],
       },
       {
         ts: '2026-04-07T11:00:00.000Z',
         event: 'skipped',
         task: 'sync',
-        reason: 'offline',
+        reason: 'requirement-unmet',
+        requirement: ['network'],
       },
       {
         ts: '2026-04-07T12:00:00.000Z',
         event: 'skipped',
         task: 'sync',
-        reason: 'offline',
+        reason: 'requirement-unmet',
+        requirement: ['network'],
       },
     ]
 

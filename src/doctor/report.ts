@@ -149,7 +149,7 @@ function renderFinding(finding: Finding, platform: Platform): string {
         `${finding.skipCount} skipped execution${finding.skipCount === 1 ? '' : 's'} due to offline connectivity.`,
         '',
         'Hint:',
-        `  Set \`enabled: 'always'\` if this task can run without network.`,
+        `  Set \`requires: []\` if this task can run without network.`,
       ].join('\n')
 
     case 'log-error': {

@@ -5,7 +5,8 @@ import { CronExpressionParser } from 'cron-parser'
 
 import { configDir as defaultConfigDir } from '#lib/config'
 import { log } from '#lib/logger'
-import { isOnline as defaultIsOnline } from '#lib/network'
+import type { Probes } from '#lib/requirements'
+import { defaultProbes, filterByRequirements } from '#lib/requirements'
 import { formatTimestamp, purgeHistory, queryHistory } from '#src/history'
 import type { TaskListEntry } from '#src/list'
 import { listTasks } from '#src/list'
@@ -17,7 +18,7 @@ type TickOptions = {
   configDir?: string
   now?: Date
   spawnRun?: (name: string, timestamp: string) => void
-  isOnline?: () => Promise<boolean>
+  probes?: Probes
   queryHistory?: typeof queryHistory
   purgeHistory?: (
     deps?: Parameters<typeof purgeHistory>[0],
@@ -90,7 +91,7 @@ export async function tick(
   const cfgDir = options?.configDir ?? defaultConfigDir
   const now = options?.now ?? new Date()
   const spawnRun = options?.spawnRun ?? defaultSpawnRun
-  const checkOnline = options?.isOnline ?? defaultIsOnline
+  const probes = { ...defaultProbes, ...options?.probes }
   const queryHistoryFn = options?.queryHistory ?? queryHistory
   const dryRun = options?.dryRun ?? false
 
@@ -136,22 +137,18 @@ export async function tick(
     ready.push(task)
   }
 
-  // Stage 4: Connectivity filter
-  let toDispatch = ready
-  if (ready.some((t) => t.enabled === 'when-online')) {
-    const online = await checkOnline()
-    if (!online) {
-      toDispatch = []
-      for (const task of ready) {
-        if (task.enabled === 'when-online') {
-          log({ event: 'skipped', task: task.name, reason: 'offline' })
-          skipped.push(task.name)
-        } else {
-          toDispatch.push(task)
-        }
-      }
-    }
+  // Stage 4: Requirements filter
+  const filtered = await filterByRequirements(ready, probes)
+  for (const { task, unmet } of filtered.skipped) {
+    log({
+      event: 'skipped',
+      task: task.name,
+      reason: 'requirement-unmet',
+      requirement: unmet,
+    })
+    skipped.push(task.name)
   }
+  const toDispatch = filtered.ready
 
   // Stage 5: Dispatch (skip in dry-run)
   for (const task of toDispatch) {

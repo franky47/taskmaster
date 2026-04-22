@@ -278,10 +278,10 @@ export function checkTaskValidation(
 
 export function checkTaskNeverRan(
   taskName: string,
-  enabled: false | 'when-online' | 'always',
+  enabled: boolean,
   historyLength: number,
 ): TaskNeverRanFinding | null {
-  if (enabled === false || historyLength > 0) return null
+  if (!enabled || historyLength > 0) return null
   return { kind: 'task-never-ran', severity: 'warning', task: taskName }
 }
 
@@ -291,7 +291,11 @@ export function checkOfflineSkips(
 ): OfflineSkipsFinding | null {
   let count = 0
   for (const entry of entries) {
-    if (entry.event === 'skipped' && entry.reason === 'offline') {
+    if (
+      entry.event === 'skipped' &&
+      entry.reason === 'requirement-unmet' &&
+      entry.requirement.includes('network')
+    ) {
       count++
     }
   }
