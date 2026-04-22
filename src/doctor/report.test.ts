@@ -432,4 +432,23 @@ describe('renderReport', () => {
     expect(report).toContain('1 skipped execution due')
     expect(report).not.toContain('executions')
   })
+
+  // -- Consecutive requirement skip findings --
+
+  test('renders consecutive-requirement-skips finding with task and requirement', () => {
+    const findings: Finding[] = [
+      {
+        kind: 'consecutive-requirement-skips',
+        severity: 'warning',
+        task: 'llm-digest',
+        requirement: 'ac-power',
+        consecutiveSkips: 4,
+      },
+    ]
+
+    const report = renderReport(findings, checkedAt, 'darwin')
+    expect(report).toContain('## Chronically blocked: llm-digest [warning]')
+    expect(report).toContain('4 consecutive skips')
+    expect(report).toContain('ac-power')
+  })
 })

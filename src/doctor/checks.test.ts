@@ -5,6 +5,7 @@ import type { HistoryEntry } from '#src/history'
 import type { ValidationResult } from '#src/validate'
 
 import {
+  checkConsecutiveRequirementSkips,
   checkContention,
   checkHeartbeat,
   checkLogErrors,
@@ -834,5 +835,165 @@ describe('checkOfflineSkips', () => {
 
   test('returns null for empty entries', () => {
     expect(checkOfflineSkips('sync', [])).toBeNull()
+  })
+})
+
+// ------------------------------------------------------------------
+// checkConsecutiveRequirementSkips
+// ------------------------------------------------------------------
+
+describe('checkConsecutiveRequirementSkips', () => {
+  function skip(ts: string, requirement: ('network' | 'ac-power')[]): LogEntry {
+    return {
+      ts,
+      event: 'skipped',
+      task: 'llm-digest',
+      reason: 'requirement-unmet',
+      requirement,
+    }
+  }
+
+  test('returns warning when exactly 3 consecutive skips share the same requirement', () => {
+    const entries: LogEntry[] = [
+      skip('2026-04-07T10:00:00.000Z', ['ac-power']),
+      skip('2026-04-07T11:00:00.000Z', ['ac-power']),
+      skip('2026-04-07T12:00:00.000Z', ['ac-power']),
+    ]
+
+    const findings = checkConsecutiveRequirementSkips('llm-digest', entries)
+
+    expect(findings).toHaveLength(1)
+    expect(findings[0]).toMatchObject({
+      kind: 'consecutive-requirement-skips',
+      severity: 'warning',
+      task: 'llm-digest',
+      requirement: 'ac-power',
+      consecutiveSkips: 3,
+    })
+  })
+
+  test('returns warning when more than 3 consecutive skips share the same requirement', () => {
+    const entries: LogEntry[] = [
+      skip('2026-04-07T09:00:00.000Z', ['ac-power']),
+      skip('2026-04-07T10:00:00.000Z', ['ac-power']),
+      skip('2026-04-07T11:00:00.000Z', ['ac-power']),
+      skip('2026-04-07T12:00:00.000Z', ['ac-power']),
+      skip('2026-04-07T13:00:00.000Z', ['ac-power']),
+    ]
+
+    const findings = checkConsecutiveRequirementSkips('llm-digest', entries)
+
+    expect(findings).toHaveLength(1)
+    expect(findings[0]).toMatchObject({
+      requirement: 'ac-power',
+      consecutiveSkips: 5,
+    })
+  })
+
+  test('returns empty when fewer than 3 consecutive skips', () => {
+    const entries: LogEntry[] = [
+      skip('2026-04-07T11:00:00.000Z', ['ac-power']),
+      skip('2026-04-07T12:00:00.000Z', ['ac-power']),
+    ]
+
+    expect(
+      checkConsecutiveRequirementSkips('llm-digest', entries),
+    ).toHaveLength(0)
+  })
+
+  test('returns empty when no skip events at all', () => {
+    expect(checkConsecutiveRequirementSkips('llm-digest', [])).toHaveLength(0)
+  })
+
+  test('returns empty when only non-requirement events exist', () => {
+    const entries: LogEntry[] = [
+      {
+        ts: '2026-04-07T10:00:00.000Z',
+        event: 'started',
+        task: 'llm-digest',
+        trigger: 'tick',
+      },
+      {
+        ts: '2026-04-07T10:05:00.000Z',
+        event: 'skipped',
+        task: 'llm-digest',
+        reason: 'contention',
+      },
+    ]
+
+    expect(
+      checkConsecutiveRequirementSkips('llm-digest', entries),
+    ).toHaveLength(0)
+  })
+
+  test('streak resets when a different single-requirement skip breaks the run', () => {
+    const entries: LogEntry[] = [
+      skip('2026-04-07T09:00:00.000Z', ['ac-power']),
+      skip('2026-04-07T10:00:00.000Z', ['ac-power']),
+      skip('2026-04-07T11:00:00.000Z', ['network']),
+      skip('2026-04-07T12:00:00.000Z', ['ac-power']),
+      skip('2026-04-07T13:00:00.000Z', ['ac-power']),
+    ]
+
+    // Most recent run of ac-power is only 2, not enough.
+    expect(
+      checkConsecutiveRequirementSkips('llm-digest', entries),
+    ).toHaveLength(0)
+  })
+
+  test('emits one finding per requirement when multiple are chronically unmet', () => {
+    const entries: LogEntry[] = [
+      skip('2026-04-07T10:00:00.000Z', ['network', 'ac-power']),
+      skip('2026-04-07T11:00:00.000Z', ['network', 'ac-power']),
+      skip('2026-04-07T12:00:00.000Z', ['network', 'ac-power']),
+    ]
+
+    const findings = checkConsecutiveRequirementSkips('llm-digest', entries)
+
+    expect(findings).toHaveLength(2)
+    const byReq = new Map(findings.map((f) => [f.requirement, f]))
+    expect(byReq.get('network')).toMatchObject({
+      consecutiveSkips: 3,
+      severity: 'warning',
+    })
+    expect(byReq.get('ac-power')).toMatchObject({
+      consecutiveSkips: 3,
+      severity: 'warning',
+    })
+  })
+
+  test('continues streak for requirement present in every recent skip, even when other requirements are mixed in', () => {
+    const entries: LogEntry[] = [
+      skip('2026-04-07T10:00:00.000Z', ['network']),
+      skip('2026-04-07T11:00:00.000Z', ['network', 'ac-power']),
+      skip('2026-04-07T12:00:00.000Z', ['network']),
+    ]
+
+    const findings = checkConsecutiveRequirementSkips('llm-digest', entries)
+
+    // network streak continues across entries; ac-power only appears once so no finding.
+    expect(findings).toHaveLength(1)
+    expect(findings[0]).toMatchObject({
+      requirement: 'network',
+      consecutiveSkips: 3,
+    })
+  })
+
+  test('only counts the most recent tail — earlier broken streaks are ignored', () => {
+    const entries: LogEntry[] = [
+      // Older run of 3: would qualify on its own but a different requirement
+      // broke the streak after it.
+      skip('2026-04-07T07:00:00.000Z', ['ac-power']),
+      skip('2026-04-07T08:00:00.000Z', ['ac-power']),
+      skip('2026-04-07T09:00:00.000Z', ['ac-power']),
+      skip('2026-04-07T10:00:00.000Z', ['network']),
+      // Most recent tail is a single network skip.
+      skip('2026-04-07T11:00:00.000Z', ['network']),
+    ]
+
+    // Only 2 consecutive network skips at the tail, 0 consecutive ac-power.
+    expect(
+      checkConsecutiveRequirementSkips('llm-digest', entries),
+    ).toHaveLength(0)
   })
 })

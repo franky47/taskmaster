@@ -13,6 +13,7 @@ import { validateTasks } from '#src/validate'
 import type { ValidationResult } from '#src/validate'
 
 import {
+  checkConsecutiveRequirementSkips,
   checkContention,
   checkHeartbeat,
   checkLogErrors,
@@ -185,6 +186,10 @@ export async function doctor(options?: DoctorOptions): Promise<DoctorResult> {
 
       const offlineSkipsFinding = checkOfflineSkips(task.name, taskLogEntries)
       if (offlineSkipsFinding) findings.push(offlineSkipsFinding)
+
+      findings.push(
+        ...checkConsecutiveRequirementSkips(task.name, taskLogEntries),
+      )
     }
   }
 

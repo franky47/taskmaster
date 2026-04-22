@@ -152,6 +152,16 @@ function renderFinding(finding: Finding, platform: Platform): string {
         `  Set \`requires: []\` if this task can run without network.`,
       ].join('\n')
 
+    case 'consecutive-requirement-skips':
+      return [
+        `## Chronically blocked: ${finding.task} [${finding.severity}]`,
+        '',
+        `${finding.consecutiveSkips} consecutive skip${finding.consecutiveSkips === 1 ? '' : 's'} — requirement \`${finding.requirement}\` unmet.`,
+        '',
+        'Investigate:',
+        `  Check whether \`${finding.requirement}\` is reachable, or drop it from this task's \`requires\`.`,
+      ].join('\n')
+
     case 'log-error': {
       const name =
         typeof finding.error['name'] === 'string'

@@ -4,6 +4,7 @@ import ms from 'ms'
 
 import type { LogEntry } from '#lib/logger'
 import { minCronIntervalMs } from '#lib/schedule'
+import type { Requirement } from '#lib/task'
 import type { HistoryEntry } from '#src/history'
 import type { ValidationResult } from '#src/validate'
 
@@ -92,6 +93,14 @@ type OfflineSkipsFinding = {
   skipCount: number
 }
 
+type ConsecutiveRequirementSkipsFinding = {
+  kind: 'consecutive-requirement-skips'
+  severity: 'warning'
+  task: string
+  requirement: Requirement
+  consecutiveSkips: number
+}
+
 type InternalErrorFinding = {
   kind: 'internal-error'
   severity: 'critical'
@@ -111,6 +120,7 @@ export type Finding =
   | TaskTimeoutFinding
   | TimeoutContentionFinding
   | OfflineSkipsFinding
+  | ConsecutiveRequirementSkipsFinding
   | InternalErrorFinding
 
 // Helpers --
@@ -306,6 +316,44 @@ export function checkOfflineSkips(
     task: taskName,
     skipCount: count,
   }
+}
+
+const CONSECUTIVE_REQUIREMENT_SKIP_THRESHOLD = 3
+
+type RequirementSkipEntry = Extract<
+  LogEntry,
+  { event: 'skipped'; reason: 'requirement-unmet' }
+>
+
+export function checkConsecutiveRequirementSkips(
+  taskName: string,
+  entries: LogEntry[],
+): ConsecutiveRequirementSkipsFinding[] {
+  const skips = entries.filter(
+    (e): e is RequirementSkipEntry =>
+      e.event === 'skipped' && e.reason === 'requirement-unmet',
+  )
+  const mostRecent = skips.at(-1)
+  if (mostRecent === undefined) return []
+
+  const findings: ConsecutiveRequirementSkipsFinding[] = []
+  for (const req of mostRecent.requirement) {
+    let count = 0
+    for (let i = skips.length - 1; i >= 0; i--) {
+      if (!skips[i]!.requirement.includes(req)) break
+      count++
+    }
+    if (count >= CONSECUTIVE_REQUIREMENT_SKIP_THRESHOLD) {
+      findings.push({
+        kind: 'consecutive-requirement-skips',
+        severity: 'warning',
+        task: taskName,
+        requirement: req,
+        consecutiveSkips: count,
+      })
+    }
+  }
+  return findings
 }
 
 export function checkContention(

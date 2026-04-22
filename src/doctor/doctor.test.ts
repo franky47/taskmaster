@@ -412,4 +412,39 @@ describe('doctor', () => {
     expect(result.report).toContain('2')
     expect(result.report).toContain('requires: []')
   })
+
+  test('reports consecutive requirement skips diagnostic', async () => {
+    const entries: LogEntry[] = [
+      {
+        ts: '2026-04-06T10:00:00.000Z',
+        event: 'skipped',
+        task: 'backup',
+        reason: 'requirement-unmet',
+        requirement: ['ac-power'],
+      },
+      {
+        ts: '2026-04-06T11:00:00.000Z',
+        event: 'skipped',
+        task: 'backup',
+        reason: 'requirement-unmet',
+        requirement: ['ac-power'],
+      },
+      {
+        ts: '2026-04-06T12:00:00.000Z',
+        event: 'skipped',
+        task: 'backup',
+        reason: 'requirement-unmet',
+        requirement: ['ac-power'],
+      },
+    ]
+    const deps = healthyDeps()
+    deps.readLog = () => entries
+
+    const result = await doctor({ now, deps })
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.report).toContain('Chronically blocked: backup')
+    expect(result.report).toContain('ac-power')
+    expect(result.report).toContain('3 consecutive')
+  })
 })

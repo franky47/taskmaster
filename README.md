@@ -193,6 +193,7 @@ Checks system health and reports findings by severity:
 - **Never-ran tasks** — enabled tasks with no history
 - **Lock contention** — concurrent execution attempts
 - **Offline skips** — tasks skipped due to connectivity
+- **Chronically blocked tasks** — 3+ consecutive skips for the same unmet requirement
 - **Timeout/schedule mismatch** — timeout >= schedule interval
 
 ## Agents
