@@ -1,16 +1,26 @@
 import * as errore from 'errore'
+import { z } from 'zod'
 
 export class TimestampParseError extends errore.createTaggedError({
   name: 'TimestampParseError',
   message: 'Invalid timestamp "$value"',
 }) {}
 
-export function formatTimestamp(date: Date): string {
+const RUN_ID_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}\.\d{2}\.\d{2}Z$/
+
+export const runIdSchema = z
+  .string()
+  .regex(RUN_ID_PATTERN, 'Invalid run ID format')
+  .brand('RunId')
+
+export type RunId = z.output<typeof runIdSchema>
+
+export function formatTimestamp(date: Date): RunId {
   const noMs = date.toISOString().slice(0, 19) + 'Z'
-  return noMs.replaceAll(':', '.')
+  return runIdSchema.parse(noMs.replaceAll(':', '.'))
 }
 
-export function manualTimestamp(now?: Date): string {
+export function manualTimestamp(now?: Date): RunId {
   const date = now ?? new Date()
   // Floor to second precision by zeroing milliseconds
   const floored = new Date(date)

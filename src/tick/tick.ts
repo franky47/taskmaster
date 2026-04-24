@@ -8,6 +8,7 @@ import { log } from '#lib/logger'
 import type { Probes } from '#lib/requirements'
 import { defaultProbes, filterByRequirements } from '#lib/requirements'
 import { formatTimestamp, purgeHistory, queryHistory } from '#src/history'
+import type { RunId } from '#src/history'
 import type { TaskListEntry } from '#src/list'
 import { listTasks } from '#src/list'
 import type { TasksDirReadError } from '#src/validate'
@@ -17,7 +18,7 @@ import type { TasksDirReadError } from '#src/validate'
 type TickOptions = {
   configDir?: string
   now?: Date
-  spawnRun?: (name: string, timestamp: string) => void
+  spawnRun?: (name: string, timestamp: RunId) => void
   probes?: Probes
   queryHistory?: typeof queryHistory
   purgeHistory?: (
@@ -68,7 +69,7 @@ function isCronMatch(
   }
 }
 
-function defaultSpawnRun(name: string, timestamp: string): void {
+function defaultSpawnRun(name: string, timestamp: RunId): void {
   // Compiled SFE: argv = ['bun', '/$bunfs/root/tm', ...], execPath = real path
   // Dev mode:     argv = ['/path/to/bun', 'src/main.ts', ...], Bun.main = script
   // In both cases, process.execPath is the reliable absolute path to the runtime.

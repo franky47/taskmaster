@@ -4,6 +4,8 @@ import fsa from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 
+import { runIdSchema } from '#src/history'
+
 import {
   type RunningMarker,
   RunningMarkerSchema,
@@ -26,7 +28,7 @@ function writeLockFile(
 const validMarker: RunningMarker = {
   pid: process.pid,
   started_at: '2026-04-09T10:00:00.000Z',
-  timestamp: '2026-04-09T10.00.00Z',
+  timestamp: runIdSchema.parse('2026-04-09T10.00.00Z'),
 }
 
 describe('RunningMarkerSchema', () => {
@@ -56,6 +58,15 @@ describe('RunningMarkerSchema', () => {
     const result = RunningMarkerSchema.safeParse({
       pid: 123,
       started_at: '2026-04-09T10:00:00.000Z',
+    })
+    expect(result.success).toBe(false)
+  })
+
+  test('rejects malformed timestamp (ISO with colons)', () => {
+    const result = RunningMarkerSchema.safeParse({
+      pid: 123,
+      started_at: '2026-04-09T10:00:00.000Z',
+      timestamp: '2026-04-09T10:00:00Z',
     })
     expect(result.success).toBe(false)
   })

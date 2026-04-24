@@ -1,6 +1,7 @@
 import { describe, expect, mock, test } from 'bun:test'
 
 import type { LogEntry } from '#lib/logger'
+import { runIdSchema } from '#src/history'
 
 import { doctor } from './doctor'
 import type { DoctorDeps } from './doctor'
@@ -23,7 +24,7 @@ function healthyDeps(): DoctorDeps {
     validateTasks: async () => [{ name: 'backup', valid: true as const }],
     queryHistory: async () => [
       {
-        timestamp: '2026-04-07T11.00.00Z',
+        timestamp: runIdSchema.parse('2026-04-07T11.00.00Z'),
         started_at: new Date('2026-04-07T11:00:00.000Z'),
         finished_at: new Date('2026-04-07T11:00:05.000Z'),
         duration_ms: 5000,
@@ -78,7 +79,7 @@ describe('doctor', () => {
     const deps = healthyDeps()
     deps.queryHistory = async () => [
       {
-        timestamp: '2026-04-07T11.00.00Z',
+        timestamp: runIdSchema.parse('2026-04-07T11.00.00Z'),
         started_at: new Date('2026-04-07T11:00:00.000Z'),
         finished_at: new Date('2026-04-07T11:00:05.000Z'),
         duration_ms: 5000,
@@ -263,7 +264,7 @@ describe('doctor', () => {
     const deps = healthyDeps()
     deps.queryHistory = async () => [
       {
-        timestamp: '2026-04-07T11.00.00Z',
+        timestamp: runIdSchema.parse('2026-04-07T11.00.00Z'),
         started_at: new Date('2026-04-07T11:00:00.000Z'),
         finished_at: new Date('2026-04-07T11:00:30.000Z'),
         duration_ms: 30_000,
@@ -367,7 +368,7 @@ describe('doctor', () => {
     ]
     deps.queryHistory = async () => [
       {
-        timestamp: '2026-04-07T11.00.00Z',
+        timestamp: runIdSchema.parse('2026-04-07T11.00.00Z'),
         started_at: new Date('2026-04-07T11:00:00.000Z'),
         finished_at: new Date('2026-04-07T11:00:05.000Z'),
         duration_ms: 5000,

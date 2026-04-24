@@ -37,6 +37,7 @@ import type {
   TaskNotFoundError,
 } from '#lib/task'
 import { parseTaskFile } from '#lib/task'
+import type { RunId } from '#src/history'
 
 import type {
   CwdAccessError,
@@ -93,7 +94,7 @@ export type ExecuteDeps = {
 
 type ExecuteOptions = {
   configDir?: string
-  timestamp?: string
+  timestamp?: RunId
   lock?: boolean
   payload?: string
   deps?: Partial<ExecuteDeps>

@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 
 import type { LogEntry } from '#lib/logger'
 import type { HistoryEntry } from '#src/history'
+import { runIdSchema } from '#src/history'
 import type { ValidationResult } from '#src/validate'
 
 import {
@@ -221,7 +222,7 @@ describe('checkTaskFailures', () => {
     overrides: Partial<HistoryEntry> & { success: boolean },
   ): HistoryEntry {
     return {
-      timestamp: '2026-04-07T11-00-00',
+      timestamp: runIdSchema.parse('2026-04-07T11.00.00Z'),
       started_at: new Date('2026-04-07T11:00:00.000Z'),
       finished_at: new Date('2026-04-07T11:00:05.000Z'),
       duration_ms: 5000,
@@ -435,7 +436,7 @@ describe('checkTaskTimeouts', () => {
     overrides: Partial<HistoryEntry> & { success: boolean },
   ): HistoryEntry {
     return {
-      timestamp: '2026-04-07T11-00-00',
+      timestamp: runIdSchema.parse('2026-04-07T11.00.00Z'),
       started_at: new Date('2026-04-07T11:00:00.000Z'),
       finished_at: new Date('2026-04-07T11:00:05.000Z'),
       duration_ms: 5000,

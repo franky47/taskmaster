@@ -8,13 +8,14 @@ import { readRunningMarker } from '#lib/lock'
 import type { ReadMarkerDeps } from '#lib/lock'
 import type { Requirement } from '#lib/task'
 import { queryHistory } from '#src/history'
+import type { RunId } from '#src/history'
 import { listTasks } from '#src/list'
 import type { TasksDirReadError } from '#src/validate'
 
 // Types --
 
 type LastRun = {
-  timestamp: string
+  timestamp: RunId
   status: 'ok' | 'timeout' | 'err'
   exit_code: number
   duration_ms: number
@@ -22,7 +23,7 @@ type LastRun = {
 
 type Running = {
   started_at: string
-  timestamp: string
+  timestamp: RunId
   pid: number
   duration_ms: number
 }
@@ -109,7 +110,7 @@ export async function getTaskStatuses(
       const latest = history[0]
       if (latest) {
         status.last_run = {
-          timestamp: latest.started_at.toISOString(),
+          timestamp: latest.timestamp,
           status: latest.success ? 'ok' : latest.timed_out ? 'timeout' : 'err',
           exit_code: latest.exit_code,
           duration_ms: latest.duration_ms,

@@ -9,6 +9,9 @@ import {
   queryGlobalHistory,
   queryHistory,
 } from './query'
+import { runIdSchema } from './timestamp'
+
+const rid = (s: string) => runIdSchema.parse(s)
 
 async function makeConfigDir(): Promise<string> {
   return fs.mkdtemp(path.join(os.tmpdir(), 'tm-query-'))
@@ -111,9 +114,9 @@ describe('queryHistory', () => {
     if (result instanceof Error) return
 
     expect(result.map((e) => e.timestamp)).toEqual([
-      '2026-04-03T08.00.00Z',
-      '2026-04-02T08.00.00Z',
-      '2026-04-01T08.00.00Z',
+      rid('2026-04-03T08.00.00Z'),
+      rid('2026-04-02T08.00.00Z'),
+      rid('2026-04-01T08.00.00Z'),
     ])
   })
 
@@ -141,7 +144,7 @@ describe('queryHistory', () => {
     if (result instanceof Error) return
 
     expect(result).toHaveLength(1)
-    expect(result[0]!.timestamp).toBe('2026-04-02T08.00.00Z')
+    expect(result[0]!.timestamp).toBe(rid('2026-04-02T08.00.00Z'))
     expect(result[0]!.success).toBe(false)
   })
 
@@ -157,8 +160,8 @@ describe('queryHistory', () => {
     if (result instanceof Error) return
 
     expect(result).toHaveLength(2)
-    expect(result[0]!.timestamp).toBe('2026-04-03T08.00.00Z')
-    expect(result[1]!.timestamp).toBe('2026-04-02T08.00.00Z')
+    expect(result[0]!.timestamp).toBe(rid('2026-04-03T08.00.00Z'))
+    expect(result[1]!.timestamp).toBe(rid('2026-04-02T08.00.00Z'))
   })
 
   test('--failures + --last combines correctly', async () => {
@@ -186,7 +189,7 @@ describe('queryHistory', () => {
     if (result instanceof Error) return
 
     expect(result).toHaveLength(2)
-    expect(result[0]!.timestamp).toBe('2026-04-03T08.00.00Z')
+    expect(result[0]!.timestamp).toBe(rid('2026-04-03T08.00.00Z'))
   })
 
   test('includes output_path when output file exists', async () => {
@@ -252,7 +255,7 @@ describe('queryHistory', () => {
       if (result instanceof Error) return
 
       expect(result).toHaveLength(1)
-      expect(result[0]!.timestamp).toBe('2026-04-01T08.00.00Z')
+      expect(result[0]!.timestamp).toBe(rid('2026-04-01T08.00.00Z'))
       expect(stderrChunks.join('')).toContain(
         'skipped 1 malformed history file',
       )
@@ -302,7 +305,7 @@ describe('buildDisplayEntries', () => {
       marker: {
         pid: 42,
         started_at: '2026-04-05T11:50:00.000Z',
-        timestamp: '2026-04-05T11.50.00Z',
+        timestamp: rid('2026-04-05T11.50.00Z'),
       },
       taskName: 'daily-audit',
       configDir,
@@ -418,9 +421,9 @@ describe('queryGlobalHistory', () => {
       'task-a',
     ])
     expect(result.map((e) => e.timestamp)).toEqual([
-      '2026-04-03T08.00.00Z',
-      '2026-04-02T08.00.00Z',
-      '2026-04-01T08.00.00Z',
+      rid('2026-04-03T08.00.00Z'),
+      rid('2026-04-02T08.00.00Z'),
+      rid('2026-04-01T08.00.00Z'),
     ])
   })
 
@@ -437,7 +440,7 @@ describe('queryGlobalHistory', () => {
     if (result instanceof Error) return
 
     expect(result).toHaveLength(20)
-    expect(result[0]!.timestamp).toBe('2026-01-25T08.00.00Z')
+    expect(result[0]!.timestamp).toBe(rid('2026-01-25T08.00.00Z'))
   })
 
   test('--last overrides default limit', async () => {
@@ -452,7 +455,7 @@ describe('queryGlobalHistory', () => {
     if (result instanceof Error) return
 
     expect(result).toHaveLength(1)
-    expect(result[0]!.timestamp).toBe('2026-04-03T08.00.00Z')
+    expect(result[0]!.timestamp).toBe(rid('2026-04-03T08.00.00Z'))
   })
 
   test('--failures filter works in global mode', async () => {
@@ -518,7 +521,7 @@ describe('queryGlobalHistory', () => {
     if (result instanceof Error) return
 
     expect(result).toHaveLength(1)
-    expect(result[0]!.timestamp).toBe('2026-04-01T08.00.00Z')
+    expect(result[0]!.timestamp).toBe(rid('2026-04-01T08.00.00Z'))
   })
 
   test('includes trigger and event fields for dispatch entries', async () => {

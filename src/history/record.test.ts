@@ -6,6 +6,7 @@ import path from 'node:path'
 import type { RecordArtifacts } from './record'
 import { HistoryWriteError, recordHistory } from './record'
 import type { HistoryMetaInput } from './schema'
+import { runIdSchema } from './timestamp'
 
 async function makeConfigDir(): Promise<string> {
   return fs.mkdtemp(path.join(os.tmpdir(), 'tm-hist-'))
@@ -13,7 +14,7 @@ async function makeConfigDir(): Promise<string> {
 
 function makeMeta(overrides: Partial<HistoryMetaInput> = {}): HistoryMetaInput {
   return {
-    timestamp: '2026-04-04T08.30.00Z',
+    timestamp: runIdSchema.parse('2026-04-04T08.30.00Z'),
     started_at: new Date('2026-04-04T08:30:00.000Z'),
     finished_at: new Date('2026-04-04T08:30:15.456Z'),
     exit_code: 0,

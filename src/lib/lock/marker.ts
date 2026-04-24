@@ -3,12 +3,14 @@ import path from 'node:path'
 
 import { z } from 'zod'
 
+import { runIdSchema } from '#src/history'
+
 // Schema --
 
 export const RunningMarkerSchema = z.object({
   pid: z.number().int().positive(),
   started_at: z.iso.datetime(),
-  timestamp: z.string(),
+  timestamp: runIdSchema,
 })
 
 export type RunningMarker = z.infer<typeof RunningMarkerSchema>

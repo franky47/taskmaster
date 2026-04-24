@@ -8,6 +8,7 @@ import type { Probes } from '#lib/requirements'
 import { defaultProbes, filterByRequirements } from '#lib/requirements'
 import type { Requirement } from '#lib/task'
 import { manualTimestamp } from '#src/history'
+import type { RunId } from '#src/history'
 import type { TaskListEntry } from '#src/list'
 import { listTasks } from '#src/list'
 import type { TasksDirReadError } from '#src/validate'
@@ -27,7 +28,7 @@ type DispatchResult = {
 type DispatchOptions = {
   payload?: string
   configDir?: string
-  spawnRun?: (name: string, timestamp: string, extraArgs: string[]) => void
+  spawnRun?: (name: string, timestamp: RunId, extraArgs: string[]) => void
   probes?: Probes
 }
 
@@ -35,7 +36,7 @@ type DispatchOptions = {
 
 function defaultSpawnRun(
   name: string,
-  timestamp: string,
+  timestamp: RunId,
   extraArgs: string[],
 ): void {
   const tmCommand = /\.[jt]s$/.test(Bun.main)

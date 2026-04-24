@@ -12,6 +12,7 @@ import {
   TaskFileNameError,
   TaskNotFoundError,
 } from '#lib/task'
+import { runIdSchema } from '#src/history'
 
 import { CwdNotFoundError } from './cwd'
 import type { ExecuteDeps, SpawnAgentDeps } from './run'
@@ -584,7 +585,7 @@ describe('executeTask', () => {
     let receivedOutputPath: string | undefined
     await executeTask('fd-test', {
       configDir,
-      timestamp: '2026-04-09T10.00.00Z',
+      timestamp: runIdSchema.parse('2026-04-09T10.00.00Z'),
       deps: {
         spawnAgent: async (opts) => {
           receivedOutputPath = opts.outputPath
@@ -614,7 +615,7 @@ describe('executeTask', () => {
     let histDirExisted = false
     await executeTask('dir-create', {
       configDir,
-      timestamp: '2026-04-09T10.00.00Z',
+      timestamp: runIdSchema.parse('2026-04-09T10.00.00Z'),
       deps: {
         spawnAgent: async () => {
           const histDir = path.join(configDir, 'history', 'dir-create')

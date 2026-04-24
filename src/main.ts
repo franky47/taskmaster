@@ -18,7 +18,7 @@ import {
   queryHistory,
   recordHistory,
 } from './history'
-import type { HistoryEntry } from './history'
+import type { HistoryEntry, RunId } from './history'
 import {
   configDir,
   historyDir,
@@ -91,7 +91,7 @@ async function main(): Promise<void> {
           payloadFile?: string
         },
       ) => {
-        let timestamp: string
+        let timestamp: RunId
         if (opts.timestamp) {
           const parsed = parseTimestampFlag(opts.timestamp)
           if (parsed instanceof Error) {

@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+import { runIdSchema } from './timestamp'
+
 const isoDatetimeToDate = z.codec(z.iso.datetime(), z.date(), {
   decode: (s) => new Date(s),
   encode: (d) => d.toISOString(),
@@ -9,7 +11,7 @@ const triggerField = z.enum(['manual', 'tick', 'dispatch']).optional()
 
 export const historyMetaSchema = z
   .object({
-    timestamp: z.string(),
+    timestamp: runIdSchema,
     started_at: isoDatetimeToDate,
     finished_at: isoDatetimeToDate,
     duration_ms: z.number(),

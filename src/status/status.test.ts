@@ -4,8 +4,11 @@ import os from 'node:os'
 import path from 'node:path'
 
 import type { RunningMarker } from '#lib/lock'
+import { runIdSchema } from '#src/history'
 
 import { getTaskStatuses } from './status'
+
+const rid = (s: string) => runIdSchema.parse(s)
 
 async function makeConfigDir(): Promise<string> {
   const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'tm-status-'))
@@ -193,7 +196,7 @@ describe('getTaskStatuses', () => {
     expect(first).toBeDefined()
     if (!first) return
     expect(first.last_run).toEqual({
-      timestamp: '2026-04-04T08:00:00.000Z',
+      timestamp: rid('2026-04-04T08.00.00Z'),
       status: 'ok',
       exit_code: 0,
       duration_ms: 1500,
@@ -217,7 +220,7 @@ describe('getTaskStatuses', () => {
     expect(first).toBeDefined()
     if (!first) return
     expect(first.last_run).toEqual({
-      timestamp: '2026-04-04T08:00:00.000Z',
+      timestamp: rid('2026-04-04T08.00.00Z'),
       status: 'err',
       exit_code: 1,
       duration_ms: 500,
@@ -244,7 +247,7 @@ describe('getTaskStatuses', () => {
     expect(first).toBeDefined()
     if (!first) return
     expect(first.last_run?.status).toBe('ok')
-    expect(first.last_run?.timestamp).toBe('2026-04-04T08:00:00.000Z')
+    expect(first.last_run?.timestamp).toBe(rid('2026-04-04T08.00.00Z'))
   })
 
   test('always-run task (requires: []) computes next_run', async () => {
@@ -381,7 +384,7 @@ Task with timeout.
     expect(first).toBeDefined()
     if (!first) return
     expect(first.last_run).toEqual({
-      timestamp: '2026-04-04T08:00:00.000Z',
+      timestamp: rid('2026-04-04T08.00.00Z'),
       status: 'timeout',
       exit_code: 124,
       duration_ms: 30000,
@@ -394,7 +397,7 @@ Task with timeout.
     await writeMarker(configDir, 'my-task', {
       pid: process.pid,
       started_at: '2026-04-05T11:50:00.000Z',
-      timestamp: '2026-04-05T11.50.00Z',
+      timestamp: rid('2026-04-05T11.50.00Z'),
     })
 
     const result = await getTaskStatuses({
@@ -410,7 +413,7 @@ Task with timeout.
     if (!first) return
     expect(first.running).toEqual({
       started_at: '2026-04-05T11:50:00.000Z',
-      timestamp: '2026-04-05T11.50.00Z',
+      timestamp: rid('2026-04-05T11.50.00Z'),
       pid: process.pid,
       duration_ms: 600_000, // 10 minutes: 12:00 - 11:50
     })
@@ -436,7 +439,7 @@ Task with timeout.
     await writeMarker(configDir, 'my-task', {
       pid: 999999,
       started_at: '2026-04-05T11:50:00.000Z',
-      timestamp: '2026-04-05T11.50.00Z',
+      timestamp: rid('2026-04-05T11.50.00Z'),
     })
 
     const result = await getTaskStatuses({

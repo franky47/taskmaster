@@ -1,9 +1,10 @@
 import { describe, expect, test } from 'bun:test'
 
 import { historyMetaSchema } from './schema'
+import { runIdSchema } from './timestamp'
 
 const baseMeta = {
-  timestamp: '2026-04-04T08.30.00Z',
+  timestamp: runIdSchema.parse('2026-04-04T08.30.00Z'),
   started_at: '2026-04-04T08:30:00.000Z',
   finished_at: '2026-04-04T08:30:15.456Z',
   duration_ms: 15456,
@@ -37,7 +38,7 @@ describe('historyMetaSchema', () => {
 
   test('encode converts Date objects back to ISO strings', () => {
     const encoded = historyMetaSchema.encode({
-      timestamp: '2026-04-04T08.30.00Z',
+      timestamp: runIdSchema.parse('2026-04-04T08.30.00Z'),
       started_at: new Date('2026-04-04T08:30:00.000Z'),
       finished_at: new Date('2026-04-04T08:30:15.456Z'),
       duration_ms: 15456,
@@ -140,6 +141,21 @@ describe('historyMetaSchema', () => {
   test('rejects event with no trigger', () => {
     expect(() =>
       historyMetaSchema.decode({ ...baseMeta, event: 'deploy' }),
+    ).toThrow()
+  })
+
+  test('rejects malformed timestamp (ISO with colons)', () => {
+    expect(() =>
+      historyMetaSchema.decode({
+        ...baseMeta,
+        timestamp: '2026-04-04T08:30:00Z',
+      }),
+    ).toThrow()
+  })
+
+  test('rejects malformed timestamp (arbitrary string)', () => {
+    expect(() =>
+      historyMetaSchema.decode({ ...baseMeta, timestamp: 'not-a-timestamp' }),
     ).toThrow()
   })
 })

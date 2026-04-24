@@ -6,4 +6,6 @@ export {
   formatTimestamp,
   manualTimestamp,
   parseTimestampFlag,
+  runIdSchema,
 } from './timestamp'
+export type { RunId } from './timestamp'

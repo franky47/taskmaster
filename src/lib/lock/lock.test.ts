@@ -4,6 +4,8 @@ import fsa from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 
+import { runIdSchema } from '#src/history'
+
 import { acquireTaskLock, releaseLock } from './lock'
 import { readRunningMarker, writeRunningMarker } from './marker'
 
@@ -112,7 +114,7 @@ describe('acquireTaskLock', () => {
     const marker = {
       pid: process.pid,
       started_at: '2026-04-09T10:00:00.000Z',
-      timestamp: '2026-04-09T10.00.00Z',
+      timestamp: runIdSchema.parse('2026-04-09T10.00.00Z'),
     }
     writeRunningMarker(holder.fd, marker)
 
