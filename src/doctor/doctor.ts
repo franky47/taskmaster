@@ -1,4 +1,3 @@
-import fs from 'node:fs/promises'
 import path from 'node:path'
 
 import { configDir, logFilePath, tasksDir } from '#lib/config'
@@ -9,6 +8,7 @@ import type { HistoryEntry } from '#src/history'
 import { listTasks } from '#src/list'
 import type { TaskListEntry } from '#src/list'
 import { isSchedulerInstalled } from '#src/setup'
+import { readHeartbeat } from '#src/tick/heartbeat'
 import { validateTasks } from '#src/validate'
 import type { ValidationResult } from '#src/validate'
 
@@ -54,15 +54,8 @@ type DoctorResult =
 
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60_000
 
-async function defaultReadHeartbeat(): Promise<Date | null> {
-  const heartbeatPath = path.join(configDir, 'heartbeat')
-  try {
-    const content = await fs.readFile(heartbeatPath, 'utf-8')
-    const date = new Date(content.trim())
-    return isNaN(date.getTime()) ? null : date
-  } catch {
-    return null
-  }
+function defaultReadHeartbeat(): Promise<Date | null> {
+  return readHeartbeat(path.join(configDir, 'heartbeat'))
 }
 
 // Public API --

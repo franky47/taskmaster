@@ -1,4 +1,3 @@
-import fs from 'node:fs/promises'
 import path from 'node:path'
 
 import { CronExpressionParser } from 'cron-parser'
@@ -12,6 +11,8 @@ import type { RunId } from '#src/history'
 import type { TaskListEntry } from '#src/list'
 import { listTasks } from '#src/list'
 import type { TasksDirReadError } from '#src/validate'
+
+import { writeHeartbeat } from './heartbeat'
 
 // Types --
 
@@ -183,14 +184,13 @@ export async function tick(
 
   // S8.7: Write heartbeat
   const heartbeatPath = path.join(cfgDir, 'heartbeat')
+  const writeErr = await writeHeartbeat(heartbeatPath, now)
   let heartbeat: string
-  try {
-    await fs.writeFile(heartbeatPath, now.toISOString())
-    heartbeat = now.toISOString()
-  } catch (e: unknown) {
-    const error = e instanceof Error ? e : new Error(String(e))
-    log({ event: 'error', task: '(heartbeat)', error }, logPath)
+  if (writeErr) {
+    log({ event: 'error', task: '(heartbeat)', error: writeErr }, logPath)
     heartbeat = ''
+  } else {
+    heartbeat = now.toISOString()
   }
 
   return {
