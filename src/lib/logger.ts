@@ -3,27 +3,28 @@ import path from 'node:path'
 
 import { z } from 'zod'
 
+import { isoNow, isoUtcSchema } from '#lib/observability-time'
 import { REQUIREMENT_TOKENS } from '#lib/task'
 import type { Requirement } from '#lib/task'
 
 // Schema --
 
 const startedEntrySchema = z.object({
-  ts: z.iso.datetime(),
+  ts: isoUtcSchema,
   event: z.literal('started'),
   task: z.string(),
   trigger: z.enum(['manual', 'tick', 'dispatch']),
 })
 
 const skippedPlainEntrySchema = z.object({
-  ts: z.iso.datetime(),
+  ts: isoUtcSchema,
   event: z.literal('skipped'),
   task: z.string(),
   reason: z.enum(['contention', 'disabled']),
 })
 
 const skippedRequirementEntrySchema = z.object({
-  ts: z.iso.datetime(),
+  ts: isoUtcSchema,
   event: z.literal('skipped'),
   task: z.string(),
   reason: z.literal('requirement-unmet'),
@@ -31,7 +32,7 @@ const skippedRequirementEntrySchema = z.object({
 })
 
 const errorEntrySchema = z.object({
-  ts: z.iso.datetime(),
+  ts: isoUtcSchema,
   event: z.literal('error'),
   task: z.string(),
   error: z.record(z.string(), z.unknown()),
@@ -91,12 +92,12 @@ export function serializeError(err: Error): Record<string, unknown> {
 function serializeEntry(entry: LogInput): Record<string, unknown> {
   if (entry.event === 'error') {
     return {
-      ts: new Date().toISOString(),
+      ts: isoNow(),
       ...entry,
       error: serializeError(entry.error),
     }
   }
-  return { ts: new Date().toISOString(), ...entry }
+  return { ts: isoNow(), ...entry }
 }
 
 // Public API --

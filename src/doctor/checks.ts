@@ -3,6 +3,7 @@ import path from 'node:path'
 import ms from 'ms'
 
 import type { LogEntry } from '#lib/logger'
+import { formatRelative } from '#lib/observability-time'
 import { minCronIntervalMs } from '#lib/schedule'
 import type { Requirement } from '#lib/task'
 import type { HistoryEntry } from '#src/history'
@@ -123,25 +124,6 @@ export type Finding =
   | ConsecutiveRequirementSkipsFinding
   | InternalErrorFinding
 
-// Helpers --
-
-const rtf = new Intl.RelativeTimeFormat('en', {
-  style: 'narrow',
-  numeric: 'auto',
-})
-
-export function formatRelativeTime(from: Date, to: Date): string {
-  const diffMs = to.getTime() - from.getTime()
-  const totalMinutes = Math.floor(diffMs / 60_000)
-  const totalHours = Math.floor(totalMinutes / 60)
-  const totalDays = Math.floor(totalHours / 24)
-
-  if (totalDays >= 1) return rtf.format(-totalDays, 'day')
-  if (totalHours >= 1) return rtf.format(-totalHours, 'hour')
-  if (totalMinutes >= 1) return rtf.format(-totalMinutes, 'minute')
-  return rtf.format(0, 'second')
-}
-
 // Check functions --
 
 // Heartbeat staleness threshold: the scheduler is configured to tick every
@@ -161,7 +143,7 @@ export function checkHeartbeat(
     kind: 'heartbeat-stale',
     severity: 'critical',
     heartbeatTime: heartbeatTime.toISOString(),
-    relativeTime: formatRelativeTime(heartbeatTime, now),
+    relativeTime: formatRelative(heartbeatTime, now),
   }
 }
 
@@ -214,7 +196,7 @@ export function checkTaskFailures(
     task: taskName,
     consecutiveFailures,
     lastFailureTimestamp: first.finished_at.toISOString(),
-    relativeTime: formatRelativeTime(first.finished_at, now),
+    relativeTime: formatRelative(first.finished_at, now),
     exitCode: first.exit_code,
     output_path: first.output_path,
     runDir: first.output_path ? path.dirname(first.output_path) : undefined,
@@ -245,7 +227,7 @@ export function checkTaskTimeouts(
     task: taskName,
     consecutiveTimeouts,
     lastTimeoutTimestamp: first.finished_at.toISOString(),
-    relativeTime: formatRelativeTime(first.finished_at, now),
+    relativeTime: formatRelative(first.finished_at, now),
     timeout: timeoutMs !== undefined ? ms(timeoutMs) : undefined,
   }
 }

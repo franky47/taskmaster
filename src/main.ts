@@ -28,6 +28,7 @@ import {
 } from './lib/config'
 import { TaskContentionError, readRunningMarker } from './lib/lock'
 import { log } from './lib/logger'
+import { parseSinceFlag } from './lib/observability-time'
 import { listTasks } from './list'
 import { getTaskLogs } from './logs'
 import { runTask } from './run'
@@ -557,9 +558,9 @@ async function main(): Promise<void> {
     .action(async (opts: { since?: string }) => {
       let since: Date | undefined
       if (opts.since) {
-        const parsed = new Date(opts.since)
-        if (isNaN(parsed.getTime())) {
-          console.error('Invalid --since timestamp')
+        const parsed = parseSinceFlag(opts.since)
+        if (parsed instanceof Error) {
+          console.error(parsed.message)
           process.exit(1)
         }
         since = parsed

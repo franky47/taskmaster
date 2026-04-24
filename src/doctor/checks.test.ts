@@ -17,7 +17,6 @@ import {
   checkTaskTimeouts,
   checkTaskValidation,
   checkTimeoutContention,
-  formatRelativeTime,
 } from './checks'
 
 describe('checkLogErrors', () => {
@@ -78,54 +77,6 @@ describe('checkLogErrors', () => {
   test('returns empty array for empty input', () => {
     const findings = checkLogErrors([])
     expect(findings).toHaveLength(0)
-  })
-})
-
-// ------------------------------------------------------------------
-// formatRelativeTime
-// ------------------------------------------------------------------
-
-describe('formatRelativeTime', () => {
-  const base = new Date('2026-04-07T12:00:00.000Z')
-
-  test('returns "now" for < 1 minute', () => {
-    const from = new Date(base.getTime() - 30_000) // 30s ago
-    expect(formatRelativeTime(from, base)).toBe('now')
-  })
-
-  test('returns minutes for < 1 hour', () => {
-    const from = new Date(base.getTime() - 25 * 60_000) // 25m ago
-    expect(formatRelativeTime(from, base)).toBe('25m ago')
-  })
-
-  test('uses largest unit for hours range', () => {
-    const from = new Date(base.getTime() - (3 * 3600_000 + 37 * 60_000)) // 3h 37m
-    expect(formatRelativeTime(from, base)).toBe('3h ago')
-  })
-
-  test('returns exact hours', () => {
-    const from = new Date(base.getTime() - 2 * 3600_000) // exactly 2h
-    expect(formatRelativeTime(from, base)).toBe('2h ago')
-  })
-
-  test('uses largest unit for days range', () => {
-    const from = new Date(base.getTime() - (2 * 86400_000 + 5 * 3600_000)) // 2d 5h
-    expect(formatRelativeTime(from, base)).toBe('2d ago')
-  })
-
-  test('returns "1m ago" at exactly 1 minute', () => {
-    const from = new Date(base.getTime() - 60_000)
-    expect(formatRelativeTime(from, base)).toBe('1m ago')
-  })
-
-  test('returns "1h ago" at exactly 1 hour', () => {
-    const from = new Date(base.getTime() - 3600_000)
-    expect(formatRelativeTime(from, base)).toBe('1h ago')
-  })
-
-  test('returns "yesterday" at exactly 1 day', () => {
-    const from = new Date(base.getTime() - 86400_000)
-    expect(formatRelativeTime(from, base)).toBe('yesterday')
   })
 })
 
