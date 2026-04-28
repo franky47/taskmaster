@@ -86,10 +86,34 @@ const preflightErrorMeta = z
     'event is only valid when trigger is dispatch',
   )
 
+export const PAYLOAD_ERROR_REASONS = ['oversize', 'invalid-utf8'] as const
+export type PayloadErrorReason = (typeof PAYLOAD_ERROR_REASONS)[number]
+
+const payloadBlockSchema = z.object({
+  bytes: z.number().int().nonnegative(),
+  error_reason: z.enum(PAYLOAD_ERROR_REASONS),
+})
+
+const payloadErrorMeta = z
+  .object({
+    ...baseFields,
+    status: z.literal('payload-error'),
+    payload: payloadBlockSchema,
+  })
+  .refine(
+    (m) => m.duration_ms === m.finished_at.getTime() - m.started_at.getTime(),
+    'duration_ms must match finished_at - started_at',
+  )
+  .refine(
+    (m) => m.event === undefined || m.trigger === 'dispatch',
+    'event is only valid when trigger is dispatch',
+  )
+
 export const historyMetaSchema = z.union([
   agentRanMeta,
   skippedPreflightMeta,
   preflightErrorMeta,
+  payloadErrorMeta,
 ])
 
 export type HistoryMeta = z.output<typeof historyMetaSchema>
@@ -97,6 +121,7 @@ export type HistoryMeta = z.output<typeof historyMetaSchema>
 type AgentRanMeta = z.output<typeof agentRanMeta>
 type SkippedPreflightMeta = z.output<typeof skippedPreflightMeta>
 type PreflightErrorMeta = z.output<typeof preflightErrorMeta>
+type PayloadErrorMeta = z.output<typeof payloadErrorMeta>
 
 export function isAgentRanMeta<T extends HistoryMeta>(
   meta: T,
@@ -108,3 +133,4 @@ export type HistoryMetaInput =
   | Omit<AgentRanMeta, 'success' | 'duration_ms'>
   | Omit<SkippedPreflightMeta, 'duration_ms'>
   | Omit<PreflightErrorMeta, 'duration_ms'>
+  | Omit<PayloadErrorMeta, 'duration_ms'>

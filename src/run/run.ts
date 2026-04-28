@@ -28,7 +28,7 @@ import {
   acquireTaskLock,
 } from '#lib/lock'
 import { clearRunningMarker, writeRunningMarker } from '#lib/lock/marker'
-import { decodePreflightStdout, substituteTokens } from '#lib/prompt-template'
+import { decodeBoundedUtf8, substituteTokens } from '#lib/prompt-template'
 import type {
   FrontmatterParseError,
   FrontmatterValidationError,
@@ -39,7 +39,10 @@ import type {
 } from '#lib/task'
 import { parseTaskFile } from '#lib/task'
 import type { RunId } from '#src/history'
-import type { PreflightErrorReason } from '#src/history/schema'
+import type {
+  PayloadErrorReason,
+  PreflightErrorReason,
+} from '#src/history/schema'
 
 import type {
   CwdAccessError,
@@ -95,7 +98,25 @@ type PreflightErrorResult = {
   preflight: PreflightOutcome
 }
 
-type RunResult = AgentRunResult | PreflightSkipResult | PreflightErrorResult
+type PayloadOutcome = {
+  bytes: number
+  error_reason: PayloadErrorReason
+}
+
+type PayloadErrorResult = {
+  kind: 'payload-error'
+  cwd: ResolvedCwd
+  prompt: string
+  startedAt: Date
+  finishedAt: Date
+  payload: PayloadOutcome
+}
+
+type RunResult =
+  | AgentRunResult
+  | PreflightSkipResult
+  | PreflightErrorResult
+  | PayloadErrorResult
 
 type SpawnAgentOpts = {
   command: string
@@ -156,7 +177,7 @@ type ExecuteOptions = {
   event?: string
   payloadFile?: string
   lock?: boolean
-  payload?: string
+  payload?: Buffer
   deps?: Partial<ExecuteDeps>
 }
 
@@ -200,6 +221,8 @@ function defaultKillProcessGroup(pid: number, signal: NodeJS.Signals): void {
 }
 
 const PREFLIGHT_TIMEOUT_MS = 60_000
+const PREFLIGHT_MAX_BYTES = 1024 * 1024
+const PAYLOAD_MAX_BYTES = 1024 * 1024
 
 async function defaultSpawnPreflight(
   opts: SpawnPreflightOpts,
@@ -256,7 +279,7 @@ async function defaultSpawnPreflight(
       clearTimeout(graceTimer)
       const stdoutBuf = Buffer.concat(stdoutChunks)
       const stderrBuf = Buffer.concat(stderrChunks)
-      const decoded = decodePreflightStdout(stdoutBuf)
+      const decoded = decodeBoundedUtf8(stdoutBuf, PREFLIGHT_MAX_BYTES)
       resolve({
         exit_code: code ?? 1,
         duration_ms: Date.now() - startedAt,
@@ -266,7 +289,7 @@ async function defaultSpawnPreflight(
         stderr_bytes: stderrBuf.length,
         timed_out: timedOut,
         signaled: code === null && !timedOut,
-        stdout_oversize: !decoded.ok && decoded.reason === 'oversize-stdout',
+        stdout_oversize: !decoded.ok && decoded.reason === 'oversize',
         stdout_invalid_utf8: !decoded.ok && decoded.reason === 'invalid-utf8',
       })
     })
@@ -397,9 +420,27 @@ export async function executeTask(
 
   const startedAt = new Date()
 
-  const prompt = options?.payload
-    ? `${task.prompt}\n---\n${options.payload}`
-    : task.prompt
+  // Validate payload bytes once, before preflight, so an oversize/invalid
+  // payload short-circuits the whole pipeline (no preflight side effects,
+  // no agent spawn).
+  let payloadValue: string | undefined
+  if (options?.payload) {
+    const decoded = decodeBoundedUtf8(options.payload, PAYLOAD_MAX_BYTES)
+    if (!decoded.ok) {
+      const finishedAt = new Date()
+      return {
+        kind: 'payload-error',
+        cwd,
+        prompt: task.prompt,
+        startedAt,
+        finishedAt,
+        payload: { bytes: decoded.bytes, error_reason: decoded.reason },
+      }
+    }
+    payloadValue = decoded.value
+  }
+
+  const prompt = task.prompt
 
   // Build TM_* env additions
   const trigger = options?.trigger
@@ -486,24 +527,32 @@ export async function executeTask(
     }
   }
 
-  // Substitute <PREFLIGHT/> token (after preflight has succeeded). When
-  // substitution actually replaces tokens with non-empty content, persist
-  // the resolved prompt to history for audit.
-  let resolvedPrompt = prompt
+  // Substitute <PREFLIGHT/> and <PAYLOAD/> tokens in a single pass (no
+  // recursive substitution: replacement strings are not re-scanned). The
+  // resolved prompt is persisted as <ts>.prompt.txt only when at least one
+  // substitution produced non-empty content.
+  const tokenValues: { PREFLIGHT?: string; PAYLOAD?: string } = {}
   if (task.preflight && preflightOutcome) {
-    const sub = substituteTokens(prompt, { PREFLIGHT: preflightOutcome.stdout })
-    resolvedPrompt = sub.resolved
-    if (sub.nonEmptyCount > 0 && options?.timestamp) {
-      const histDir = path.join(
-        configRoot ? path.join(configRoot, 'history') : defaultHistoryDir,
-        name,
-      )
-      await fsPromises.mkdir(histDir, { recursive: true })
-      await fsPromises.writeFile(
-        path.join(histDir, `${options.timestamp}.prompt.txt`),
-        resolvedPrompt,
-      )
-    }
+    tokenValues.PREFLIGHT = preflightOutcome.stdout
+  }
+  // PAYLOAD is bound to '' on event tasks even when no payload was supplied,
+  // so the token disappears (rather than persisting as a literal placeholder)
+  // when the dispatcher delivered nothing.
+  if ('event' in task.on) {
+    tokenValues.PAYLOAD = payloadValue ?? ''
+  }
+  const sub = substituteTokens(prompt, tokenValues)
+  const resolvedPrompt = sub.resolved
+  if (sub.nonEmptyCount > 0 && options?.timestamp) {
+    const histDir = path.join(
+      configRoot ? path.join(configRoot, 'history') : defaultHistoryDir,
+      name,
+    )
+    await fsPromises.mkdir(histDir, { recursive: true })
+    await fsPromises.writeFile(
+      path.join(histDir, `${options.timestamp}.prompt.txt`),
+      resolvedPrompt,
+    )
   }
 
   const promptPath = writePromptFile(name, startedAt, resolvedPrompt)

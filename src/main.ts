@@ -83,7 +83,7 @@ async function main(): Promise<void> {
     .addOption(
       new Option(
         '--payload-file <path>',
-        'Path to payload file to append to prompt',
+        'Path to payload file substituted into <PAYLOAD/> token',
       ).hideHelp(),
     )
     .action(
@@ -120,10 +120,10 @@ async function main(): Promise<void> {
         const trigger = triggerResult.data
         log({ event: 'started', task: name, trigger }, logFilePath)
 
-        let payload: string | undefined
+        let payload: Buffer | undefined
         if (opts.payloadFile) {
           try {
-            payload = await fsPromises.readFile(opts.payloadFile, 'utf-8')
+            payload = await fsPromises.readFile(opts.payloadFile)
           } catch (e: unknown) {
             const msg = e instanceof Error ? e.message : String(e)
             console.error(`Failed to read payload file: ${msg}`)
@@ -213,6 +213,46 @@ async function main(): Promise<void> {
             process.stdout.write(result.output)
           }
           process.exit(exitCode)
+        }
+
+        if (result.kind === 'payload-error') {
+          const recordErr = await recordHistory(
+            {
+              timestamp,
+              started_at: result.startedAt,
+              finished_at: result.finishedAt,
+              status: 'payload-error',
+              trigger,
+              event: trigger === 'dispatch' ? opts.event : undefined,
+              payload: {
+                bytes: result.payload.bytes,
+                error_reason: result.payload.error_reason,
+              },
+            },
+            {
+              task_name: name,
+              output: '',
+              prompt: result.prompt,
+              cwd: result.cwd,
+            },
+          )
+          if (recordErr instanceof Error) {
+            console.error(recordErr.message)
+          }
+          log(
+            { event: 'error', task: name, reason: 'payload-error' },
+            logFilePath,
+          )
+          if (opts.json) {
+            console.log(
+              JSON.stringify({
+                payload_error: true,
+                error_reason: result.payload.error_reason,
+                taskName: name,
+              }),
+            )
+          }
+          process.exit(0)
         }
 
         // skipped-preflight or preflight-error

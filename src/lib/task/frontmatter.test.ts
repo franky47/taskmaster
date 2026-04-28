@@ -780,6 +780,41 @@ describe('parseMarkdown', () => {
     })
   })
 
+  describe('payload token', () => {
+    test('accepts <PAYLOAD/> in body on event tasks', () => {
+      const result = parseMarkdown(
+        md(
+          `on:\n  event: 'deploy'\n${VALID_AGENT}`,
+          'Body with <PAYLOAD/> token.',
+        ),
+      )
+      expect(result).not.toBeInstanceOf(Error)
+    })
+
+    test('rejects <PAYLOAD/> in body on schedule tasks', () => {
+      const result = parseMarkdown(
+        md(
+          `on:\n  schedule: '0 8 * * *'\n${VALID_AGENT}`,
+          'Body with <PAYLOAD/> token.',
+        ),
+      )
+      expect(result).toBeInstanceOf(FrontmatterValidationError)
+      if (!(result instanceof FrontmatterValidationError)) return
+      expect(
+        result.errors.some(
+          (e) => e.key === 'on' && e.message.includes('<PAYLOAD/>'),
+        ),
+      ).toBe(true)
+    })
+
+    test('event task with no <PAYLOAD/> in body is allowed', () => {
+      const result = parseMarkdown(
+        md(`on:\n  event: 'deploy'\n${VALID_AGENT}`, 'No token here.'),
+      )
+      expect(result).not.toBeInstanceOf(Error)
+    })
+  })
+
   describe('timeout', () => {
     test('defaults timeout when omitted', () => {
       // Schedule: daily at 8am (24h interval) — default capped at 1h

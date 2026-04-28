@@ -1,2 +1,2 @@
 export { findTokens, substituteTokens } from './substitute'
-export { decodePreflightStdout } from './preflight-output'
+export { decodeBoundedUtf8 } from './bounded-text'

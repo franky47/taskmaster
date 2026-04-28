@@ -154,6 +154,17 @@ export function parseMarkdown(
         ],
       })
     }
+    if (tokens.has('PAYLOAD') && !('event' in result.data.on)) {
+      return new FrontmatterValidationError({
+        errors: [
+          {
+            key: 'on',
+            message:
+              '<PAYLOAD/> token in body is only valid on event tasks (on.event)',
+          },
+        ],
+      })
+    }
     return {
       ...result.data,
       prompt,

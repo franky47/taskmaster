@@ -116,6 +116,58 @@ describe('substituteTokens', () => {
   })
 })
 
+describe('substituteTokens — PAYLOAD', () => {
+  test('substitutes <PAYLOAD/> with provided value', () => {
+    const result = substituteTokens('Before <PAYLOAD/> after', {
+      PAYLOAD: 'EVENT-DATA',
+    })
+    expect(result.resolved).toBe('Before EVENT-DATA after')
+    expect(result.nonEmptyCount).toBe(1)
+  })
+
+  test('matches <PAYLOAD /> with internal whitespace', () => {
+    const result = substituteTokens('a <PAYLOAD /> b', { PAYLOAD: 'x' })
+    expect(result.resolved).toBe('a x b')
+  })
+
+  test('does not match lowercase <payload/>', () => {
+    const result = substituteTokens('<payload/>', { PAYLOAD: 'x' })
+    expect(result.resolved).toBe('<payload/>')
+  })
+
+  test('substitutes both PREFLIGHT and PAYLOAD in a single pass', () => {
+    const result = substituteTokens('pre=<PREFLIGHT/> pay=<PAYLOAD/>', {
+      PREFLIGHT: 'A',
+      PAYLOAD: 'B',
+    })
+    expect(result.resolved).toBe('pre=A pay=B')
+    expect(result.nonEmptyCount).toBe(2)
+  })
+
+  test('PAYLOAD value containing <PREFLIGHT/> is not re-substituted', () => {
+    const result = substituteTokens('<PREFLIGHT/> <PAYLOAD/>', {
+      PREFLIGHT: 'real-pf',
+      PAYLOAD: '<PREFLIGHT/>',
+    })
+    expect(result.resolved).toBe('real-pf <PREFLIGHT/>')
+  })
+
+  test('PREFLIGHT value containing <PAYLOAD/> is not re-substituted', () => {
+    const result = substituteTokens('<PREFLIGHT/> <PAYLOAD/>', {
+      PREFLIGHT: '<PAYLOAD/>',
+      PAYLOAD: 'real-payload',
+    })
+    expect(result.resolved).toBe('<PAYLOAD/> real-payload')
+  })
+
+  test('trims leading and trailing whitespace from PAYLOAD value', () => {
+    const result = substituteTokens('[<PAYLOAD/>]', {
+      PAYLOAD: '  hello  ',
+    })
+    expect(result.resolved).toBe('[hello]')
+  })
+})
+
 describe('findTokens', () => {
   test('returns the set of token names present in the body', () => {
     expect(findTokens('a <PREFLIGHT/> b').has('PREFLIGHT')).toBe(true)

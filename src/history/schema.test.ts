@@ -182,8 +182,8 @@ describe('historyMetaSchema', () => {
         status: 'skipped-preflight',
         preflight: preflightBlock,
       })
-      if (isAgentRanMeta(result)) throw new Error('expected preflight variant')
-      expect(result.status).toBe('skipped-preflight')
+      if (isAgentRanMeta(result) || result.status !== 'skipped-preflight')
+        throw new Error('expected skipped-preflight')
       expect(result.preflight).toEqual(preflightBlock)
     })
 
@@ -193,8 +193,8 @@ describe('historyMetaSchema', () => {
         status: 'preflight-error',
         preflight: { ...preflightBlock, exit_code: 2, error_reason: 'nonzero' },
       })
-      if (isAgentRanMeta(result)) throw new Error('expected preflight variant')
-      expect(result.status).toBe('preflight-error')
+      if (isAgentRanMeta(result) || result.status !== 'preflight-error')
+        throw new Error('expected preflight-error')
       expect(result.preflight.error_reason).toBe('nonzero')
     })
 
@@ -215,8 +215,8 @@ describe('historyMetaSchema', () => {
         preflight: preflightBlock,
       })
       const encoded = historyMetaSchema.encode(decoded)
-      if (!('status' in encoded)) throw new Error('expected status field')
-      expect(encoded.status).toBe('skipped-preflight')
+      if (!('status' in encoded) || encoded.status !== 'skipped-preflight')
+        throw new Error('expected skipped-preflight encoded')
       expect(encoded.preflight).toEqual(preflightBlock)
     })
 
@@ -239,7 +239,8 @@ describe('historyMetaSchema', () => {
           error_reason: 'invalid-utf8',
         },
       })
-      if (isAgentRanMeta(result)) throw new Error('expected preflight variant')
+      if (isAgentRanMeta(result) || result.status !== 'preflight-error')
+        throw new Error('expected preflight-error')
       expect(result.preflight.error_reason).toBe('invalid-utf8')
     })
 
@@ -253,7 +254,8 @@ describe('historyMetaSchema', () => {
           error_reason: 'oversize-stdout',
         },
       })
-      if (isAgentRanMeta(result)) throw new Error('expected preflight variant')
+      if (isAgentRanMeta(result) || result.status !== 'preflight-error')
+        throw new Error('expected preflight-error')
       expect(result.preflight.error_reason).toBe('oversize-stdout')
     })
 
@@ -266,6 +268,76 @@ describe('historyMetaSchema', () => {
           preflight: { ...preflightBlock, error_reason: 'bogus' },
         }),
       ).toThrow()
+    })
+  })
+
+  describe('payload-error variant', () => {
+    const payloadErrorFields = {
+      timestamp: runIdSchema.parse('2026-04-04T08.30.00Z'),
+      started_at: '2026-04-04T08:30:00.000Z',
+      finished_at: '2026-04-04T08:30:00.005Z',
+      duration_ms: 5,
+      trigger: 'dispatch' as const,
+      event: 'deploy',
+    }
+
+    test('parses payload-error record with oversize reason', () => {
+      const result = historyMetaSchema.decode({
+        ...payloadErrorFields,
+        status: 'payload-error',
+        payload: { bytes: 2_000_000, error_reason: 'oversize' },
+      })
+      if (isAgentRanMeta(result) || result.status !== 'payload-error')
+        throw new Error('expected payload-error')
+      expect(result.payload.bytes).toBe(2_000_000)
+      expect(result.payload.error_reason).toBe('oversize')
+    })
+
+    test('parses payload-error with invalid-utf8 reason', () => {
+      const result = historyMetaSchema.decode({
+        ...payloadErrorFields,
+        status: 'payload-error',
+        payload: { bytes: 12, error_reason: 'invalid-utf8' },
+      })
+      if (isAgentRanMeta(result) || result.status !== 'payload-error')
+        throw new Error('expected payload-error')
+      expect(result.payload.error_reason).toBe('invalid-utf8')
+    })
+
+    test('rejects payload-error without payload block', () => {
+      expect(() =>
+        // @ts-expect-error intentionally missing payload block
+        historyMetaSchema.decode({
+          ...payloadErrorFields,
+          status: 'payload-error',
+        }),
+      ).toThrow()
+    })
+
+    test('rejects payload-error with unknown error_reason', () => {
+      expect(() =>
+        // @ts-expect-error invalid reason
+        historyMetaSchema.decode({
+          ...payloadErrorFields,
+          status: 'payload-error',
+          payload: { bytes: 0, error_reason: 'bogus' },
+        }),
+      ).toThrow()
+    })
+
+    test('encode round-trips payload-error', () => {
+      const decoded = historyMetaSchema.decode({
+        ...payloadErrorFields,
+        status: 'payload-error',
+        payload: { bytes: 100, error_reason: 'oversize' },
+      })
+      const encoded = historyMetaSchema.encode(decoded)
+      if (!('status' in encoded) || encoded.status !== 'payload-error')
+        throw new Error('expected payload-error encoded')
+      expect(encoded.payload).toEqual({
+        bytes: 100,
+        error_reason: 'oversize',
+      })
     })
   })
 })

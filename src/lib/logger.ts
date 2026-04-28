@@ -27,7 +27,7 @@ const preflightErrorEntrySchema = z.object({
   ts: isoUtcSchema,
   event: z.literal('error'),
   task: z.string(),
-  reason: z.literal('preflight-error'),
+  reason: z.enum(['preflight-error', 'payload-error']),
 })
 
 const skippedRequirementEntrySchema = z.object({
@@ -71,7 +71,11 @@ type LogInput =
       requirement: Requirement[]
     }
   | { event: 'error'; task: string; error: Error }
-  | { event: 'error'; task: string; reason: 'preflight-error' }
+  | {
+      event: 'error'
+      task: string
+      reason: 'preflight-error' | 'payload-error'
+    }
 
 // Serialization --
 

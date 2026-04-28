@@ -1,4 +1,4 @@
-const TOKEN_NAMES = ['PREFLIGHT'] as const
+const TOKEN_NAMES = ['PREFLIGHT', 'PAYLOAD'] as const
 type TokenName = (typeof TOKEN_NAMES)[number]
 
 const TOKEN_SET: ReadonlySet<string> = new Set(TOKEN_NAMES)

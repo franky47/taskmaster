@@ -30,7 +30,13 @@ export type HistoryEntry = HistoryMeta & {
 }
 
 type CompletedHistoryEntry = HistoryEntry & {
-  status: 'ok' | 'timeout' | 'err' | 'skipped-preflight' | 'preflight-error'
+  status:
+    | 'ok'
+    | 'timeout'
+    | 'err'
+    | 'skipped-preflight'
+    | 'preflight-error'
+    | 'payload-error'
 }
 
 type RunningHistoryEntry = {

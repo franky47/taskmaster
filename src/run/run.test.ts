@@ -655,18 +655,18 @@ describe('executeTask', () => {
     expect(receivedOutputPath).toBeUndefined()
   })
 
-  test('appends payload to prompt with --- separator', async () => {
+  test('does not append payload to prompt when body has no <PAYLOAD/> token', async () => {
     const configDir = await makeConfigDir()
     await writeTask(
       configDir,
-      'payload-task',
+      'no-payload-token',
       '---\non:\n  event: deploy\nagent: opencode\n---\nBase prompt.',
     )
 
     let promptContent = ''
-    const result = await executeTask('payload-task', {
+    const result = await executeTask('no-payload-token', {
       configDir,
-      payload: 'deploy context here',
+      payload: Buffer.from('deploy context here'),
       deps: {
         spawnAgent: async (opts) => {
           promptContent = fs.readFileSync(opts.env['TM_PROMPT_FILE']!, 'utf-8')
@@ -676,11 +676,12 @@ describe('executeTask', () => {
     })
 
     if (result instanceof Error) throw result
-    expect(promptContent).toBe('Base prompt.\n---\ndeploy context here')
-    expect(result.prompt).toBe('Base prompt.\n---\ndeploy context here')
+    expect(promptContent).toBe('Base prompt.')
+    expect(promptContent).not.toContain('---')
+    expect(result.prompt).toBe('Base prompt.')
   })
 
-  test('does not append separator when payload is absent', async () => {
+  test('does not write a separator when payload is absent', async () => {
     const configDir = await makeConfigDir()
     await writeTask(
       configDir,
@@ -702,6 +703,168 @@ describe('executeTask', () => {
     if (result instanceof Error) throw result
     expect(promptContent).toBe('Base prompt.')
     expect(result.prompt).toBe('Base prompt.')
+  })
+
+  describe('<PAYLOAD/> substitution', () => {
+    const payloadTask = [
+      '---',
+      'on:',
+      '  event: deploy',
+      'agent: opencode',
+      '---',
+      'Header.',
+      '<PAYLOAD/>',
+      'Footer.',
+    ].join('\n')
+
+    test('substitutes <PAYLOAD/> with provided payload bytes', async () => {
+      const configDir = await makeConfigDir()
+      await writeTask(configDir, 'pay-sub', payloadTask)
+
+      const result = await executeTask('pay-sub', {
+        configDir,
+        payload: Buffer.from('PAYLOAD-VALUE'),
+        deps: { spawnAgent: fakeSpawn() },
+      })
+
+      if (result instanceof Error) throw result
+      if (result.kind !== 'agent') throw new Error('expected agent result')
+      expect(result.prompt).toBe('Header.\nPAYLOAD-VALUE\nFooter.')
+    })
+
+    test('trims payload before substitution', async () => {
+      const configDir = await makeConfigDir()
+      await writeTask(configDir, 'pay-trim', payloadTask)
+
+      const result = await executeTask('pay-trim', {
+        configDir,
+        payload: Buffer.from('\n\n  hi\nyou  \n\n'),
+        deps: { spawnAgent: fakeSpawn() },
+      })
+
+      if (result instanceof Error) throw result
+      if (result.kind !== 'agent') throw new Error('expected agent result')
+      expect(result.prompt).toBe('Header.\nhi\nyou\nFooter.')
+    })
+
+    test('substitutes <PAYLOAD/> to empty when no payload provided', async () => {
+      const configDir = await makeConfigDir()
+      await writeTask(configDir, 'pay-empty', payloadTask)
+
+      const result = await executeTask('pay-empty', {
+        configDir,
+        deps: { spawnAgent: fakeSpawn() },
+      })
+
+      if (result instanceof Error) throw result
+      if (result.kind !== 'agent') throw new Error('expected agent result')
+      expect(result.prompt).toBe('Header.\n\nFooter.')
+    })
+
+    test('payload value containing <PREFLIGHT/> is not re-substituted', async () => {
+      const configDir = await makeConfigDir()
+      const dualToken = [
+        '---',
+        'on:',
+        '  event: deploy',
+        'agent: opencode',
+        "preflight: 'echo'",
+        '---',
+        'pre=<PREFLIGHT/> pay=<PAYLOAD/>',
+      ].join('\n')
+      await writeTask(configDir, 'pay-cross', dualToken)
+
+      const result = await executeTask('pay-cross', {
+        configDir,
+        payload: Buffer.from('<PREFLIGHT/>'),
+        deps: {
+          spawnPreflight: async () => ({
+            exit_code: 0,
+            duration_ms: 5,
+            stdout: 'real-pf',
+            stderr: '',
+            timed_out: false,
+            signaled: false,
+            stdout_bytes: 7,
+            stderr_bytes: 0,
+          }),
+          spawnAgent: fakeSpawn(),
+        },
+      })
+
+      if (result instanceof Error) throw result
+      if (result.kind !== 'agent') throw new Error('expected agent result')
+      expect(result.prompt).toBe('pre=real-pf pay=<PREFLIGHT/>')
+    })
+
+    test('writes <ts>.prompt.txt when PAYLOAD substitution produced non-empty content', async () => {
+      const configDir = await makeConfigDir()
+      await writeTask(configDir, 'pay-prompt-file', payloadTask)
+      const ts = runIdSchema.parse('2026-04-08T08.30.00Z')
+
+      await executeTask('pay-prompt-file', {
+        configDir,
+        timestamp: ts,
+        payload: Buffer.from('SOMETHING'),
+        deps: { spawnAgent: fakeSpawn() },
+      })
+
+      const promptPath = path.join(
+        configDir,
+        'history',
+        'pay-prompt-file',
+        `${ts}.prompt.txt`,
+      )
+      const body = await fsPromises.readFile(promptPath, 'utf-8')
+      expect(body).toBe('Header.\nSOMETHING\nFooter.')
+    })
+
+    test('oversize payload returns payload-error and skips agent', async () => {
+      const configDir = await makeConfigDir()
+      await writeTask(configDir, 'pay-big', payloadTask)
+
+      let agentSpawned = false
+      const result = await executeTask('pay-big', {
+        configDir,
+        payload: Buffer.alloc(1024 * 1024 + 1, 'a'),
+        deps: {
+          spawnAgent: async () => {
+            agentSpawned = true
+            return { exitCode: 0, output: '', timedOut: false }
+          },
+        },
+      })
+
+      if (result instanceof Error) throw result
+      expect(agentSpawned).toBe(false)
+      expect(result.kind).toBe('payload-error')
+      if (result.kind !== 'payload-error') return
+      expect(result.payload.error_reason).toBe('oversize')
+      expect(result.payload.bytes).toBe(1024 * 1024 + 1)
+    })
+
+    test('invalid-utf8 payload returns payload-error and skips agent', async () => {
+      const configDir = await makeConfigDir()
+      await writeTask(configDir, 'pay-bad-utf8', payloadTask)
+
+      let agentSpawned = false
+      const result = await executeTask('pay-bad-utf8', {
+        configDir,
+        payload: Buffer.from([0xc3, 0x28]),
+        deps: {
+          spawnAgent: async () => {
+            agentSpawned = true
+            return { exitCode: 0, output: '', timedOut: false }
+          },
+        },
+      })
+
+      if (result instanceof Error) throw result
+      expect(agentSpawned).toBe(false)
+      expect(result.kind).toBe('payload-error')
+      if (result.kind !== 'payload-error') return
+      expect(result.payload.error_reason).toBe('invalid-utf8')
+    })
   })
 
   test('timedOut is false for normal completion', async () => {
