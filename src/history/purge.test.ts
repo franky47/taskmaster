@@ -57,6 +57,26 @@ describe('purgeHistory', () => {
     expect(fs.access(path.join(dir, `${oldTs}.output.txt`))).rejects.toThrow()
   })
 
+  test('deletes preflight.txt sibling alongside purged entry', async () => {
+    const configDir = await makeConfigDir()
+    const oldTs = '2026-01-01T00.00.00Z'
+    await writeHistoryEntry(configDir, 'my-task', oldTs, {
+      success: true,
+      finished_at: '2026-01-01T00:00:00Z',
+    })
+    const dir = path.join(configDir, 'history', 'my-task')
+    await fs.writeFile(path.join(dir, `${oldTs}.preflight.txt`), 'old run')
+
+    const now = new Date('2026-03-01T00:00:00Z')
+    const result = await purgeHistory({ configDir, now })
+    if (result instanceof Error) throw result
+
+    expect(result.deleted).toBe(1)
+    expect(
+      fs.access(path.join(dir, `${oldTs}.preflight.txt`)),
+    ).rejects.toThrow()
+  })
+
   test('preserves successful entries newer than 30 days', async () => {
     const configDir = await makeConfigDir()
     const recentTs = '2026-03-15T10.00.00Z'

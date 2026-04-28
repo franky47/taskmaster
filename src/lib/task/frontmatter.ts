@@ -262,6 +262,11 @@ const rawFrontmatter = z.object({
     .optional()
     .default(['network']),
 
+  preflight: z
+    .string({ error: 'preflight must be a string' })
+    .min(1, { error: 'preflight must be a non-empty string' })
+    .optional(),
+
   timeout: z
     .string({ error: 'timeout must be a string' })
     .pipe(durationString)

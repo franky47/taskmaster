@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
-import { historyMetaSchema } from './schema'
+import { historyMetaSchema, isAgentRanMeta } from './schema'
 import { runIdSchema } from './timestamp'
 
 const baseMeta = {
@@ -15,16 +15,19 @@ const baseMeta = {
 describe('historyMetaSchema', () => {
   test('parses record without timed_out (backwards compat)', () => {
     const result = historyMetaSchema.parse(baseMeta)
+    if (!isAgentRanMeta(result)) throw new Error('expected agent-ran')
     expect(result.timed_out).toBe(false)
   })
 
   test('parses record with timed_out: true', () => {
     const result = historyMetaSchema.parse({ ...baseMeta, timed_out: true })
+    if (!isAgentRanMeta(result)) throw new Error('expected agent-ran')
     expect(result.timed_out).toBe(true)
   })
 
   test('parses record with timed_out: false', () => {
     const result = historyMetaSchema.parse({ ...baseMeta, timed_out: false })
+    if (!isAgentRanMeta(result)) throw new Error('expected agent-ran')
     expect(result.timed_out).toBe(false)
   })
 
@@ -157,5 +160,84 @@ describe('historyMetaSchema', () => {
     expect(() =>
       historyMetaSchema.decode({ ...baseMeta, timestamp: 'not-a-timestamp' }),
     ).toThrow()
+  })
+
+  describe('preflight variants', () => {
+    const preflightFields = {
+      timestamp: runIdSchema.parse('2026-04-04T08.30.00Z'),
+      started_at: '2026-04-04T08:30:00.000Z',
+      finished_at: '2026-04-04T08:30:00.050Z',
+      duration_ms: 50,
+    }
+    const preflightBlock = {
+      exit_code: 1,
+      duration_ms: 30,
+      stdout_bytes: 0,
+      stderr_bytes: 0,
+    }
+
+    test('parses skipped-preflight record', () => {
+      const result = historyMetaSchema.decode({
+        ...preflightFields,
+        status: 'skipped-preflight',
+        preflight: preflightBlock,
+      })
+      if (isAgentRanMeta(result)) throw new Error('expected preflight variant')
+      expect(result.status).toBe('skipped-preflight')
+      expect(result.preflight).toEqual(preflightBlock)
+    })
+
+    test('parses preflight-error record with error_reason', () => {
+      const result = historyMetaSchema.decode({
+        ...preflightFields,
+        status: 'preflight-error',
+        preflight: { ...preflightBlock, exit_code: 2, error_reason: 'nonzero' },
+      })
+      if (isAgentRanMeta(result)) throw new Error('expected preflight variant')
+      expect(result.status).toBe('preflight-error')
+      expect(result.preflight.error_reason).toBe('nonzero')
+    })
+
+    test('rejects skipped-preflight without preflight block', () => {
+      expect(() =>
+        // @ts-expect-error intentionally missing preflight block
+        historyMetaSchema.decode({
+          ...preflightFields,
+          status: 'skipped-preflight',
+        }),
+      ).toThrow()
+    })
+
+    test('encode round-trips skipped-preflight', () => {
+      const decoded = historyMetaSchema.decode({
+        ...preflightFields,
+        status: 'skipped-preflight',
+        preflight: preflightBlock,
+      })
+      const encoded = historyMetaSchema.encode(decoded)
+      if (!('status' in encoded)) throw new Error('expected status field')
+      expect(encoded.status).toBe('skipped-preflight')
+      expect(encoded.preflight).toEqual(preflightBlock)
+    })
+
+    test('agent-ran record may carry optional preflight block', () => {
+      const result = historyMetaSchema.decode({
+        ...baseMeta,
+        preflight: { ...preflightBlock, exit_code: 0 },
+      })
+      if (!isAgentRanMeta(result)) throw new Error('expected agent-ran')
+      expect(result.preflight?.exit_code).toBe(0)
+    })
+
+    test('rejects unknown error_reason', () => {
+      expect(() =>
+        historyMetaSchema.decode({
+          ...preflightFields,
+          status: 'preflight-error',
+          // @ts-expect-error invalid error_reason value
+          preflight: { ...preflightBlock, error_reason: 'bogus' },
+        }),
+      ).toThrow()
+    })
   })
 })

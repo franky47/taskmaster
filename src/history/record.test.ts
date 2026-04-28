@@ -137,6 +137,62 @@ describe('recordHistory', () => {
     expect(fs.access(tmpDir)).rejects.toThrow()
   })
 
+  test('skipped-preflight + temp dir: deletes temp dir, no runs/ archive', async () => {
+    const configDir = await makeConfigDir()
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'taskmaster-'))
+    await fs.writeFile(path.join(tmpDir, 'artifact.txt'), 'data')
+
+    await recordHistory(
+      {
+        timestamp: runIdSchema.parse('2026-04-04T08.30.00Z'),
+        started_at: new Date('2026-04-04T08:30:00.000Z'),
+        finished_at: new Date('2026-04-04T08:30:00.050Z'),
+        status: 'skipped-preflight',
+        preflight: {
+          exit_code: 1,
+          duration_ms: 50,
+          stdout_bytes: 0,
+          stderr_bytes: 0,
+        },
+      },
+      makeArtifacts({ cwd: { path: tmpDir, is_temp: true } }),
+      { configDir },
+    )
+
+    expect(fs.access(tmpDir)).rejects.toThrow()
+    expect(
+      fs.access(path.join(configDir, 'runs', 'daily-audit')),
+    ).rejects.toThrow()
+  })
+
+  test('preflight-error + temp dir: deletes temp dir, no runs/ archive', async () => {
+    const configDir = await makeConfigDir()
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'taskmaster-'))
+
+    await recordHistory(
+      {
+        timestamp: runIdSchema.parse('2026-04-04T08.30.00Z'),
+        started_at: new Date('2026-04-04T08:30:00.000Z'),
+        finished_at: new Date('2026-04-04T08:30:00.050Z'),
+        status: 'preflight-error',
+        preflight: {
+          exit_code: 2,
+          duration_ms: 50,
+          stdout_bytes: 0,
+          stderr_bytes: 0,
+          error_reason: 'nonzero',
+        },
+      },
+      makeArtifacts({ cwd: { path: tmpDir, is_temp: true } }),
+      { configDir },
+    )
+
+    expect(fs.access(tmpDir)).rejects.toThrow()
+    expect(
+      fs.access(path.join(configDir, 'runs', 'daily-audit')),
+    ).rejects.toThrow()
+  })
+
   test('failure + temp dir: moves to runs/ with artifacts', async () => {
     const configDir = await makeConfigDir()
     const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'taskmaster-'))

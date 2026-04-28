@@ -9,6 +9,7 @@ import {
   queryGlobalHistory,
   queryHistory,
 } from './query'
+import { isAgentRanMeta } from './schema'
 import { runIdSchema } from './timestamp'
 
 const rid = (s: string) => runIdSchema.parse(s)
@@ -144,8 +145,10 @@ describe('queryHistory', () => {
     if (result instanceof Error) return
 
     expect(result).toHaveLength(1)
-    expect(result[0]!.timestamp).toBe(rid('2026-04-02T08.00.00Z'))
-    expect(result[0]!.success).toBe(false)
+    const failureEntry = result[0]!
+    expect(failureEntry.timestamp).toBe(rid('2026-04-02T08.00.00Z'))
+    if (!isAgentRanMeta(failureEntry)) throw new Error('expected agent-ran')
+    expect(failureEntry.success).toBe(false)
   })
 
   test('--last N limits to N most recent entries', async () => {
@@ -280,6 +283,7 @@ describe('queryHistory', () => {
     if (result instanceof Error) return
 
     const entry = result[0]!
+    if (!isAgentRanMeta(entry)) throw new Error('expected agent-ran')
     expect(entry.started_at).toBeInstanceOf(Date)
     expect(entry.finished_at).toBeInstanceOf(Date)
     expect(entry.started_at.toISOString()).toBe('2026-04-04T08:30:00.000Z')

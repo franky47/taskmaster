@@ -7,6 +7,7 @@ import { formatRelative } from '#lib/observability-time'
 import { minCronIntervalMs } from '#lib/schedule'
 import type { Requirement } from '#lib/task'
 import type { HistoryEntry } from '#src/history'
+import { isAgentRanMeta } from '#src/history/schema'
 import type { ValidationResult } from '#src/validate'
 
 // Finding types --
@@ -158,7 +159,7 @@ export function checkSchedulerInstalled(
 export function checkLogErrors(entries: LogEntry[]): Finding[] {
   const findings: Finding[] = []
   for (const entry of entries) {
-    if (entry.event === 'error') {
+    if (entry.event === 'error' && 'error' in entry) {
       findings.push({
         kind: 'log-error',
         severity: 'info',
@@ -178,11 +179,12 @@ export function checkTaskFailures(
   history: HistoryEntry[],
   now: Date,
 ): TaskFailureFinding | null {
-  const first = history[0]
+  const agentRuns = history.filter(isAgentRanMeta)
+  const first = agentRuns[0]
   if (first === undefined || first.success || first.timed_out) return null
 
   let consecutiveFailures = 0
-  for (const entry of history) {
+  for (const entry of agentRuns) {
     if (entry.success || entry.timed_out) break
     consecutiveFailures++
   }
@@ -209,11 +211,12 @@ export function checkTaskTimeouts(
   timeoutMs: number | undefined,
   now: Date,
 ): TaskTimeoutFinding | null {
-  const first = history[0]
+  const agentRuns = history.filter(isAgentRanMeta)
+  const first = agentRuns[0]
   if (first === undefined || first.success || !first.timed_out) return null
 
   let consecutiveTimeouts = 0
-  for (const entry of history) {
+  for (const entry of agentRuns) {
     if (!entry.timed_out) break
     consecutiveTimeouts++
   }

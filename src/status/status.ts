@@ -9,6 +9,7 @@ import type { ReadMarkerDeps } from '#lib/lock'
 import type { Requirement } from '#lib/task'
 import { queryHistory } from '#src/history'
 import type { RunId } from '#src/history'
+import { isAgentRanMeta } from '#src/history/schema'
 import { listTasks } from '#src/list'
 import type { TasksDirReadError } from '#src/validate'
 
@@ -107,7 +108,7 @@ export async function getTaskStatuses(
         `warning: ${task.name}: could not read history: ${history.message}\n`,
       )
     } else {
-      const latest = history[0]
+      const latest = history.find(isAgentRanMeta)
       if (latest) {
         status.last_run = {
           timestamp: latest.timestamp,

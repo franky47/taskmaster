@@ -57,19 +57,19 @@ export async function recordHistory(
   deps?: RecordHistoryDeps,
 ): Promise<HistoryWriteError | undefined> {
   const { task_name, output, prompt, cwd } = artifacts
-  const success = meta.exit_code === 0
   const duration_ms = meta.finished_at.getTime() - meta.started_at.getTime()
+  const success = 'exit_code' in meta ? meta.exit_code === 0 : false
   const cfgDir = deps?.configDir ?? defaultConfigDir
 
   try {
     const histDir = path.join(cfgDir, 'history', task_name)
     await fs.mkdir(histDir, { recursive: true })
 
-    const serialized = historyMetaSchema.encode({
-      ...meta,
-      success,
-      duration_ms,
-    })
+    const fullMeta =
+      'exit_code' in meta
+        ? { ...meta, success, duration_ms }
+        : { ...meta, duration_ms }
+    const serialized = historyMetaSchema.encode(fullMeta)
 
     await fs.writeFile(
       path.join(histDir, `${meta.timestamp}.meta.json`),
@@ -84,11 +84,9 @@ export async function recordHistory(
     }
 
     if (cwd.is_temp) {
-      if (success) {
-        // S4.5: delete temp dir on success
-        await fs.rm(cwd.path, { recursive: true })
-      } else {
-        // S4.6: move temp dir to runs/ on failure, write artifacts
+      const agentRanAndFailed = 'exit_code' in meta && !success
+      if (agentRanAndFailed) {
+        // S4.6: move temp dir to runs/ on agent-run failure, write artifacts
         const runsBase = deps?.configDir
           ? path.join(deps.configDir, 'runs')
           : defaultRunsDir
@@ -98,6 +96,10 @@ export async function recordHistory(
 
         await fs.writeFile(path.join(runsPath, 'prompt.md'), prompt)
         await fs.writeFile(path.join(runsPath, 'output.txt'), output)
+      } else {
+        // S4.5: delete temp dir on success or when agent never ran
+        // (preflight skip/error — no agent artifacts worth preserving)
+        await fs.rm(cwd.path, { recursive: true })
       }
     }
     // S4.7: explicit cwd — no directory operations

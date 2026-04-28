@@ -8,7 +8,7 @@ import { configDir as defaultConfigDir } from '#lib/config'
 import type { RunningMarker } from '#lib/lock'
 
 import type { HistoryMeta } from './schema'
-import { historyMetaSchema } from './schema'
+import { historyMetaSchema, isAgentRanMeta } from './schema'
 
 // Errors --
 
@@ -30,7 +30,7 @@ export type HistoryEntry = HistoryMeta & {
 }
 
 type CompletedHistoryEntry = HistoryEntry & {
-  status: 'ok' | 'timeout' | 'err'
+  status: 'ok' | 'timeout' | 'err' | 'skipped-preflight' | 'preflight-error'
 }
 
 type RunningHistoryEntry = {
@@ -108,10 +108,17 @@ export function buildDisplayEntries(
   entries: HistoryEntry[],
   options: DisplayOptions,
 ): HistoryDisplayEntry[] {
-  const completed: CompletedHistoryEntry[] = entries.map((e) => ({
-    ...e,
-    status: e.success ? 'ok' : e.timed_out ? 'timeout' : 'err',
-  }))
+  const completed: CompletedHistoryEntry[] = entries.map((e) => {
+    if (isAgentRanMeta(e)) {
+      const status: 'ok' | 'timeout' | 'err' = e.success
+        ? 'ok'
+        : e.timed_out
+          ? 'timeout'
+          : 'err'
+      return { ...e, status }
+    }
+    return e
+  })
 
   if (!options.marker) return completed
 
@@ -152,7 +159,9 @@ export async function queryHistory(
   }
 
   // Filter failures (S6.3)
-  let result = options?.failures ? entries.filter((e) => !e.success) : entries
+  let result = options?.failures
+    ? entries.filter((e) => !isAgentRanMeta(e) || !e.success)
+    : entries
 
   // Limit (S6.4)
   if (options?.last !== undefined) {
@@ -205,7 +214,7 @@ export async function queryGlobalHistory(
 
   // Filter failures
   let result: GlobalHistoryEntry[] = options?.failures
-    ? allEntries.filter((e) => !e.success)
+    ? allEntries.filter((e) => !isAgentRanMeta(e) || !e.success)
     : allEntries
 
   // Limit (default 20)

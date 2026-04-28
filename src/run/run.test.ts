@@ -7,6 +7,7 @@ import path from 'node:path'
 import { PassThrough } from 'node:stream'
 
 import { AgentNotFoundError } from '#lib/agent'
+import { TaskContentionError } from '#lib/lock'
 import {
   FrontmatterValidationError,
   TaskFileNameError,
@@ -261,6 +262,7 @@ describe('executeTask', () => {
     })
 
     if (result instanceof Error) throw result
+    if (result.kind !== 'agent') throw new Error('expected agent result')
     expect(result.exitCode).toBe(1)
     expect(fs.existsSync(promptPath)).toBe(false)
   })
@@ -414,6 +416,7 @@ describe('executeTask', () => {
     })
 
     if (result instanceof Error) throw result
+    if (result.kind !== 'agent') throw new Error('expected agent result')
     expect(result.exitCode).toBe(42)
   })
 
@@ -435,6 +438,7 @@ describe('executeTask', () => {
     })
 
     if (result instanceof Error) throw result
+    if (result.kind !== 'agent') throw new Error('expected agent result')
     expect(result.output).toBe('hello out\nhello err')
   })
 
@@ -571,6 +575,7 @@ describe('executeTask', () => {
     })
 
     if (result instanceof Error) throw result
+    if (result.kind !== 'agent') throw new Error('expected agent result')
     expect(result.timedOut).toBe(true)
   })
 
@@ -713,7 +718,440 @@ describe('executeTask', () => {
     })
 
     if (result instanceof Error) throw result
+    if (result.kind !== 'agent') throw new Error('expected agent result')
     expect(result.timedOut).toBe(false)
+  })
+
+  describe('preflight', () => {
+    const preflightTask = [
+      '---',
+      'on:',
+      '  schedule: "0 8 * * 1-5"',
+      'agent: opencode',
+      "preflight: 'true'",
+      '---',
+      'Do thing.',
+    ].join('\n')
+
+    function fakePreflight(
+      result: Partial<{
+        exit_code: number
+        stdout: string
+        stderr: string
+        timed_out: boolean
+        signaled: boolean
+        duration_ms: number
+      }> = {},
+    ): ExecuteDeps['spawnPreflight'] {
+      return async () => ({
+        exit_code: 0,
+        stdout: '',
+        stderr: '',
+        timed_out: false,
+        signaled: false,
+        duration_ms: 5,
+        ...result,
+      })
+    }
+
+    test('invokes preflight before agent on exit 0 and proceeds', async () => {
+      const configDir = await makeConfigDir()
+      await writeTask(configDir, 'pf', preflightTask)
+
+      const calls: string[] = []
+      const result = await executeTask('pf', {
+        configDir,
+        deps: {
+          spawnPreflight: async () => {
+            calls.push('preflight')
+            return {
+              exit_code: 0,
+              stdout: '',
+              stderr: '',
+              timed_out: false,
+              signaled: false,
+              duration_ms: 5,
+            }
+          },
+          spawnAgent: async () => {
+            calls.push('agent')
+            return { exitCode: 0, output: '', timedOut: false }
+          },
+        },
+      })
+
+      if (result instanceof Error) throw result
+      expect(calls).toEqual(['preflight', 'agent'])
+      expect(result.kind).toBe('agent')
+    })
+
+    test('exit 1 skips agent and returns skipped-preflight result', async () => {
+      const configDir = await makeConfigDir()
+      await writeTask(configDir, 'skip-pf', preflightTask)
+
+      const calls: string[] = []
+      const result = await executeTask('skip-pf', {
+        configDir,
+        deps: {
+          spawnPreflight: fakePreflight({ exit_code: 1 }),
+          spawnAgent: async () => {
+            calls.push('agent')
+            return { exitCode: 0, output: '', timedOut: false }
+          },
+        },
+      })
+
+      if (result instanceof Error) throw result
+      expect(calls).toEqual([])
+      expect(result.kind).toBe('skipped-preflight')
+      if (result.kind !== 'skipped-preflight') return
+      expect(result.preflight.exit_code).toBe(1)
+      expect(result.preflight.error_reason).toBeUndefined()
+    })
+
+    test('exit 2+ returns preflight-error with error_reason: nonzero', async () => {
+      const configDir = await makeConfigDir()
+      await writeTask(configDir, 'err-pf', preflightTask)
+
+      const result = await executeTask('err-pf', {
+        configDir,
+        deps: {
+          spawnPreflight: fakePreflight({
+            exit_code: 2,
+            stderr: 'crash',
+          }),
+          spawnAgent: fakeSpawn(),
+        },
+      })
+
+      if (result instanceof Error) throw result
+      expect(result.kind).toBe('preflight-error')
+      if (result.kind !== 'preflight-error') return
+      expect(result.preflight.error_reason).toBe('nonzero')
+      expect(result.preflight.stderr).toBe('crash')
+    })
+
+    test('timeout returns preflight-error with error_reason: timeout', async () => {
+      const configDir = await makeConfigDir()
+      await writeTask(configDir, 'pf-timeout', preflightTask)
+
+      const result = await executeTask('pf-timeout', {
+        configDir,
+        deps: {
+          spawnPreflight: fakePreflight({
+            exit_code: 124,
+            timed_out: true,
+          }),
+          spawnAgent: fakeSpawn(),
+        },
+      })
+
+      if (result instanceof Error) throw result
+      expect(result.kind).toBe('preflight-error')
+      if (result.kind !== 'preflight-error') return
+      expect(result.preflight.error_reason).toBe('timeout')
+      expect(result.preflight.timed_out).toBe(true)
+    })
+
+    test('timed_out wins over exit_code 0 (killed process reaped as 0)', async () => {
+      const configDir = await makeConfigDir()
+      await writeTask(configDir, 'pf-killed-zero', preflightTask)
+
+      const result = await executeTask('pf-killed-zero', {
+        configDir,
+        deps: {
+          spawnPreflight: fakePreflight({
+            exit_code: 0,
+            timed_out: true,
+          }),
+          spawnAgent: fakeSpawn(),
+        },
+      })
+
+      if (result instanceof Error) throw result
+      expect(result.kind).toBe('preflight-error')
+      if (result.kind !== 'preflight-error') return
+      expect(result.preflight.error_reason).toBe('timeout')
+    })
+
+    test('signal exit returns preflight-error with error_reason: signal', async () => {
+      const configDir = await makeConfigDir()
+      await writeTask(configDir, 'pf-signal', preflightTask)
+
+      const result = await executeTask('pf-signal', {
+        configDir,
+        deps: {
+          spawnPreflight: fakePreflight({
+            exit_code: 1,
+            signaled: true,
+          }),
+          spawnAgent: fakeSpawn(),
+        },
+      })
+
+      if (result instanceof Error) throw result
+      expect(result.kind).toBe('preflight-error')
+      if (result.kind !== 'preflight-error') return
+      expect(result.preflight.error_reason).toBe('signal')
+    })
+
+    test('passes 60s timeout to preflight spawn', async () => {
+      const configDir = await makeConfigDir()
+      await writeTask(configDir, 'pf-timeout-cap', preflightTask)
+
+      let observedTimeout = 0
+      await executeTask('pf-timeout-cap', {
+        configDir,
+        deps: {
+          spawnPreflight: async (opts) => {
+            observedTimeout = opts.timeoutMs
+            return {
+              exit_code: 0,
+              duration_ms: 5,
+              stdout: '',
+              stderr: '',
+              timed_out: false,
+              signaled: false,
+            }
+          },
+          spawnAgent: fakeSpawn(),
+        },
+      })
+
+      expect(observedTimeout).toBe(60_000)
+    })
+
+    test('exposes TM_TASK_NAME and TM_TRIGGER to preflight', async () => {
+      const configDir = await makeConfigDir()
+      await writeTask(configDir, 'pf-env', preflightTask)
+
+      let preflightEnv: Record<string, string> = {}
+      await executeTask('pf-env', {
+        configDir,
+        trigger: 'tick',
+        deps: {
+          spawnPreflight: async (opts) => {
+            preflightEnv = opts.env
+            return {
+              exit_code: 0,
+              duration_ms: 5,
+              stdout: '',
+              stderr: '',
+              timed_out: false,
+              signaled: false,
+            }
+          },
+          spawnAgent: fakeSpawn(),
+        },
+      })
+
+      expect(preflightEnv['TM_TASK_NAME']).toBe('pf-env')
+      expect(preflightEnv['TM_TRIGGER']).toBe('tick')
+    })
+
+    test('exposes TM_EVENT_NAME and TM_EVENT_PAYLOAD_FILE on dispatch trigger', async () => {
+      const configDir = await makeConfigDir()
+      await writeTask(configDir, 'pf-dispatch', preflightTask)
+
+      let preflightEnv: Record<string, string> = {}
+      await executeTask('pf-dispatch', {
+        configDir,
+        trigger: 'dispatch',
+        event: 'deploy',
+        payloadFile: '/tmp/payload-123',
+        deps: {
+          spawnPreflight: async (opts) => {
+            preflightEnv = opts.env
+            return {
+              exit_code: 0,
+              duration_ms: 5,
+              stdout: '',
+              stderr: '',
+              timed_out: false,
+              signaled: false,
+            }
+          },
+          spawnAgent: fakeSpawn(),
+        },
+      })
+
+      expect(preflightEnv['TM_EVENT_NAME']).toBe('deploy')
+      expect(preflightEnv['TM_EVENT_PAYLOAD_FILE']).toBe('/tmp/payload-123')
+    })
+
+    test('exposes TM_* env vars to agent run as well as preflight', async () => {
+      const configDir = await makeConfigDir()
+      await writeTask(configDir, 'agent-env', preflightTask)
+
+      let agentEnv: Record<string, string> = {}
+      await executeTask('agent-env', {
+        configDir,
+        trigger: 'manual',
+        timestamp: runIdSchema.parse('2026-04-04T08.30.00Z'),
+        deps: {
+          spawnPreflight: fakePreflight(),
+          spawnAgent: async (opts) => {
+            agentEnv = opts.env
+            return { exitCode: 0, output: '', timedOut: false }
+          },
+        },
+      })
+
+      expect(agentEnv['TM_TASK_NAME']).toBe('agent-env')
+      expect(agentEnv['TM_TRIGGER']).toBe('manual')
+      expect(agentEnv['TM_RUN_TIMESTAMP']).toBe('2026-04-04T08.30.00Z')
+    })
+
+    test('omits agent stage when preflight skips', async () => {
+      const configDir = await makeConfigDir()
+      await writeTask(configDir, 'no-agent', preflightTask)
+
+      let agentSpawnCount = 0
+      await executeTask('no-agent', {
+        configDir,
+        deps: {
+          spawnPreflight: fakePreflight({ exit_code: 1 }),
+          spawnAgent: async () => {
+            agentSpawnCount++
+            return { exitCode: 0, output: '', timedOut: false }
+          },
+        },
+      })
+
+      expect(agentSpawnCount).toBe(0)
+    })
+
+    test('attaches preflight outcome to agent result on exit 0', async () => {
+      const configDir = await makeConfigDir()
+      await writeTask(configDir, 'attach-pf', preflightTask)
+
+      const result = await executeTask('attach-pf', {
+        configDir,
+        deps: {
+          spawnPreflight: fakePreflight({
+            exit_code: 0,
+            stdout: 'inbox has 5 items',
+            duration_ms: 42,
+          }),
+          spawnAgent: fakeSpawn(),
+        },
+      })
+
+      if (result instanceof Error) throw result
+      if (result.kind !== 'agent') throw new Error('expected agent result')
+      expect(result.preflight?.exit_code).toBe(0)
+      expect(result.preflight?.stdout).toBe('inbox has 5 items')
+      expect(result.preflight?.duration_ms).toBe(42)
+    })
+
+    test('writes <ts>.preflight.txt to history dir when timestamp provided', async () => {
+      const configDir = await makeConfigDir()
+      await writeTask(configDir, 'pf-file', preflightTask)
+      const ts = runIdSchema.parse('2026-04-04T08.30.00Z')
+
+      await executeTask('pf-file', {
+        configDir,
+        timestamp: ts,
+        deps: {
+          spawnPreflight: fakePreflight({
+            exit_code: 1,
+            stdout: 'no work',
+            stderr: 'noisy',
+          }),
+          spawnAgent: fakeSpawn(),
+        },
+      })
+
+      const preflightPath = path.join(
+        configDir,
+        'history',
+        'pf-file',
+        `${ts}.preflight.txt`,
+      )
+      const body = await fsPromises.readFile(preflightPath, 'utf-8')
+      expect(body).toContain('no work')
+      expect(body).toContain('noisy')
+    })
+
+    test('preflight.txt is written even on exit 0 (agent ran)', async () => {
+      const configDir = await makeConfigDir()
+      await writeTask(configDir, 'pf-success-file', preflightTask)
+      const ts = runIdSchema.parse('2026-04-05T08.30.00Z')
+
+      await executeTask('pf-success-file', {
+        configDir,
+        timestamp: ts,
+        deps: {
+          spawnPreflight: fakePreflight({
+            exit_code: 0,
+            stdout: 'all good',
+          }),
+          spawnAgent: fakeSpawn(),
+        },
+      })
+
+      const preflightPath = path.join(
+        configDir,
+        'history',
+        'pf-success-file',
+        `${ts}.preflight.txt`,
+      )
+      const body = await fsPromises.readFile(preflightPath, 'utf-8')
+      expect(body).toContain('all good')
+    })
+
+    test('does not write preflight.txt when no preflight field declared', async () => {
+      const configDir = await makeConfigDir()
+      await writeTask(configDir, 'no-pf-file', agentTask)
+      const ts = runIdSchema.parse('2026-04-06T08.30.00Z')
+
+      await executeTask('no-pf-file', {
+        configDir,
+        timestamp: ts,
+        deps: {
+          spawnPreflight: fakePreflight(),
+          spawnAgent: fakeSpawn(),
+        },
+      })
+
+      const preflightPath = path.join(
+        configDir,
+        'history',
+        'no-pf-file',
+        `${ts}.preflight.txt`,
+      )
+      expect(fs.existsSync(preflightPath)).toBe(false)
+    })
+
+    test('tasks without preflight skip the preflight stage entirely', async () => {
+      const configDir = await makeConfigDir()
+      await writeTask(configDir, 'no-pf', agentTask)
+
+      let preflightCalled = false
+      const result = await executeTask('no-pf', {
+        configDir,
+        deps: {
+          spawnPreflight: async () => {
+            preflightCalled = true
+            return {
+              exit_code: 0,
+              duration_ms: 0,
+              stdout: '',
+              stderr: '',
+              timed_out: false,
+              signaled: false,
+            }
+          },
+          spawnAgent: fakeSpawn(),
+        },
+      })
+
+      if (result instanceof Error) throw result
+      expect(preflightCalled).toBe(false)
+      expect(result.kind).toBe('agent')
+      if (result.kind !== 'agent') return
+      expect(result.preflight).toBeUndefined()
+    })
   })
 })
 
@@ -728,6 +1166,7 @@ describe('runTask', () => {
     })
 
     if (result instanceof Error) throw result
+    if (result.kind !== 'agent') throw new Error('expected agent result')
     expect(result.exitCode).toBe(0)
   })
 
@@ -749,6 +1188,75 @@ describe('runTask', () => {
 
     expect(a).not.toBeInstanceOf(Error)
     expect(b).not.toBeInstanceOf(Error)
+  })
+
+  test('preflight does not run when lock is contended', async () => {
+    const configDir = await makeConfigDir()
+    const preflightLockTask = [
+      '---',
+      'on:',
+      '  schedule: "0 8 * * 1-5"',
+      'agent: opencode',
+      "preflight: 'true'",
+      '---',
+      'Body.',
+    ].join('\n')
+    await writeTask(configDir, 'pf-lock', preflightLockTask)
+
+    let preflightCalls = 0
+    const blockingAgent: ExecuteDeps['spawnAgent'] = () =>
+      new Promise((resolve) => {
+        setTimeout(() => {
+          resolve({ exitCode: 0, output: '', timedOut: false })
+        }, 50)
+      })
+
+    // Hold lock with a slow agent run
+    const slow = runTask('pf-lock', {
+      configDir,
+      lock: true,
+      deps: {
+        spawnPreflight: async () => {
+          preflightCalls++
+          return {
+            exit_code: 0,
+            duration_ms: 1,
+            stdout: '',
+            stderr: '',
+            timed_out: false,
+            signaled: false,
+          }
+        },
+        spawnAgent: blockingAgent,
+      },
+    })
+
+    // Wait long enough for the slow run to grab the lock
+    await new Promise((r) => setTimeout(r, 10))
+
+    const contended = await runTask('pf-lock', {
+      configDir,
+      lock: true,
+      deps: {
+        spawnPreflight: async () => {
+          preflightCalls++
+          return {
+            exit_code: 0,
+            duration_ms: 1,
+            stdout: '',
+            stderr: '',
+            timed_out: false,
+            signaled: false,
+          }
+        },
+        spawnAgent: fakeSpawn(),
+      },
+    })
+
+    expect(contended).toBeInstanceOf(TaskContentionError)
+    await slow
+    // Only the first run's preflight ran; the contended one bailed before preflight
+    expect(preflightCalls).toBe(1)
   })
 })
 

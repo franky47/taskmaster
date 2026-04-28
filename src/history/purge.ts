@@ -5,7 +5,7 @@ import * as errore from 'errore'
 
 import { historyDir as defaultHistoryDir } from '#lib/config'
 
-import { historyMetaSchema } from './schema'
+import { historyMetaSchema, isAgentRanMeta } from './schema'
 
 // Errors --
 
@@ -72,8 +72,8 @@ export async function purgeHistory(
         if (!result.success) continue
         const meta = result.data
 
-        // S4.9: never purge failed entries
-        if (!meta.success) continue
+        // S4.9: never purge failed entries; non-agent-ran entries are also kept
+        if (!isAgentRanMeta(meta) || !meta.success) continue
 
         const age = now.getTime() - meta.finished_at.getTime()
         if (age <= maxAge) continue
@@ -82,6 +82,7 @@ export async function purgeHistory(
         const tsPrefix = metaFile.replace('.meta.json', '')
         await fs.unlink(metaPath)
         await tryUnlink(path.join(taskDir, `${tsPrefix}.output.txt`))
+        await tryUnlink(path.join(taskDir, `${tsPrefix}.preflight.txt`))
         deleted++
       }
     }

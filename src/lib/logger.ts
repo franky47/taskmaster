@@ -20,7 +20,14 @@ const skippedPlainEntrySchema = z.object({
   ts: isoUtcSchema,
   event: z.literal('skipped'),
   task: z.string(),
-  reason: z.enum(['contention', 'disabled']),
+  reason: z.enum(['contention', 'disabled', 'preflight-skip']),
+})
+
+const preflightErrorEntrySchema = z.object({
+  ts: isoUtcSchema,
+  event: z.literal('error'),
+  task: z.string(),
+  reason: z.literal('preflight-error'),
 })
 
 const skippedRequirementEntrySchema = z.object({
@@ -43,6 +50,7 @@ export const logEntrySchema = z.union([
   skippedPlainEntrySchema,
   skippedRequirementEntrySchema,
   errorEntrySchema,
+  preflightErrorEntrySchema,
 ])
 
 // Types --
@@ -54,7 +62,7 @@ type LogInput =
   | {
       event: 'skipped'
       task: string
-      reason: 'contention' | 'disabled'
+      reason: 'contention' | 'disabled' | 'preflight-skip'
     }
   | {
       event: 'skipped'
@@ -63,6 +71,7 @@ type LogInput =
       requirement: Requirement[]
     }
   | { event: 'error'; task: string; error: Error }
+  | { event: 'error'; task: string; reason: 'preflight-error' }
 
 // Serialization --
 
@@ -90,7 +99,7 @@ export function serializeError(err: Error): Record<string, unknown> {
 }
 
 function serializeEntry(entry: LogInput): Record<string, unknown> {
-  if (entry.event === 'error') {
+  if (entry.event === 'error' && 'error' in entry) {
     return {
       ts: isoNow(),
       ...entry,

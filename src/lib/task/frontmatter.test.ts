@@ -695,6 +695,55 @@ describe('parseMarkdown', () => {
     })
   })
 
+  describe('preflight', () => {
+    test('accepts non-empty string', () => {
+      const result = parseMarkdown(
+        md(
+          `on:\n  schedule: '0 8 * * *'\n${VALID_AGENT}\npreflight: 'test -s /tmp/inbox'`,
+        ),
+      )
+      expect(result).not.toBeInstanceOf(Error)
+      if (result instanceof Error) return
+      expect(result.preflight).toBe('test -s /tmp/inbox')
+    })
+
+    test('rejects empty string', () => {
+      const result = parseMarkdown(
+        md(`on:\n  schedule: '0 8 * * *'\n${VALID_AGENT}\npreflight: ''`),
+      )
+      expect(result).toBeInstanceOf(FrontmatterValidationError)
+      if (!(result instanceof FrontmatterValidationError)) return
+      expect(
+        result.errors.some(
+          (e) => e.key === 'preflight' && e.message.includes('non-empty'),
+        ),
+      ).toBe(true)
+    })
+
+    test('rejects non-string', () => {
+      const result = parseMarkdown(
+        md(`on:\n  schedule: '0 8 * * *'\n${VALID_AGENT}\npreflight: 42`),
+      )
+      expect(result).toBeInstanceOf(FrontmatterValidationError)
+      if (!(result instanceof FrontmatterValidationError)) return
+      expect(
+        result.errors.some(
+          (e) =>
+            e.key === 'preflight' && e.message.includes('must be a string'),
+        ),
+      ).toBe(true)
+    })
+
+    test('allows missing preflight', () => {
+      const result = parseMarkdown(
+        md(`on:\n  schedule: '0 8 * * *'\n${VALID_AGENT}`),
+      )
+      expect(result).not.toBeInstanceOf(Error)
+      if (result instanceof Error) return
+      expect(result.preflight).toBeUndefined()
+    })
+  })
+
   describe('timeout', () => {
     test('defaults timeout when omitted', () => {
       // Schedule: daily at 8am (24h interval) — default capped at 1h

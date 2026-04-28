@@ -38,6 +38,7 @@ import type {
 } from '#lib/task'
 import { parseTaskFile } from '#lib/task'
 import type { RunId } from '#src/history'
+import type { PreflightErrorReason } from '#src/history/schema'
 
 import type {
   CwdAccessError,
@@ -51,7 +52,18 @@ import { cleanupPromptFile, writePromptFile } from './prompt'
 
 // Types --
 
-type RunResult = {
+type PreflightOutcome = {
+  exit_code: number
+  duration_ms: number
+  stdout: string
+  stderr: string
+  timed_out: boolean
+  signaled: boolean
+  error_reason?: PreflightErrorReason
+}
+
+type AgentRunResult = {
+  kind: 'agent'
   exitCode: number
   output: string
   timedOut: boolean
@@ -59,7 +71,28 @@ type RunResult = {
   prompt: string
   startedAt: Date
   finishedAt: Date
+  preflight?: PreflightOutcome
 }
+
+type PreflightSkipResult = {
+  kind: 'skipped-preflight'
+  cwd: ResolvedCwd
+  prompt: string
+  startedAt: Date
+  finishedAt: Date
+  preflight: PreflightOutcome
+}
+
+type PreflightErrorResult = {
+  kind: 'preflight-error'
+  cwd: ResolvedCwd
+  prompt: string
+  startedAt: Date
+  finishedAt: Date
+  preflight: PreflightOutcome
+}
+
+type RunResult = AgentRunResult | PreflightSkipResult | PreflightErrorResult
 
 type SpawnAgentOpts = {
   command: string
@@ -73,6 +106,22 @@ type SpawnAgentResult = {
   exitCode: number
   output: string
   timedOut: boolean
+}
+
+export type SpawnPreflightOpts = {
+  command: string
+  cwd: string
+  env: Record<string, string>
+  timeoutMs: number
+}
+
+export type SpawnPreflightResult = {
+  exit_code: number
+  duration_ms: number
+  stdout: string
+  stderr: string
+  timed_out: boolean
+  signaled: boolean
 }
 
 type SpawnedChild = {
@@ -90,11 +139,15 @@ export type SpawnAgentDeps = {
 
 export type ExecuteDeps = {
   spawnAgent: (opts: SpawnAgentOpts) => Promise<SpawnAgentResult>
+  spawnPreflight: (opts: SpawnPreflightOpts) => Promise<SpawnPreflightResult>
 }
 
 type ExecuteOptions = {
   configDir?: string
   timestamp?: RunId
+  trigger?: 'manual' | 'tick' | 'dispatch'
+  event?: string
+  payloadFile?: string
   lock?: boolean
   payload?: string
   deps?: Partial<ExecuteDeps>
@@ -137,6 +190,70 @@ function defaultKillProcessGroup(pid: number, signal: NodeJS.Signals): void {
       `tm: failed to kill process group ${pid}: ${msg} — process may still be running\n`,
     )
   }
+}
+
+const PREFLIGHT_TIMEOUT_MS = 60_000
+
+async function defaultSpawnPreflight(
+  opts: SpawnPreflightOpts,
+  deps?: Partial<SpawnAgentDeps>,
+): Promise<SpawnPreflightResult> {
+  const spawnFn = deps?.spawn ?? nodeSpawn
+  const killGroup = deps?.killProcessGroup ?? defaultKillProcessGroup
+
+  return new Promise((resolve) => {
+    const startedAt = Date.now()
+    const child = spawnFn('sh', ['-c', opts.command], {
+      cwd: opts.cwd,
+      env: opts.env,
+      detached: true,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
+
+    const pid = child.pid
+    if (pid === undefined) {
+      resolve({
+        exit_code: 127,
+        duration_ms: Date.now() - startedAt,
+        stdout: '',
+        stderr: `Failed to spawn process: ${opts.command}`,
+        timed_out: false,
+        signaled: false,
+      })
+      return
+    }
+
+    let timedOut = false
+    let timeoutTimer: ReturnType<typeof setTimeout> | undefined
+    let graceTimer: ReturnType<typeof setTimeout> | undefined
+    const stdoutChunks: Buffer[] = []
+    const stderrChunks: Buffer[] = []
+
+    child.stdout?.on('data', (chunk: Buffer) => stdoutChunks.push(chunk))
+    child.stderr?.on('data', (chunk: Buffer) => stderrChunks.push(chunk))
+
+    timeoutTimer = setTimeout(() => {
+      if (child.exitCode !== null) return
+      timedOut = true
+      killGroup(pid, 'SIGTERM')
+      graceTimer = setTimeout(() => {
+        killGroup(pid, 'SIGKILL')
+      }, KILL_GRACE_MS)
+    }, opts.timeoutMs)
+
+    child.on('close', (code: number | null) => {
+      clearTimeout(timeoutTimer)
+      clearTimeout(graceTimer)
+      resolve({
+        exit_code: code ?? 1,
+        duration_ms: Date.now() - startedAt,
+        stdout: Buffer.concat(stdoutChunks).toString(),
+        stderr: Buffer.concat(stderrChunks).toString(),
+        timed_out: timedOut,
+        signaled: code === null && !timedOut,
+      })
+    })
+  })
 }
 
 export async function defaultSpawnAgent(
@@ -267,6 +384,80 @@ export async function executeTask(
     ? `${task.prompt}\n---\n${options.payload}`
     : task.prompt
 
+  // Build TM_* env additions
+  const trigger = options?.trigger
+  const tmEnv: Record<string, string> = { TM_TASK_NAME: name }
+  if (trigger) tmEnv['TM_TRIGGER'] = trigger
+  if (options?.timestamp) tmEnv['TM_RUN_TIMESTAMP'] = options.timestamp
+  if (trigger === 'dispatch' && options?.event)
+    tmEnv['TM_EVENT_NAME'] = options.event
+  if (trigger === 'dispatch' && options?.payloadFile)
+    tmEnv['TM_EVENT_PAYLOAD_FILE'] = options.payloadFile
+
+  // Preflight stage
+  let preflightOutcome: PreflightOutcome | undefined
+  if (task.preflight) {
+    const spawnPreflight =
+      options?.deps?.spawnPreflight ?? defaultSpawnPreflight
+    const pf = await spawnPreflight({
+      command: task.preflight,
+      cwd: cwd.path,
+      env: { ...env, ...tmEnv },
+      timeoutMs: PREFLIGHT_TIMEOUT_MS,
+    })
+
+    // timed_out / signaled win over exit_code: a process killed by SIGTERM
+    // can still have its exit code reported as 0 by the kernel.
+    const error_reason: PreflightErrorReason | undefined = pf.timed_out
+      ? 'timeout'
+      : pf.signaled
+        ? 'signal'
+        : pf.exit_code === 0 || pf.exit_code === 1
+          ? undefined
+          : 'nonzero'
+
+    preflightOutcome = {
+      exit_code: pf.exit_code,
+      duration_ms: pf.duration_ms,
+      stdout: pf.stdout,
+      stderr: pf.stderr,
+      timed_out: pf.timed_out,
+      signaled: pf.signaled,
+      ...(error_reason ? { error_reason } : {}),
+    }
+
+    // Persist <ts>.preflight.txt when timestamp is provided
+    if (options?.timestamp) {
+      const histDir = path.join(
+        configRoot ? path.join(configRoot, 'history') : defaultHistoryDir,
+        name,
+      )
+      await fsPromises.mkdir(histDir, { recursive: true })
+      const body = `[stdout]\n${pf.stdout}\n[stderr]\n${pf.stderr}\n`
+      await fsPromises.writeFile(
+        path.join(histDir, `${options.timestamp}.preflight.txt`),
+        body,
+      )
+    }
+
+    if (pf.exit_code !== 0 || pf.timed_out || pf.signaled) {
+      const finishedAt = new Date()
+      const kind: 'skipped-preflight' | 'preflight-error' =
+        pf.exit_code === 1 && !pf.timed_out && !pf.signaled
+          ? 'skipped-preflight'
+          : 'preflight-error'
+
+      return {
+        kind,
+        cwd,
+        prompt,
+        startedAt,
+        finishedAt,
+        preflight: preflightOutcome,
+      }
+    }
+  }
+
   const promptPath = writePromptFile(name, startedAt, prompt)
   if (promptPath instanceof Error) return promptPath
 
@@ -287,18 +478,22 @@ export async function executeTask(
     const result = await spawnAgent({
       command,
       cwd: cwd.path,
-      env: { ...env, TM_PROMPT_FILE: promptPath },
+      env: { ...env, ...tmEnv, TM_PROMPT_FILE: promptPath },
       timeoutMs: task.timeout,
       outputPath,
     })
     const finishedAt = new Date()
 
     return {
+      kind: 'agent',
       ...result,
       cwd,
       prompt,
       startedAt,
       finishedAt,
+      ...(typeof preflightOutcome !== 'undefined'
+        ? { preflight: preflightOutcome }
+        : {}),
     }
   } finally {
     cleanupPromptFile(promptPath)

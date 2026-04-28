@@ -240,7 +240,7 @@ describe('readLog', () => {
     const errorEntry = entries[2]!
     expect(errorEntry).toMatchObject({ event: 'error', task: 'my-task' })
     expect(errorEntry.ts).toBeString()
-    if (errorEntry.event === 'error') {
+    if (errorEntry.event === 'error' && 'error' in errorEntry) {
       expect(errorEntry.error['message']).toBe('boom')
     }
   })

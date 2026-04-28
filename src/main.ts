@@ -19,6 +19,7 @@ import {
   recordHistory,
 } from './history'
 import type { HistoryEntry, RunId } from './history'
+import { isAgentRanMeta } from './history/schema'
 import {
   configDir,
   historyDir,
@@ -41,9 +42,13 @@ function printHistoryEntry(entry: HistoryEntry, taskName?: string): void {
   const header = taskName ? `${taskName}  ${entry.timestamp}` : entry.timestamp
   console.log(header)
   console.log(`  duration  ${entry.duration_ms}ms`)
-  console.log(`  exit_code ${entry.exit_code}`)
-  const status = entry.success ? 'ok' : entry.timed_out ? 'timeout' : 'err'
-  console.log(`  status    ${status}`)
+  if (isAgentRanMeta(entry)) {
+    console.log(`  exit_code ${entry.exit_code}`)
+    const status = entry.success ? 'ok' : entry.timed_out ? 'timeout' : 'err'
+    console.log(`  status    ${status}`)
+  } else {
+    console.log(`  status    ${entry.status}`)
+  }
   if (entry.trigger) {
     console.log(`  trigger   ${entry.trigger}`)
   }
@@ -124,15 +129,21 @@ async function main(): Promise<void> {
             console.error(`Failed to read payload file: ${msg}`)
             process.exit(1)
           }
-          // Best-effort cleanup — ENOENT is fine if another child already deleted it
-          await fsPromises.unlink(opts.payloadFile).catch(() => {})
         }
 
         const result = await runTask(name, {
           timestamp,
+          trigger,
+          event: trigger === 'dispatch' ? opts.event : undefined,
+          payloadFile: opts.payloadFile,
           lock: trigger === 'tick',
           payload,
         })
+
+        // Clean up payload file once preflight + agent had a chance to read it
+        if (opts.payloadFile) {
+          await fsPromises.unlink(opts.payloadFile).catch(() => {})
+        }
 
         if (result instanceof Error) {
           if (result instanceof TaskContentionError) {
@@ -152,47 +163,114 @@ async function main(): Promise<void> {
           process.exit(1)
         }
 
-        const exitCode = result.timedOut ? 124 : result.exitCode
+        if (result.kind === 'agent') {
+          const exitCode = result.timedOut ? 124 : result.exitCode
 
-        // non-fatal
+          // non-fatal
+          const recordErr = await recordHistory(
+            {
+              timestamp,
+              started_at: result.startedAt,
+              finished_at: result.finishedAt,
+              exit_code: exitCode,
+              timed_out: result.timedOut,
+              trigger,
+              event: trigger === 'dispatch' ? opts.event : undefined,
+              ...(result.preflight
+                ? {
+                    preflight: {
+                      exit_code: result.preflight.exit_code,
+                      duration_ms: result.preflight.duration_ms,
+                      stdout_bytes: Buffer.byteLength(
+                        result.preflight.stdout,
+                        'utf8',
+                      ),
+                      stderr_bytes: Buffer.byteLength(
+                        result.preflight.stderr,
+                        'utf8',
+                      ),
+                    },
+                  }
+                : {}),
+            },
+            {
+              task_name: name,
+              output: result.output,
+              prompt: result.prompt,
+              cwd: result.cwd,
+              outputPrewritten: true,
+            },
+          )
+          if (recordErr instanceof Error) {
+            console.error(recordErr.message)
+          }
+
+          if (opts.json) {
+            console.log(
+              JSON.stringify({
+                skipped: false,
+                exitCode,
+                timedOut: result.timedOut,
+                duration_ms:
+                  result.finishedAt.getTime() - result.startedAt.getTime(),
+              }),
+            )
+          } else if (result.output) {
+            process.stdout.write(result.output)
+          }
+          process.exit(exitCode)
+        }
+
+        // skipped-preflight or preflight-error
         const recordErr = await recordHistory(
           {
             timestamp,
             started_at: result.startedAt,
             finished_at: result.finishedAt,
-            exit_code: exitCode,
-            timed_out: result.timedOut,
+            status: result.kind,
             trigger,
             event: trigger === 'dispatch' ? opts.event : undefined,
+            preflight: {
+              exit_code: result.preflight.exit_code,
+              duration_ms: result.preflight.duration_ms,
+              stdout_bytes: Buffer.byteLength(result.preflight.stdout, 'utf8'),
+              stderr_bytes: Buffer.byteLength(result.preflight.stderr, 'utf8'),
+              ...(result.preflight.error_reason
+                ? { error_reason: result.preflight.error_reason }
+                : {}),
+            },
           },
           {
             task_name: name,
-            output: result.output,
+            output: '',
             prompt: result.prompt,
             cwd: result.cwd,
-            outputPrewritten: true,
           },
         )
         if (recordErr instanceof Error) {
           console.error(recordErr.message)
         }
-
+        if (result.kind === 'skipped-preflight') {
+          log(
+            { event: 'skipped', task: name, reason: 'preflight-skip' },
+            logFilePath,
+          )
+        } else {
+          log(
+            { event: 'error', task: name, reason: 'preflight-error' },
+            logFilePath,
+          )
+        }
         if (opts.json) {
           console.log(
             JSON.stringify({
-              skipped: false,
-              exitCode,
-              timedOut: result.timedOut,
-              duration_ms:
-                result.finishedAt.getTime() - result.startedAt.getTime(),
+              skipped: result.kind === 'skipped-preflight',
+              preflight_error: result.kind === 'preflight-error',
+              taskName: name,
             }),
           )
-        } else {
-          if (result.output) {
-            process.stdout.write(result.output)
-          }
         }
-        process.exit(exitCode)
+        process.exit(0)
       },
     )
 
@@ -337,7 +415,9 @@ async function main(): Promise<void> {
               console.log(`  output    ${entry.output_path}`)
             } else {
               console.log(`  duration  ${entry.duration_ms}ms`)
-              console.log(`  exit_code ${entry.exit_code}`)
+              if ('exit_code' in entry) {
+                console.log(`  exit_code ${entry.exit_code}`)
+              }
               console.log(`  status    ${entry.status}`)
               if (entry.trigger) {
                 console.log(`  trigger   ${entry.trigger}`)
