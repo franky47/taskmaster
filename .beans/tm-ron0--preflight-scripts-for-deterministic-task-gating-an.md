@@ -1,10 +1,11 @@
 ---
 # tm-ron0
 title: Preflight scripts for deterministic task gating and prompt injection
-status: todo
+status: completed
 type: epic
+priority: normal
 created_at: 2026-04-28T14:38:37Z
-updated_at: 2026-04-28T14:38:37Z
+updated_at: 2026-04-28T16:21:13Z
 ---
 
 ## Problem Statement
@@ -154,3 +155,15 @@ Slow scenarios (process spawn, real timeouts) should use the existing `*.integra
 - `<PREFLIGHT/>` and `<PAYLOAD/>` are intentionally both routed through the same shared substitution module. They are different *data sources* (computed stdout vs delivered payload) but they share a single mechanism — the duplication concern that motivated dropping the implicit append applies only when there are two *mechanisms* for the same data, not when there is one mechanism with multiple bound variables.
 - A 60 s preflight timeout is theoretically incompatible with `* * * * *` per-minute cron tasks. Accepted: such tasks are an edge case, and the rest of the system already enforces `timeout < schedule interval`. Revisit if real per-minute preflighted tasks emerge.
 - `tm doctor`'s 14-day-stale-success threshold and "task has run at least once" guard are tunable. The intent is to avoid noising on freshly-added tasks and on rare-event tasks that legitimately skip for long stretches, while still surfacing scripts that have silently broken.
+
+## Summary of Changes
+
+Five-slice epic shipping deterministic preflight gating + token-substituted prompt injection:
+
+- **tm-v1sy** (commit 082cb3e): runner gate — `preflight` frontmatter field, exit-code → status mapping (0 run, 1 skip, else error), 60s hard cap, history meta with new `skipped-preflight` and `preflight-error` statuses, `TM_*` env vars, lock-aware execution.
+- **tm-ttdd** (commit b74085a): `<PREFLIGHT/>` token substitution module with single-pass non-recursive substitution, 1 MB cap, UTF-8 validation, parse-time validation rejecting the token without the field.
+- **tm-nzcg** (commit 41a65f9): `<PAYLOAD/>` token via the same shared module; the implicit `\n---\n` payload append is removed entirely; new `payload-error` history status.
+- **tm-jtg4** (commit 7c813c8): CLI surfacing — `[preflight]` marker on `tm list`, verbatim status display in `tm status`, preflight rows inline in `tm history`, `--failures` includes preflight-error/payload-error but not skipped-preflight.
+- **tm-gael** (commit f8af63e): `tm doctor` chronic-preflight-error and stale-preflight-success diagnostics, both gated to tasks declaring preflight, surfaced via `tm doctor --json` with stable kind identifiers.
+
+All 38 user stories addressed. Full `bun run check` green: 688 tests, formatted, linted, typecheck clean, knip clean, no deprecated calls. The implicit `payload \n---\n` append is gone — there is exactly one mechanism (token substitution) for both data sources to enter the prompt.
