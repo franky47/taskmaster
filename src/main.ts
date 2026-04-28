@@ -181,14 +181,8 @@ async function main(): Promise<void> {
                     preflight: {
                       exit_code: result.preflight.exit_code,
                       duration_ms: result.preflight.duration_ms,
-                      stdout_bytes: Buffer.byteLength(
-                        result.preflight.stdout,
-                        'utf8',
-                      ),
-                      stderr_bytes: Buffer.byteLength(
-                        result.preflight.stderr,
-                        'utf8',
-                      ),
+                      stdout_bytes: result.preflight.stdout_bytes,
+                      stderr_bytes: result.preflight.stderr_bytes,
                     },
                   }
                 : {}),
@@ -233,8 +227,8 @@ async function main(): Promise<void> {
             preflight: {
               exit_code: result.preflight.exit_code,
               duration_ms: result.preflight.duration_ms,
-              stdout_bytes: Buffer.byteLength(result.preflight.stdout, 'utf8'),
-              stderr_bytes: Buffer.byteLength(result.preflight.stderr, 'utf8'),
+              stdout_bytes: result.preflight.stdout_bytes,
+              stderr_bytes: result.preflight.stderr_bytes,
               ...(result.preflight.error_reason
                 ? { error_reason: result.preflight.error_reason }
                 : {}),

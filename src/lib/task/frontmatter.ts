@@ -4,6 +4,7 @@ import matter from 'gray-matter'
 import ms from 'ms'
 import { z } from 'zod'
 
+import { findTokens } from '#lib/prompt-template'
 import { minCronIntervalMs } from '#lib/schedule'
 
 const VALID_TIMEZONES = new Set(Intl.supportedValuesOf('timeZone'))
@@ -140,9 +141,22 @@ export function parseMarkdown(
 
   const result = frontmatterSchema.safeParse(fm.data)
   if (result.success) {
+    const prompt = fm.content.trim()
+    const tokens = findTokens(prompt)
+    if (tokens.has('PREFLIGHT') && result.data.preflight === undefined) {
+      return new FrontmatterValidationError({
+        errors: [
+          {
+            key: 'preflight',
+            message:
+              '<PREFLIGHT/> token in body but no `preflight` field declared',
+          },
+        ],
+      })
+    }
     return {
       ...result.data,
-      prompt: fm.content.trim(),
+      prompt,
     }
   }
 

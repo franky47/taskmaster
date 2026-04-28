@@ -229,6 +229,34 @@ describe('historyMetaSchema', () => {
       expect(result.preflight?.exit_code).toBe(0)
     })
 
+    test('parses preflight-error with invalid-utf8 error_reason', () => {
+      const result = historyMetaSchema.decode({
+        ...preflightFields,
+        status: 'preflight-error',
+        preflight: {
+          ...preflightBlock,
+          exit_code: 0,
+          error_reason: 'invalid-utf8',
+        },
+      })
+      if (isAgentRanMeta(result)) throw new Error('expected preflight variant')
+      expect(result.preflight.error_reason).toBe('invalid-utf8')
+    })
+
+    test('parses preflight-error with oversize-stdout error_reason', () => {
+      const result = historyMetaSchema.decode({
+        ...preflightFields,
+        status: 'preflight-error',
+        preflight: {
+          ...preflightBlock,
+          exit_code: 0,
+          error_reason: 'oversize-stdout',
+        },
+      })
+      if (isAgentRanMeta(result)) throw new Error('expected preflight variant')
+      expect(result.preflight.error_reason).toBe('oversize-stdout')
+    })
+
     test('rejects unknown error_reason', () => {
       expect(() =>
         historyMetaSchema.decode({

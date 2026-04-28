@@ -9,7 +9,13 @@ const isoDatetimeToDate = z.codec(z.iso.datetime(), z.date(), {
 
 const triggerField = z.enum(['manual', 'tick', 'dispatch']).optional()
 
-export const PREFLIGHT_ERROR_REASONS = ['nonzero', 'signal', 'timeout'] as const
+export const PREFLIGHT_ERROR_REASONS = [
+  'nonzero',
+  'signal',
+  'timeout',
+  'invalid-utf8',
+  'oversize-stdout',
+] as const
 export type PreflightErrorReason = (typeof PREFLIGHT_ERROR_REASONS)[number]
 
 const preflightBlockSchema = z.object({

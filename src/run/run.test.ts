@@ -741,9 +741,13 @@ describe('executeTask', () => {
         timed_out: boolean
         signaled: boolean
         duration_ms: number
+        stdout_oversize: boolean
+        stdout_invalid_utf8: boolean
+        stdout_bytes: number
+        stderr_bytes: number
       }> = {},
     ): ExecuteDeps['spawnPreflight'] {
-      return async () => ({
+      const merged = {
         exit_code: 0,
         stdout: '',
         stderr: '',
@@ -751,6 +755,13 @@ describe('executeTask', () => {
         signaled: false,
         duration_ms: 5,
         ...result,
+      }
+      return async () => ({
+        ...merged,
+        stdout_bytes:
+          result.stdout_bytes ?? Buffer.byteLength(merged.stdout, 'utf8'),
+        stderr_bytes:
+          result.stderr_bytes ?? Buffer.byteLength(merged.stderr, 'utf8'),
       })
     }
 
@@ -771,6 +782,8 @@ describe('executeTask', () => {
               timed_out: false,
               signaled: false,
               duration_ms: 5,
+              stdout_bytes: 0,
+              stderr_bytes: 0,
             }
           },
           spawnAgent: async () => {
@@ -912,6 +925,8 @@ describe('executeTask', () => {
               stderr: '',
               timed_out: false,
               signaled: false,
+              stdout_bytes: 0,
+              stderr_bytes: 0,
             }
           },
           spawnAgent: fakeSpawn(),
@@ -939,6 +954,8 @@ describe('executeTask', () => {
               stderr: '',
               timed_out: false,
               signaled: false,
+              stdout_bytes: 0,
+              stderr_bytes: 0,
             }
           },
           spawnAgent: fakeSpawn(),
@@ -969,6 +986,8 @@ describe('executeTask', () => {
               stderr: '',
               timed_out: false,
               signaled: false,
+              stdout_bytes: 0,
+              stderr_bytes: 0,
             }
           },
           spawnAgent: fakeSpawn(),
@@ -1123,6 +1142,208 @@ describe('executeTask', () => {
       expect(fs.existsSync(preflightPath)).toBe(false)
     })
 
+    const preflightTokenTask = [
+      '---',
+      'on:',
+      '  schedule: "0 8 * * 1-5"',
+      'agent: opencode',
+      "preflight: 'echo data'",
+      '---',
+      'Header.',
+      '<PREFLIGHT/>',
+      'Footer.',
+    ].join('\n')
+
+    test('substitutes <PREFLIGHT/> with preflight stdout in resolved prompt', async () => {
+      const configDir = await makeConfigDir()
+      await writeTask(configDir, 'pf-sub', preflightTokenTask)
+
+      let promptFileContents = ''
+      const result = await executeTask('pf-sub', {
+        configDir,
+        deps: {
+          spawnPreflight: fakePreflight({ stdout: 'INJECTED-VALUE' }),
+          spawnAgent: async (opts) => {
+            const p = opts.env['TM_PROMPT_FILE'] ?? ''
+            promptFileContents = fs.readFileSync(p, 'utf-8')
+            return { exitCode: 0, output: '', timedOut: false }
+          },
+        },
+      })
+
+      if (result instanceof Error) throw result
+      if (result.kind !== 'agent') throw new Error('expected agent result')
+      expect(result.prompt).toBe('Header.\nINJECTED-VALUE\nFooter.')
+      expect(promptFileContents).toBe('Header.\nINJECTED-VALUE\nFooter.')
+    })
+
+    test('trims leading/trailing whitespace from preflight stdout before substitution', async () => {
+      const configDir = await makeConfigDir()
+      await writeTask(configDir, 'pf-trim', preflightTokenTask)
+
+      const result = await executeTask('pf-trim', {
+        configDir,
+        deps: {
+          spawnPreflight: fakePreflight({
+            stdout: '\n\n  hello\nworld  \n\n',
+          }),
+          spawnAgent: fakeSpawn(),
+        },
+      })
+
+      if (result instanceof Error) throw result
+      if (result.kind !== 'agent') throw new Error('expected agent result')
+      expect(result.prompt).toBe('Header.\nhello\nworld\nFooter.')
+    })
+
+    test('substitutes all occurrences of <PREFLIGHT/>', async () => {
+      const configDir = await makeConfigDir()
+      const multiToken = [
+        '---',
+        'on:',
+        '  schedule: "0 8 * * 1-5"',
+        'agent: opencode',
+        "preflight: 'echo'",
+        '---',
+        '<PREFLIGHT/> and <PREFLIGHT/>',
+      ].join('\n')
+      await writeTask(configDir, 'pf-multi', multiToken)
+
+      const result = await executeTask('pf-multi', {
+        configDir,
+        deps: {
+          spawnPreflight: fakePreflight({ stdout: 'X' }),
+          spawnAgent: fakeSpawn(),
+        },
+      })
+
+      if (result instanceof Error) throw result
+      if (result.kind !== 'agent') throw new Error('expected agent result')
+      expect(result.prompt).toBe('X and X')
+    })
+
+    test('writes <ts>.prompt.txt when substitution produced non-empty content', async () => {
+      const configDir = await makeConfigDir()
+      await writeTask(configDir, 'pf-prompt-file', preflightTokenTask)
+      const ts = runIdSchema.parse('2026-04-07T08.30.00Z')
+
+      await executeTask('pf-prompt-file', {
+        configDir,
+        timestamp: ts,
+        deps: {
+          spawnPreflight: fakePreflight({ stdout: 'INJECTED' }),
+          spawnAgent: fakeSpawn(),
+        },
+      })
+
+      const promptPath = path.join(
+        configDir,
+        'history',
+        'pf-prompt-file',
+        `${ts}.prompt.txt`,
+      )
+      const body = await fsPromises.readFile(promptPath, 'utf-8')
+      expect(body).toBe('Header.\nINJECTED\nFooter.')
+    })
+
+    test('does not write <ts>.prompt.txt when body has no token', async () => {
+      const configDir = await makeConfigDir()
+      await writeTask(configDir, 'pf-no-token', preflightTask)
+      const ts = runIdSchema.parse('2026-04-07T09.30.00Z')
+
+      await executeTask('pf-no-token', {
+        configDir,
+        timestamp: ts,
+        deps: {
+          spawnPreflight: fakePreflight({ stdout: 'unused' }),
+          spawnAgent: fakeSpawn(),
+        },
+      })
+
+      const promptPath = path.join(
+        configDir,
+        'history',
+        'pf-no-token',
+        `${ts}.prompt.txt`,
+      )
+      expect(fs.existsSync(promptPath)).toBe(false)
+    })
+
+    test('does not write <ts>.prompt.txt when stdout trims to empty', async () => {
+      const configDir = await makeConfigDir()
+      await writeTask(configDir, 'pf-empty', preflightTokenTask)
+      const ts = runIdSchema.parse('2026-04-07T10.30.00Z')
+
+      await executeTask('pf-empty', {
+        configDir,
+        timestamp: ts,
+        deps: {
+          spawnPreflight: fakePreflight({ stdout: '   \n  ' }),
+          spawnAgent: fakeSpawn(),
+        },
+      })
+
+      const promptPath = path.join(
+        configDir,
+        'history',
+        'pf-empty',
+        `${ts}.prompt.txt`,
+      )
+      expect(fs.existsSync(promptPath)).toBe(false)
+    })
+
+    test('oversize-stdout flag returns preflight-error with no agent spawn', async () => {
+      const configDir = await makeConfigDir()
+      await writeTask(configDir, 'pf-oversize', preflightTask)
+
+      let agentSpawned = false
+      const result = await executeTask('pf-oversize', {
+        configDir,
+        deps: {
+          spawnPreflight: fakePreflight({
+            exit_code: 0,
+            stdout_oversize: true,
+          }),
+          spawnAgent: async () => {
+            agentSpawned = true
+            return { exitCode: 0, output: '', timedOut: false }
+          },
+        },
+      })
+
+      if (result instanceof Error) throw result
+      expect(agentSpawned).toBe(false)
+      expect(result.kind).toBe('preflight-error')
+      if (result.kind !== 'preflight-error') return
+      expect(result.preflight.error_reason).toBe('oversize-stdout')
+    })
+
+    test('invalid-utf8 flag returns preflight-error with no agent spawn', async () => {
+      const configDir = await makeConfigDir()
+      await writeTask(configDir, 'pf-invalid-utf8', preflightTask)
+
+      let agentSpawned = false
+      const result = await executeTask('pf-invalid-utf8', {
+        configDir,
+        deps: {
+          spawnPreflight: fakePreflight({
+            exit_code: 0,
+            stdout_invalid_utf8: true,
+          }),
+          spawnAgent: async () => {
+            agentSpawned = true
+            return { exitCode: 0, output: '', timedOut: false }
+          },
+        },
+      })
+
+      if (result instanceof Error) throw result
+      expect(agentSpawned).toBe(false)
+      expect(result.kind).toBe('preflight-error')
+      if (result.kind !== 'preflight-error') return
+      expect(result.preflight.error_reason).toBe('invalid-utf8')
+    })
+
     test('tasks without preflight skip the preflight stage entirely', async () => {
       const configDir = await makeConfigDir()
       await writeTask(configDir, 'no-pf', agentTask)
@@ -1140,6 +1361,8 @@ describe('executeTask', () => {
               stderr: '',
               timed_out: false,
               signaled: false,
+              stdout_bytes: 0,
+              stderr_bytes: 0,
             }
           },
           spawnAgent: fakeSpawn(),
@@ -1225,6 +1448,8 @@ describe('runTask', () => {
             stderr: '',
             timed_out: false,
             signaled: false,
+            stdout_bytes: 0,
+            stderr_bytes: 0,
           }
         },
         spawnAgent: blockingAgent,
@@ -1247,6 +1472,8 @@ describe('runTask', () => {
             stderr: '',
             timed_out: false,
             signaled: false,
+            stdout_bytes: 0,
+            stderr_bytes: 0,
           }
         },
         spawnAgent: fakeSpawn(),

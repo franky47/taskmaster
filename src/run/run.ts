@@ -28,6 +28,7 @@ import {
   acquireTaskLock,
 } from '#lib/lock'
 import { clearRunningMarker, writeRunningMarker } from '#lib/lock/marker'
+import { decodePreflightStdout, substituteTokens } from '#lib/prompt-template'
 import type {
   FrontmatterParseError,
   FrontmatterValidationError,
@@ -57,6 +58,8 @@ type PreflightOutcome = {
   duration_ms: number
   stdout: string
   stderr: string
+  stdout_bytes: number
+  stderr_bytes: number
   timed_out: boolean
   signaled: boolean
   error_reason?: PreflightErrorReason
@@ -120,8 +123,12 @@ export type SpawnPreflightResult = {
   duration_ms: number
   stdout: string
   stderr: string
+  stdout_bytes: number
+  stderr_bytes: number
   timed_out: boolean
   signaled: boolean
+  stdout_oversize?: boolean
+  stdout_invalid_utf8?: boolean
 }
 
 type SpawnedChild = {
@@ -212,11 +219,14 @@ async function defaultSpawnPreflight(
 
     const pid = child.pid
     if (pid === undefined) {
+      const stderr = `Failed to spawn process: ${opts.command}`
       resolve({
         exit_code: 127,
         duration_ms: Date.now() - startedAt,
         stdout: '',
-        stderr: `Failed to spawn process: ${opts.command}`,
+        stderr,
+        stdout_bytes: 0,
+        stderr_bytes: Buffer.byteLength(stderr, 'utf8'),
         timed_out: false,
         signaled: false,
       })
@@ -244,13 +254,20 @@ async function defaultSpawnPreflight(
     child.on('close', (code: number | null) => {
       clearTimeout(timeoutTimer)
       clearTimeout(graceTimer)
+      const stdoutBuf = Buffer.concat(stdoutChunks)
+      const stderrBuf = Buffer.concat(stderrChunks)
+      const decoded = decodePreflightStdout(stdoutBuf)
       resolve({
         exit_code: code ?? 1,
         duration_ms: Date.now() - startedAt,
-        stdout: Buffer.concat(stdoutChunks).toString(),
-        stderr: Buffer.concat(stderrChunks).toString(),
+        stdout: decoded.ok ? decoded.value : '',
+        stderr: stderrBuf.toString(),
+        stdout_bytes: stdoutBuf.length,
+        stderr_bytes: stderrBuf.length,
         timed_out: timedOut,
         signaled: code === null && !timedOut,
+        stdout_oversize: !decoded.ok && decoded.reason === 'oversize-stdout',
+        stdout_invalid_utf8: !decoded.ok && decoded.reason === 'invalid-utf8',
       })
     })
   })
@@ -407,20 +424,28 @@ export async function executeTask(
     })
 
     // timed_out / signaled win over exit_code: a process killed by SIGTERM
-    // can still have its exit code reported as 0 by the kernel.
+    // can still have its exit code reported as 0 by the kernel. Stdout-shape
+    // failures (oversize / invalid-utf8) likewise mean the agent must not
+    // run, regardless of the script's exit_code.
     const error_reason: PreflightErrorReason | undefined = pf.timed_out
       ? 'timeout'
       : pf.signaled
         ? 'signal'
-        : pf.exit_code === 0 || pf.exit_code === 1
-          ? undefined
-          : 'nonzero'
+        : pf.stdout_oversize
+          ? 'oversize-stdout'
+          : pf.stdout_invalid_utf8
+            ? 'invalid-utf8'
+            : pf.exit_code === 0 || pf.exit_code === 1
+              ? undefined
+              : 'nonzero'
 
     preflightOutcome = {
       exit_code: pf.exit_code,
       duration_ms: pf.duration_ms,
       stdout: pf.stdout,
       stderr: pf.stderr,
+      stdout_bytes: pf.stdout_bytes,
+      stderr_bytes: pf.stderr_bytes,
       timed_out: pf.timed_out,
       signaled: pf.signaled,
       ...(error_reason ? { error_reason } : {}),
@@ -440,10 +465,13 @@ export async function executeTask(
       )
     }
 
-    if (pf.exit_code !== 0 || pf.timed_out || pf.signaled) {
+    if (pf.exit_code !== 0 || error_reason !== undefined) {
       const finishedAt = new Date()
+      // Only a clean exit-1 with no stdout-shape errors counts as a skip.
+      // Any error_reason (timeout, signal, oversize, invalid-utf8, nonzero)
+      // is a preflight-error.
       const kind: 'skipped-preflight' | 'preflight-error' =
-        pf.exit_code === 1 && !pf.timed_out && !pf.signaled
+        pf.exit_code === 1 && error_reason === undefined
           ? 'skipped-preflight'
           : 'preflight-error'
 
@@ -458,7 +486,27 @@ export async function executeTask(
     }
   }
 
-  const promptPath = writePromptFile(name, startedAt, prompt)
+  // Substitute <PREFLIGHT/> token (after preflight has succeeded). When
+  // substitution actually replaces tokens with non-empty content, persist
+  // the resolved prompt to history for audit.
+  let resolvedPrompt = prompt
+  if (task.preflight && preflightOutcome) {
+    const sub = substituteTokens(prompt, { PREFLIGHT: preflightOutcome.stdout })
+    resolvedPrompt = sub.resolved
+    if (sub.nonEmptyCount > 0 && options?.timestamp) {
+      const histDir = path.join(
+        configRoot ? path.join(configRoot, 'history') : defaultHistoryDir,
+        name,
+      )
+      await fsPromises.mkdir(histDir, { recursive: true })
+      await fsPromises.writeFile(
+        path.join(histDir, `${options.timestamp}.prompt.txt`),
+        resolvedPrompt,
+      )
+    }
+  }
+
+  const promptPath = writePromptFile(name, startedAt, resolvedPrompt)
   if (promptPath instanceof Error) return promptPath
 
   // When timestamp is available, stream output to history dir via fd passthrough
@@ -488,7 +536,7 @@ export async function executeTask(
       kind: 'agent',
       ...result,
       cwd,
-      prompt,
+      prompt: resolvedPrompt,
       startedAt,
       finishedAt,
       ...(typeof preflightOutcome !== 'undefined'

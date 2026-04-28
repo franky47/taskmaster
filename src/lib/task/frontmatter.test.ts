@@ -742,6 +742,42 @@ describe('parseMarkdown', () => {
       if (result instanceof Error) return
       expect(result.preflight).toBeUndefined()
     })
+
+    test('rejects <PREFLIGHT/> in body when no preflight field declared', () => {
+      const result = parseMarkdown(
+        md(
+          `on:\n  schedule: '0 8 * * *'\n${VALID_AGENT}`,
+          'Body with <PREFLIGHT/> token.',
+        ),
+      )
+      expect(result).toBeInstanceOf(FrontmatterValidationError)
+      if (!(result instanceof FrontmatterValidationError)) return
+      expect(
+        result.errors.some(
+          (e) => e.key === 'preflight' && e.message.includes('<PREFLIGHT/>'),
+        ),
+      ).toBe(true)
+    })
+
+    test('accepts <PREFLIGHT/> in body when preflight field declared', () => {
+      const result = parseMarkdown(
+        md(
+          `on:\n  schedule: '0 8 * * *'\n${VALID_AGENT}\npreflight: 'echo hi'`,
+          'Body with <PREFLIGHT/> token.',
+        ),
+      )
+      expect(result).not.toBeInstanceOf(Error)
+    })
+
+    test('accepts preflight field without <PREFLIGHT/> in body (gate-only)', () => {
+      const result = parseMarkdown(
+        md(
+          `on:\n  schedule: '0 8 * * *'\n${VALID_AGENT}\npreflight: 'test -s /tmp/inbox'`,
+          'No token in body — gate-only use.',
+        ),
+      )
+      expect(result).not.toBeInstanceOf(Error)
+    })
   })
 
   describe('timeout', () => {
