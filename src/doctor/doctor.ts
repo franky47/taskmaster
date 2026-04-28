@@ -18,7 +18,9 @@ import {
   checkHeartbeat,
   checkLogErrors,
   checkOfflineSkips,
+  checkPreflightChronicError,
   checkSchedulerInstalled,
+  checkStalePreflightSuccess,
   checkTaskFailures,
   checkTaskNeverRan,
   checkTaskTimeouts,
@@ -47,8 +49,8 @@ type DoctorOptions = {
 }
 
 type DoctorResult =
-  | { ok: true; message: string }
-  | { ok: false; report: string }
+  | { ok: true; message: string; findings: Finding[] }
+  | { ok: false; report: string; findings: Finding[] }
 
 // Default dep implementations --
 
@@ -183,12 +185,33 @@ export async function doctor(options?: DoctorOptions): Promise<DoctorResult> {
       findings.push(
         ...checkConsecutiveRequirementSkips(task.name, taskLogEntries),
       )
+
+      const hasPreflight = task.preflight !== undefined
+      const chronicPreflightFinding = checkPreflightChronicError(
+        task.name,
+        history,
+        hasPreflight,
+        now,
+      )
+      if (chronicPreflightFinding) findings.push(chronicPreflightFinding)
+
+      const stalePreflightFinding = checkStalePreflightSuccess(
+        task.name,
+        history,
+        hasPreflight,
+        now,
+      )
+      if (stalePreflightFinding) findings.push(stalePreflightFinding)
     }
   }
 
   if (findings.length === 0) {
-    return { ok: true, message: 'All systems operational' }
+    return { ok: true, message: 'All systems operational', findings }
   }
 
-  return { ok: false, report: renderReport(findings, now, platform) }
+  return {
+    ok: false,
+    report: renderReport(findings, now, platform),
+    findings,
+  }
 }

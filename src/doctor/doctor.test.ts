@@ -42,7 +42,11 @@ function healthyDeps(): DoctorDeps {
 describe('doctor', () => {
   test('returns ok when no findings', async () => {
     const result = await doctor({ now, deps: healthyDeps() })
-    expect(result).toEqual({ ok: true, message: 'All systems operational' })
+    expect(result).toEqual({
+      ok: true,
+      message: 'All systems operational',
+      findings: [],
+    })
   })
 
   test('reports heartbeat missing', async () => {

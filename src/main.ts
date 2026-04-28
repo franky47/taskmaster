@@ -672,7 +672,8 @@ async function main(): Promise<void> {
       '--since <iso8601>',
       'Check from this timestamp (default: 7 days ago)',
     )
-    .action(async (opts: { since?: string }) => {
+    .option('--json', 'Output findings as JSON')
+    .action(async (opts: { since?: string; json?: boolean }) => {
       let since: Date | undefined
       if (opts.since) {
         const parsed = parseSinceFlag(opts.since)
@@ -684,6 +685,10 @@ async function main(): Promise<void> {
       }
 
       const result = await doctor({ since })
+      if (opts.json) {
+        console.log(JSON.stringify(result.findings))
+        process.exit(result.ok ? 0 : 1)
+      }
       if (result.ok) {
         console.log(result.message)
         process.exit(0)

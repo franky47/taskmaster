@@ -185,6 +185,28 @@ function renderFinding(finding: Finding, platform: Platform): string {
         '',
         finding.message,
       ].join('\n')
+
+    case 'chronic-preflight-error':
+      return [
+        `## Preflight chronically failing: ${finding.task} [${finding.severity}]`,
+        '',
+        `${finding.consecutiveErrors} consecutive preflight-error runs.`,
+        `Last error: ${finding.lastErrorTimestamp} (${finding.relativeTime})`,
+        '',
+        'Investigate:',
+        `  tm history ${finding.task} --failures --last 5`,
+      ].join('\n')
+
+    case 'stale-preflight-success':
+      return [
+        `## Preflight task stale: ${finding.task} [${finding.severity}]`,
+        '',
+        `Last successful run was ${finding.lastSuccessTimestamp}, more than ${finding.thresholdDays} days ago.`,
+        'Either the preflight gate is silently broken, or the trigger is no longer firing.',
+        '',
+        'Investigate:',
+        `  tm history ${finding.task} --last 10`,
+      ].join('\n')
   }
 }
 

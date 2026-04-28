@@ -3,6 +3,7 @@ import { describe, expect, test } from 'bun:test'
 import type { LogEntry } from '#lib/logger'
 import type { HistoryEntry } from '#src/history'
 import { runIdSchema } from '#src/history'
+import { historyMetaSchema } from '#src/history/schema'
 import type { ValidationResult } from '#src/validate'
 
 import {
@@ -11,7 +12,9 @@ import {
   checkHeartbeat,
   checkLogErrors,
   checkOfflineSkips,
+  checkPreflightChronicError,
   checkSchedulerInstalled,
+  checkStalePreflightSuccess,
   checkTaskFailures,
   checkTaskNeverRan,
   checkTaskTimeouts,
@@ -975,5 +978,195 @@ describe('checkConsecutiveRequirementSkips', () => {
     expect(
       checkConsecutiveRequirementSkips('llm-digest', entries),
     ).toHaveLength(0)
+  })
+})
+
+// --
+// checkPreflightChronicError
+// --
+
+describe('checkPreflightChronicError', () => {
+  const now = new Date('2026-04-07T12:00:00.000Z')
+
+  function preflightErrorEntry(
+    overrides: { finished_at?: Date } = {},
+  ): HistoryEntry {
+    const base = historyMetaSchema.decode({
+      timestamp: '2026-04-07T11.00.00Z',
+      started_at: '2026-04-07T11:00:00.000Z',
+      finished_at: '2026-04-07T11:00:00.005Z',
+      duration_ms: 5,
+      status: 'preflight-error',
+      preflight: {
+        exit_code: 2,
+        duration_ms: 3,
+        stdout_bytes: 0,
+        stderr_bytes: 0,
+        error_reason: 'nonzero',
+      },
+    })
+    return { ...base, output_path: undefined, ...overrides }
+  }
+
+  function agentSuccessEntry(): HistoryEntry {
+    const base = historyMetaSchema.decode({
+      timestamp: '2026-04-07T11.00.00Z',
+      started_at: '2026-04-07T11:00:00.000Z',
+      finished_at: '2026-04-07T11:00:05.000Z',
+      duration_ms: 5000,
+      exit_code: 0,
+      success: true,
+      timed_out: false,
+    })
+    return { ...base, output_path: undefined }
+  }
+
+  test('returns null when task does not declare preflight', () => {
+    const history = [
+      preflightErrorEntry(),
+      preflightErrorEntry(),
+      preflightErrorEntry(),
+    ]
+    expect(checkPreflightChronicError('no-pf', history, false, now)).toBeNull()
+  })
+
+  test('returns null for empty history', () => {
+    expect(checkPreflightChronicError('pf', [], true, now)).toBeNull()
+  })
+
+  test('returns null when fewer than 3 consecutive preflight-errors', () => {
+    const history = [
+      preflightErrorEntry(),
+      preflightErrorEntry(),
+      agentSuccessEntry(),
+    ]
+    expect(checkPreflightChronicError('pf', history, true, now)).toBeNull()
+  })
+
+  test('returns critical when exactly 3 consecutive preflight-errors', () => {
+    const history = [
+      preflightErrorEntry({
+        finished_at: new Date('2026-04-07T11:55:00.000Z'),
+      }),
+      preflightErrorEntry(),
+      preflightErrorEntry(),
+      agentSuccessEntry(),
+    ]
+    const finding = checkPreflightChronicError('pf', history, true, now)
+    expect(finding).toMatchObject({
+      kind: 'chronic-preflight-error',
+      severity: 'critical',
+      task: 'pf',
+      consecutiveErrors: 3,
+      lastErrorTimestamp: '2026-04-07T11:55:00.000Z',
+    })
+  })
+
+  test('returns critical when more than 3 consecutive preflight-errors', () => {
+    const history = [
+      preflightErrorEntry(),
+      preflightErrorEntry(),
+      preflightErrorEntry(),
+      preflightErrorEntry(),
+    ]
+    const finding = checkPreflightChronicError('pf', history, true, now)
+    expect(finding?.consecutiveErrors).toBe(4)
+  })
+
+  test('a successful run breaks the streak', () => {
+    const history = [
+      preflightErrorEntry(),
+      preflightErrorEntry(),
+      agentSuccessEntry(),
+      preflightErrorEntry(),
+      preflightErrorEntry(),
+      preflightErrorEntry(),
+    ]
+    expect(checkPreflightChronicError('pf', history, true, now)).toBeNull()
+  })
+
+  test('returns null when most recent run is not a preflight-error', () => {
+    const history = [
+      agentSuccessEntry(),
+      preflightErrorEntry(),
+      preflightErrorEntry(),
+      preflightErrorEntry(),
+    ]
+    expect(checkPreflightChronicError('pf', history, true, now)).toBeNull()
+  })
+})
+
+// --
+// checkStalePreflightSuccess
+// --
+
+describe('checkStalePreflightSuccess', () => {
+  const now = new Date('2026-04-30T12:00:00.000Z')
+  const STALE_THRESHOLD_DAYS = 14
+
+  function agentEntry(finished_at: string, success: boolean): HistoryEntry {
+    const base = historyMetaSchema.decode({
+      timestamp: '2026-04-01T08.00.00Z',
+      started_at: finished_at,
+      finished_at,
+      duration_ms: 0,
+      exit_code: success ? 0 : 1,
+      success,
+      timed_out: false,
+    })
+    return { ...base, output_path: undefined }
+  }
+
+  test('returns null when task does not declare preflight', () => {
+    const history = [agentEntry('2026-03-01T08:00:00.000Z', true)]
+    expect(checkStalePreflightSuccess('no-pf', history, false, now)).toBeNull()
+  })
+
+  test('returns null when task has zero successful agent runs', () => {
+    const history = [
+      agentEntry('2026-04-29T08:00:00.000Z', false),
+      agentEntry('2026-04-28T08:00:00.000Z', false),
+    ]
+    expect(checkStalePreflightSuccess('pf', history, true, now)).toBeNull()
+  })
+
+  test('returns null when last success is within 14 days', () => {
+    const history = [
+      agentEntry('2026-04-20T08:00:00.000Z', true),
+      agentEntry('2026-04-15T08:00:00.000Z', true),
+    ]
+    expect(checkStalePreflightSuccess('pf', history, true, now)).toBeNull()
+  })
+
+  test('returns info finding when last success is older than 14 days', () => {
+    const lastSuccess = '2026-04-15T08:00:00.000Z'
+    const history = [agentEntry(lastSuccess, true)]
+    const finding = checkStalePreflightSuccess('pf', history, true, now)
+    // 30-04 minus 15-04 = 15 days, just past threshold
+    expect(finding).toMatchObject({
+      kind: 'stale-preflight-success',
+      severity: 'info',
+      task: 'pf',
+      lastSuccessTimestamp: lastSuccess,
+      thresholdDays: STALE_THRESHOLD_DAYS,
+    })
+  })
+
+  test('finds the most recent successful run, not the most recent overall', () => {
+    const history = [
+      agentEntry('2026-04-29T08:00:00.000Z', false),
+      agentEntry('2026-04-28T08:00:00.000Z', false),
+      agentEntry('2026-04-10T08:00:00.000Z', true),
+    ]
+    const finding = checkStalePreflightSuccess('pf', history, true, now)
+    expect(finding?.lastSuccessTimestamp).toBe('2026-04-10T08:00:00.000Z')
+  })
+
+  test('does not flag at exactly the 14-day boundary', () => {
+    const lastSuccess = new Date(
+      now.getTime() - 14 * 24 * 60 * 60_000,
+    ).toISOString()
+    const history = [agentEntry(lastSuccess, true)]
+    expect(checkStalePreflightSuccess('pf', history, true, now)).toBeNull()
   })
 })

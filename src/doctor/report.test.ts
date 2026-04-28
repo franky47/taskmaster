@@ -451,4 +451,44 @@ describe('renderReport', () => {
     expect(report).toContain('4 consecutive skips')
     expect(report).toContain('ac-power')
   })
+
+  test('renders chronic-preflight-error finding', () => {
+    const findings: Finding[] = [
+      {
+        kind: 'chronic-preflight-error',
+        severity: 'critical',
+        task: 'inbox-check',
+        consecutiveErrors: 5,
+        lastErrorTimestamp: '2026-04-07T11:55:00.000Z',
+        relativeTime: '5m ago',
+      },
+    ]
+
+    const report = renderReport(findings, checkedAt, 'darwin')
+    expect(report).toContain(
+      '## Preflight chronically failing: inbox-check [critical]',
+    )
+    expect(report).toContain('5 consecutive preflight-error runs')
+    expect(report).toContain('2026-04-07T11:55:00.000Z')
+    expect(report).toContain('5m ago')
+    expect(report).toContain('tm history inbox-check --failures --last 5')
+  })
+
+  test('renders stale-preflight-success finding', () => {
+    const findings: Finding[] = [
+      {
+        kind: 'stale-preflight-success',
+        severity: 'info',
+        task: 'inbox-check',
+        lastSuccessTimestamp: '2026-04-15T08:00:00.000Z',
+        thresholdDays: 14,
+      },
+    ]
+
+    const report = renderReport(findings, checkedAt, 'darwin')
+    expect(report).toContain('## Preflight task stale: inbox-check [info]')
+    expect(report).toContain('2026-04-15T08:00:00.000Z')
+    expect(report).toContain('more than 14 days ago')
+    expect(report).toContain('tm history inbox-check --last 10')
+  })
 })

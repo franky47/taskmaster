@@ -110,6 +110,23 @@ type InternalErrorFinding = {
   message: string
 }
 
+type ChronicPreflightErrorFinding = {
+  kind: 'chronic-preflight-error'
+  severity: 'critical'
+  task: string
+  consecutiveErrors: number
+  lastErrorTimestamp: string
+  relativeTime: string
+}
+
+type StalePreflightSuccessFinding = {
+  kind: 'stale-preflight-success'
+  severity: 'info'
+  task: string
+  lastSuccessTimestamp: string
+  thresholdDays: number
+}
+
 export type Finding =
   | LogErrorFinding
   | HeartbeatStaleFinding
@@ -124,6 +141,8 @@ export type Finding =
   | OfflineSkipsFinding
   | ConsecutiveRequirementSkipsFinding
   | InternalErrorFinding
+  | ChronicPreflightErrorFinding
+  | StalePreflightSuccessFinding
 
 // Check functions --
 
@@ -357,5 +376,61 @@ export function checkContention(
     severity: 'warning',
     task: taskName,
     eventCount: count,
+  }
+}
+
+const CHRONIC_PREFLIGHT_ERROR_THRESHOLD = 3
+
+export function checkPreflightChronicError(
+  taskName: string,
+  history: HistoryEntry[],
+  hasPreflight: boolean,
+  now: Date,
+): ChronicPreflightErrorFinding | null {
+  if (!hasPreflight) return null
+  const first = history[0]
+  if (first === undefined) return null
+  if (isAgentRanMeta(first) || first.status !== 'preflight-error') return null
+
+  let consecutiveErrors = 0
+  for (const entry of history) {
+    if (isAgentRanMeta(entry) || entry.status !== 'preflight-error') break
+    consecutiveErrors++
+  }
+
+  if (consecutiveErrors < CHRONIC_PREFLIGHT_ERROR_THRESHOLD) return null
+
+  return {
+    kind: 'chronic-preflight-error',
+    severity: 'critical',
+    task: taskName,
+    consecutiveErrors,
+    lastErrorTimestamp: first.finished_at.toISOString(),
+    relativeTime: formatRelative(first.finished_at, now),
+  }
+}
+
+const STALE_SUCCESS_THRESHOLD_DAYS = 14
+const STALE_SUCCESS_THRESHOLD_MS =
+  STALE_SUCCESS_THRESHOLD_DAYS * 24 * 60 * 60_000
+
+export function checkStalePreflightSuccess(
+  taskName: string,
+  history: HistoryEntry[],
+  hasPreflight: boolean,
+  now: Date,
+): StalePreflightSuccessFinding | null {
+  if (!hasPreflight) return null
+  const lastSuccess = history.find((e) => isAgentRanMeta(e) && e.success)
+  if (!lastSuccess) return null
+  const ageMs = now.getTime() - lastSuccess.finished_at.getTime()
+  if (ageMs <= STALE_SUCCESS_THRESHOLD_MS) return null
+
+  return {
+    kind: 'stale-preflight-success',
+    severity: 'info',
+    task: taskName,
+    lastSuccessTimestamp: lastSuccess.finished_at.toISOString(),
+    thresholdDays: STALE_SUCCESS_THRESHOLD_DAYS,
   }
 }
