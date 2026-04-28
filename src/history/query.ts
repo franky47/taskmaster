@@ -10,6 +10,11 @@ import type { RunningMarker } from '#lib/lock'
 import type { HistoryMeta } from './schema'
 import { historyMetaSchema, isAgentRanMeta } from './schema'
 
+function isFailureEntry(entry: HistoryMeta): boolean {
+  if (isAgentRanMeta(entry)) return !entry.success
+  return entry.status !== 'skipped-preflight'
+}
+
 // Errors --
 
 export class TaskNotFoundError extends errore.createTaggedError({
@@ -165,9 +170,9 @@ export async function queryHistory(
   }
 
   // Filter failures (S6.3)
-  let result = options?.failures
-    ? entries.filter((e) => !isAgentRanMeta(e) || !e.success)
-    : entries
+  // A failure is an agent-ran-failure OR a non-skip terminal error variant.
+  // skipped-preflight is a clean "no work to do" — not a failure.
+  let result = options?.failures ? entries.filter(isFailureEntry) : entries
 
   // Limit (S6.4)
   if (options?.last !== undefined) {
@@ -218,9 +223,9 @@ export async function queryGlobalHistory(
 
   allEntries.sort((a, b) => b.timestamp.localeCompare(a.timestamp))
 
-  // Filter failures
+  // Filter failures (see queryHistory comment)
   let result: GlobalHistoryEntry[] = options?.failures
-    ? allEntries.filter((e) => !isAgentRanMeta(e) || !e.success)
+    ? allEntries.filter(isFailureEntry)
     : allEntries
 
   // Limit (default 20)

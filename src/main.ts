@@ -335,7 +335,10 @@ async function main(): Promise<void> {
           const executor = task.agent ?? 'custom'
           const trigger =
             'schedule' in task.on ? task.on.schedule : `event:${task.on.event}`
-          console.log(`${task.name} ${trigger} ${executor} ${tag}${reqs}`)
+          const preflight = task.preflight ? ' [preflight]' : ''
+          console.log(
+            `${task.name} ${trigger} ${executor} ${tag}${reqs}${preflight}`,
+          )
         }
       }
     })

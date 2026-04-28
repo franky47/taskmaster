@@ -88,6 +88,32 @@ async function writeOutput(
   await fs.writeFile(path.join(histDir, `${timestamp}.output.txt`), content)
 }
 
+async function writeRawMeta(
+  configDir: string,
+  taskName: string,
+  timestamp: string,
+  meta: Record<string, unknown>,
+): Promise<void> {
+  const histDir = path.join(configDir, 'history', taskName)
+  await fs.mkdir(histDir, { recursive: true })
+  const started_at = timestamp.replace(/\./g, ':').replace(/Z$/, '.000Z')
+  const finished_at = new Date(new Date(started_at).getTime() + 5).toISOString()
+  await fs.writeFile(
+    path.join(histDir, `${timestamp}.meta.json`),
+    JSON.stringify(
+      {
+        timestamp,
+        started_at,
+        finished_at,
+        duration_ms: 5,
+        ...meta,
+      },
+      null,
+      2,
+    ) + '\n',
+  )
+}
+
 describe('queryHistory', () => {
   test('returns TaskNotFoundError when task file does not exist', async () => {
     const configDir = await makeConfigDir()
@@ -165,6 +191,90 @@ describe('queryHistory', () => {
     expect(result).toHaveLength(2)
     expect(result[0]!.timestamp).toBe(rid('2026-04-03T08.00.00Z'))
     expect(result[1]!.timestamp).toBe(rid('2026-04-02T08.00.00Z'))
+  })
+
+  test('--failures includes preflight-error rows', async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(configDir, 'pf-task')
+    await writeMeta(configDir, 'pf-task', '2026-04-01T08.00.00Z', {
+      exit_code: 0,
+      success: true,
+    })
+    await writeRawMeta(configDir, 'pf-task', '2026-04-02T08.00.00Z', {
+      status: 'preflight-error',
+      preflight: {
+        exit_code: 2,
+        duration_ms: 3,
+        stdout_bytes: 0,
+        stderr_bytes: 0,
+        error_reason: 'nonzero',
+      },
+    })
+
+    const result = await queryHistory('pf-task', { configDir, failures: true })
+    if (result instanceof Error) throw result
+    expect(result).toHaveLength(1)
+    expect(result[0]!.timestamp).toBe(rid('2026-04-02T08.00.00Z'))
+  })
+
+  test('--failures excludes skipped-preflight rows', async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(configDir, 'pf-skip')
+    await writeRawMeta(configDir, 'pf-skip', '2026-04-01T08.00.00Z', {
+      status: 'skipped-preflight',
+      preflight: {
+        exit_code: 1,
+        duration_ms: 3,
+        stdout_bytes: 0,
+        stderr_bytes: 0,
+      },
+    })
+    await writeMeta(configDir, 'pf-skip', '2026-04-02T08.00.00Z', {
+      exit_code: 1,
+      success: false,
+    })
+
+    const result = await queryHistory('pf-skip', { configDir, failures: true })
+    if (result instanceof Error) throw result
+    expect(result).toHaveLength(1)
+    expect(result[0]!.timestamp).toBe(rid('2026-04-02T08.00.00Z'))
+  })
+
+  test('--failures includes payload-error rows', async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(configDir, 'pay-task')
+    await writeRawMeta(configDir, 'pay-task', '2026-04-01T08.00.00Z', {
+      status: 'payload-error',
+      trigger: 'dispatch',
+      event: 'deploy',
+      payload: { bytes: 2_000_000, error_reason: 'oversize' },
+    })
+
+    const result = await queryHistory('pay-task', { configDir, failures: true })
+    if (result instanceof Error) throw result
+    expect(result).toHaveLength(1)
+  })
+
+  test('history default (no --failures) includes skipped-preflight inline', async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(configDir, 'pf-skip-inline')
+    await writeRawMeta(configDir, 'pf-skip-inline', '2026-04-01T08.00.00Z', {
+      status: 'skipped-preflight',
+      preflight: {
+        exit_code: 1,
+        duration_ms: 3,
+        stdout_bytes: 0,
+        stderr_bytes: 0,
+      },
+    })
+    await writeMeta(configDir, 'pf-skip-inline', '2026-04-02T08.00.00Z', {
+      exit_code: 0,
+      success: true,
+    })
+
+    const result = await queryHistory('pf-skip-inline', { configDir })
+    if (result instanceof Error) throw result
+    expect(result).toHaveLength(2)
   })
 
   test('--failures + --last combines correctly', async () => {

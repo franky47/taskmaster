@@ -12,6 +12,7 @@ export type TaskListEntry = Pick<
   name: string
   agent?: string
   run?: string
+  preflight?: string
 }
 
 type TaskListWarning = {
@@ -63,6 +64,9 @@ export async function listTasks(
     }
     if ('run' in parsed) {
       entry.run = parsed.run
+    }
+    if (parsed.preflight !== undefined) {
+      entry.preflight = parsed.preflight
     }
     tasks.push(entry)
   }

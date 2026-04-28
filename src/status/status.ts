@@ -17,8 +17,14 @@ import type { TasksDirReadError } from '#src/validate'
 
 type LastRun = {
   timestamp: RunId
-  status: 'ok' | 'timeout' | 'err'
-  exit_code: number
+  status:
+    | 'ok'
+    | 'timeout'
+    | 'err'
+    | 'skipped-preflight'
+    | 'preflight-error'
+    | 'payload-error'
+  exit_code?: number
   duration_ms: number
 }
 
@@ -108,13 +114,25 @@ export async function getTaskStatuses(
         `warning: ${task.name}: could not read history: ${history.message}\n`,
       )
     } else {
-      const latest = history.find(isAgentRanMeta)
+      const latest = history[0]
       if (latest) {
-        status.last_run = {
-          timestamp: latest.timestamp,
-          status: latest.success ? 'ok' : latest.timed_out ? 'timeout' : 'err',
-          exit_code: latest.exit_code,
-          duration_ms: latest.duration_ms,
+        if (isAgentRanMeta(latest)) {
+          status.last_run = {
+            timestamp: latest.timestamp,
+            status: latest.success
+              ? 'ok'
+              : latest.timed_out
+                ? 'timeout'
+                : 'err',
+            exit_code: latest.exit_code,
+            duration_ms: latest.duration_ms,
+          }
+        } else {
+          status.last_run = {
+            timestamp: latest.timestamp,
+            status: latest.status,
+            duration_ms: latest.duration_ms,
+          }
         }
       }
     }

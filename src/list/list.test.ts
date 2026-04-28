@@ -265,4 +265,42 @@ Post-deploy checks.
       },
     ])
   })
+
+  test('exposes preflight command on tasks that declare one', async () => {
+    const tasksDir = await makeTmpTasksDir()
+    await writeTask(
+      tasksDir,
+      'with-preflight',
+      `---
+on:
+  schedule: '0 8 * * *'
+agent: opencode
+preflight: 'test -s /tmp/inbox'
+---
+
+Inbox check.
+`,
+    )
+    const result = await listTasks(tasksDir)
+    if (result instanceof Error) throw result
+    expect(result.tasks).toEqual([
+      {
+        name: 'with-preflight',
+        on: { schedule: '0 8 * * *' },
+        enabled: true,
+        requires: ['network'],
+        timeout: 3_600_000,
+        agent: 'opencode',
+        preflight: 'test -s /tmp/inbox',
+      },
+    ])
+  })
+
+  test('omits preflight when not declared', async () => {
+    const tasksDir = await makeTmpTasksDir()
+    await writeTask(tasksDir, 'no-pre', ENABLED_TASK)
+    const result = await listTasks(tasksDir)
+    if (result instanceof Error) throw result
+    expect(result.tasks[0]).not.toHaveProperty('preflight')
+  })
 })

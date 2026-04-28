@@ -78,6 +78,31 @@ async function writeMeta(
   )
 }
 
+async function writeStatusMeta(
+  configDir: string,
+  taskName: string,
+  timestamp: string,
+  meta: Record<string, unknown>,
+): Promise<void> {
+  const histDir = path.join(configDir, 'history', taskName)
+  await fs.mkdir(histDir, { recursive: true })
+  const started_at = timestamp.replace(/\./g, ':').replace(/Z$/, '.000Z')
+  const duration_ms = 5
+  const finished_at = new Date(
+    new Date(started_at).getTime() + duration_ms,
+  ).toISOString()
+  await fs.writeFile(
+    path.join(histDir, `${timestamp}.meta.json`),
+    JSON.stringify({
+      timestamp,
+      started_at,
+      finished_at,
+      duration_ms,
+      ...meta,
+    }),
+  )
+}
+
 const ENABLED_TASK = `---
 on:
   schedule: '0 8 * * 1-5'
@@ -496,5 +521,89 @@ Post-deploy checks.
     expect(first.on).toEqual({ event: 'deploy' })
     expect(first).not.toHaveProperty('next_run')
     expect(first.timeout).toBe('1h')
+  })
+
+  test('last_run shows skipped-preflight verbatim when latest is a skip', async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(configDir, 'pf-task', ENABLED_TASK)
+    await writeStatusMeta(configDir, 'pf-task', '2026-04-04T08.00.00Z', {
+      status: 'skipped-preflight',
+      preflight: {
+        exit_code: 1,
+        duration_ms: 3,
+        stdout_bytes: 0,
+        stderr_bytes: 0,
+      },
+    })
+
+    const result = await getTaskStatuses({ configDir, now: NOW })
+    if (result instanceof Error) throw result
+    const first = result[0]
+    if (!first) throw new Error('expected status entry')
+    expect(first.last_run?.status).toBe('skipped-preflight')
+    expect(first.last_run?.timestamp).toBe(rid('2026-04-04T08.00.00Z'))
+  })
+
+  test('last_run shows preflight-error verbatim when latest is an error', async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(configDir, 'pf-err', ENABLED_TASK)
+    await writeStatusMeta(configDir, 'pf-err', '2026-04-04T08.00.00Z', {
+      status: 'preflight-error',
+      preflight: {
+        exit_code: 2,
+        duration_ms: 3,
+        stdout_bytes: 0,
+        stderr_bytes: 0,
+        error_reason: 'nonzero',
+      },
+    })
+
+    const result = await getTaskStatuses({ configDir, now: NOW })
+    if (result instanceof Error) throw result
+    const first = result[0]
+    if (!first) throw new Error('expected status entry')
+    expect(first.last_run?.status).toBe('preflight-error')
+  })
+
+  test('last_run shows payload-error verbatim when latest is a payload error', async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(configDir, 'pay-err', ENABLED_TASK)
+    await writeStatusMeta(configDir, 'pay-err', '2026-04-04T08.00.00Z', {
+      status: 'payload-error',
+      trigger: 'dispatch',
+      event: 'deploy',
+      payload: { bytes: 2_000_000, error_reason: 'oversize' },
+    })
+
+    const result = await getTaskStatuses({ configDir, now: NOW })
+    if (result instanceof Error) throw result
+    const first = result[0]
+    if (!first) throw new Error('expected status entry')
+    expect(first.last_run?.status).toBe('payload-error')
+  })
+
+  test('last_run picks the most recent regardless of variant', async () => {
+    const configDir = await makeConfigDir()
+    await writeTask(configDir, 'mix', ENABLED_TASK)
+    await writeMeta(configDir, 'mix', '2026-04-01T08.00.00Z', {
+      exit_code: 0,
+      success: true,
+    })
+    await writeStatusMeta(configDir, 'mix', '2026-04-04T08.00.00Z', {
+      status: 'skipped-preflight',
+      preflight: {
+        exit_code: 1,
+        duration_ms: 3,
+        stdout_bytes: 0,
+        stderr_bytes: 0,
+      },
+    })
+
+    const result = await getTaskStatuses({ configDir, now: NOW })
+    if (result instanceof Error) throw result
+    const first = result[0]
+    if (!first) throw new Error('expected status entry')
+    expect(first.last_run?.status).toBe('skipped-preflight')
+    expect(first.last_run?.timestamp).toBe(rid('2026-04-04T08.00.00Z'))
   })
 })
