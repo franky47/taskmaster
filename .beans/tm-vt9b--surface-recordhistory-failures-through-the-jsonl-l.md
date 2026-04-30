@@ -1,11 +1,11 @@
 ---
 # tm-vt9b
 title: Surface recordHistory failures through the JSONL log
-status: todo
+status: completed
 type: bug
 priority: high
 created_at: 2026-04-30T19:25:12Z
-updated_at: 2026-04-30T19:25:12Z
+updated_at: 2026-04-30T20:11:21Z
 parent: tm-0o9e
 ---
 
@@ -17,14 +17,14 @@ See parent PRD `tm-0o9e` § "Branch 1 — `recordHistory` failure observability"
 
 ## Acceptance criteria
 
-- [ ] In `src/main.ts`, the agent path (around line 198) writes `log({ event: 'error', task: name, reason: 'history-write-failed', cause: recordErr.message }, logFilePath)` when `recordHistory` returns an error, in addition to the existing `console.error`
-- [ ] Same call added on the payload-error path (around line 239)
-- [ ] Same call added on the skipped-preflight / preflight-error path (around line 284)
-- [ ] Exit codes for all three paths are unchanged (agent → `exitCode`; payload-error / skipped-preflight / preflight-error → 0)
-- [ ] `console.error(recordErr.message)` is preserved on all three paths so direct-CLI users still see the failure on their terminal
-- [ ] Unit tests assert that injecting a `recordHistory` failure on each of the three paths produces both the JSONL log entry (with `reason: 'history-write-failed'`) and the stderr write
-- [ ] The new log entries are picked up by `checkLogErrors` (existing doctor check) without any new doctor wiring — verified by inspection or test
-- [ ] `bun run check` passes after the change
+- [x] In `src/main.ts`, the agent path writes a JSONL log entry on `recordHistory` failure, in addition to stderr — implemented via `notifyHistoryWriteFailure` helper
+- [x] Same call added on the payload-error path
+- [x] Same call added on the skipped-preflight / preflight-error path
+- [x] Exit codes unchanged
+- [x] `console.error(recordErr.message)` preserved (default `stderr` dep)
+- [x] Unit tests in `src/history/notify-failure.test.ts` verify both JSONL log entry and stderr write via injected deps
+- [x] Picked up by `checkLogErrors` without doctor changes — entry shape matches `event:'error' && 'error' in entry` predicate (test asserts this)
+- [x] `bun run check` passes
 
 ## User stories addressed
 
@@ -32,3 +32,22 @@ Reference by number from parent PRD `tm-0o9e`:
 
 - User story 1
 - User story 2
+
+## Summary of Changes
+
+Added `notifyHistoryWriteFailure(err, taskName, deps?)` helper in `src/history/notify-failure.ts`, exported via `src/history/index.ts`. Replaces the bare `console.error(recordErr.message)` at the three failure sites in `src/main.ts` (agent, payload-error, skipped-preflight/preflight-error) so a JSONL log entry is also written.
+
+### Design deviation from bean text
+
+The bean suggested `log({event:'error', task, reason:'history-write-failed', cause: msg})`. The implementation instead reuses the existing `errorEntrySchema` shape via `log({event:'error', task, error: recordErr})` — passing the errore-tagged `HistoryWriteError` that `recordHistory` already returns. This avoids a schema extension and a `checkLogErrors` broadening: the existing predicate `entry.event === 'error' && 'error' in entry` matches automatically, satisfying the "no new doctor wiring" criterion. `name: 'HistoryWriteError'` survives `serializeError` so the failure type is identifiable in JSONL.
+
+### Tests
+
+DI-style: `notifyHistoryWriteFailure` accepts `{log, logFilePath, stderr}` overrides; tests inject fakes and assert behavior. The 3 sites in `main.ts` are thin wrappers around this helper, verified by inspection.
+
+### Files
+
+- `src/history/notify-failure.ts` (new)
+- `src/history/notify-failure.test.ts` (new)
+- `src/history/index.ts` (export)
+- `src/main.ts` (3 wired sites)

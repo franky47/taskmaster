@@ -13,6 +13,7 @@ import {
   buildDisplayEntries,
   formatTimestamp,
   manualTimestamp,
+  notifyHistoryWriteFailure,
   parseTimestampFlag,
   queryGlobalHistory,
   queryHistory,
@@ -196,7 +197,7 @@ async function main(): Promise<void> {
             },
           )
           if (recordErr instanceof Error) {
-            console.error(recordErr.message)
+            notifyHistoryWriteFailure(recordErr, name)
           }
 
           if (opts.json) {
@@ -237,7 +238,7 @@ async function main(): Promise<void> {
             },
           )
           if (recordErr instanceof Error) {
-            console.error(recordErr.message)
+            notifyHistoryWriteFailure(recordErr, name)
           }
           log(
             { event: 'error', task: name, reason: 'payload-error' },
@@ -282,7 +283,7 @@ async function main(): Promise<void> {
           },
         )
         if (recordErr instanceof Error) {
-          console.error(recordErr.message)
+          notifyHistoryWriteFailure(recordErr, name)
         }
         if (result.kind === 'skipped-preflight') {
           log(
