@@ -39,6 +39,7 @@ tm validate
 tm run daily-audit
 tm status
 tm history daily-audit
+tm logs daily-audit
 tm doctor
 ```
 
@@ -49,18 +50,19 @@ The filename (minus `.md`) is the task ID and must match `[a-z0-9-]+`.
 
 ### Frontmatter Fields
 
-| Field | Required | Default | Description |
-|---|---|---|---|
-| `on` | **yes** | | Trigger definition. Exactly one of `schedule` or `event` must be set inside it |
-| `agent` | one of `agent` or `run` | | Agent name (built-in: `claude`, `codex`, `opencode`, `pi`; or custom from `agents.yml`) |
-| `run` | one of `agent` or `run` | | Custom shell command (must reference `$TM_PROMPT_FILE`) |
-| `args` | no | `''` | Extra CLI flags appended to the agent command (only with `agent`) |
-| `cwd` | no | temp dir | Working directory (`~` is expanded) |
-| `timezone` | no | system local | IANA timezone for cron evaluation |
-| `env` | no | `{}` | Environment variables (string key-value pairs) |
-| `timeout` | no | scheduled: `min(interval, 1h)`; event: `1h` | Max runtime as duration string (`30s`, `5m`). For scheduled tasks it must be shorter than the schedule interval |
-| `enabled` | no | `true` | Lifecycle switch. `false` = never auto-scheduled. `true` = eligible to run (subject to `requires`) |
-| `requires` | no | `['network']` | Runtime requirements that must be satisfied for the task to run. Empty array `[]` means no requirements |
+| Field       | Required                | Default                                     | Description                                                                                                                                           |
+| ----------- | ----------------------- | ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `on`        | **yes**                 |                                             | Trigger definition. Exactly one of `schedule` or `event` must be set inside it                                                                        |
+| `agent`     | one of `agent` or `run` |                                             | Agent name (built-in: `claude`, `codex`, `opencode`, `pi`; or custom from `agents.yml`)                                                               |
+| `run`       | one of `agent` or `run` |                                             | Custom shell command (must reference `$TM_PROMPT_FILE`)                                                                                               |
+| `args`      | no                      | `''`                                        | Extra CLI flags appended to the agent command (only with `agent`)                                                                                     |
+| `cwd`       | no                      | temp dir                                    | Working directory (`~` is expanded)                                                                                                                   |
+| `timezone`  | no                      | system local                                | IANA timezone for cron evaluation                                                                                                                     |
+| `env`       | no                      | `{}`                                        | Environment variables (string key-value pairs)                                                                                                        |
+| `timeout`   | no                      | scheduled: `min(interval, 1h)`; event: `1h` | Max runtime as duration string (`30s`, `5m`). For scheduled tasks it must be shorter than the schedule interval                                       |
+| `enabled`   | no                      | `true`                                      | Lifecycle switch. `false` = never auto-scheduled. `true` = eligible to run (subject to `requires`)                                                    |
+| `requires`  | no                      | `['network']`                               | Runtime requirements that must be satisfied for the task to run. Empty array `[]` means no requirements                                               |
+| `preflight` | no                      |                                             | Shell command run before the agent. Stdout substitutes into the `<PREFLIGHT/>` token. Exit `1` skips the run; any other non-zero is a preflight error |
 
 **Constraints:**
 
@@ -71,6 +73,8 @@ The filename (minus `.md`) is the task ID and must match `[a-z0-9-]+`.
 - `timeout` minimum is `1s`.
 - For scheduled tasks, `timeout` must be shorter than the schedule interval. When omitted it defaults to `min(interval, 1h)`.
 - For event tasks, `timeout` defaults to `1h` when omitted.
+- A `<PREFLIGHT/>` token in the body requires a `preflight` field.
+- A `<PAYLOAD/>` token in the body is only valid on event tasks.
 
 ### Trigger Shapes
 
@@ -151,7 +155,7 @@ Run the expensive local embedding pass over the inbox.
 
 ### Event Task Example
 
-Use `tm dispatch <event>` to trigger tasks subscribed to an event:
+Use `tm dispatch <event>` to trigger tasks subscribed to an event. Stdin piped to `tm dispatch` becomes the event payload, available to the task via the `<PAYLOAD/>` token (or, for `run` commands, the `$TM_EVENT_PAYLOAD_FILE` env variable):
 
 ```markdown
 ---
@@ -161,24 +165,54 @@ agent: claude
 requires: []
 ---
 
-Summarize the deployment payload and post release notes.
+Summarize this deployment payload and post release notes:
+
+<PAYLOAD/>
+```
+
+```sh
+echo '{"version":"1.2.3","commit":"abc123"}' | tm dispatch deploy
+```
+
+### Preflight Example
+
+A `preflight` command runs before the agent. Its stdout (UTF-8, ≤ 1 MiB) is substituted into the `<PREFLIGHT/>` token in the prompt body. The agent is only spawned when preflight exits `0`.
+
+| Preflight outcome                                                     | Result                                  |
+| --------------------------------------------------------------------- | --------------------------------------- |
+| Exit `0`                                                              | Agent runs; stdout fills `<PREFLIGHT/>` |
+| Exit `1` (clean)                                                      | Run skipped (`skipped-preflight`)       |
+| Other non-zero / signal / timeout (60s) / non-UTF-8 / oversize stdout | Run aborted (`preflight-error`)         |
+
+```markdown
+---
+on:
+  schedule: '*/15 * * * *'
+agent: claude
+preflight: 'gh pr list --json number,title,updatedAt --search "is:open updated:<$(date -v-2d -u +%Y-%m-%dT%H:%M:%SZ)"'
+---
+
+Review these idle PRs and suggest follow-ups:
+
+<PREFLIGHT/>
 ```
 
 ## CLI Reference
 
-All commands except `doctor` support `--json` for structured output.
+All commands except `doctor` and `logs` support `--json` for structured output.
 
 ```
 tm run <name>                    Execute a task immediately (bypasses enabled and requires)
-tm list                          One line per task: name, trigger, executor, enabled status
-tm status                        Rich view with last run, next scheduled time
-tm history <name>                Show run history (--failures, --last <n>)
-tm dispatch <event>              Dispatch all tasks subscribed to an event
+tm list                          One line per task: name, trigger, executor, enabled status, [preflight]
+tm status                        Rich view with last run, next scheduled time, running marker
+tm history [name]                Show run history for a task, or across all tasks (--failures, --last <n>)
+tm logs <name>                   Live-tail output if running, otherwise print last completed output
+tm dispatch <event>              Dispatch all tasks subscribed to an event (stdin → payload)
 tm validate                      Check all task files for errors
 tm doctor                        Run diagnostics (--since <iso8601>, default: 7 days)
 tm setup                         Install system scheduler (launchd/crontab)
 tm teardown                      Remove system scheduler
-tm tick                          Scheduler heartbeat (called by system scheduler)
+tm tick                          Scheduler heartbeat (--dry-run to preview without executing)
 ```
 
 ### `tm doctor`
@@ -195,19 +229,21 @@ Checks system health and reports findings by severity:
 - **Offline skips** — tasks skipped due to connectivity
 - **Chronically blocked tasks** — 3+ consecutive skips for the same unmet requirement
 - **Timeout/schedule mismatch** — timeout >= schedule interval
+- **Chronic preflight errors** — 3+ consecutive `preflight-error` outcomes (critical)
+- **Stale preflight success** — preflight task has not had a successful agent run in 14+ days (info)
 
 ## Agents
 
 Built-in agents and their dispatch commands:
 
-| Agent | Command |
-|---|---|
-| `claude` | `claude -p < $TM_PROMPT_FILE` |
-| `codex` | `codex exec - < $TM_PROMPT_FILE` |
+| Agent      | Command                           |
+| ---------- | --------------------------------- |
+| `claude`   | `claude -p < $TM_PROMPT_FILE`     |
+| `codex`    | `codex exec - < $TM_PROMPT_FILE`  |
 | `opencode` | `opencode run -f $TM_PROMPT_FILE` |
-| `pi` | `pi -p @$TM_PROMPT_FILE` |
+| `pi`       | `pi -p @$TM_PROMPT_FILE`          |
 
-`$TM_PROMPT_FILE` is set at runtime to a temp file containing the prompt (frontmatter stripped).
+`$TM_PROMPT_FILE` is set at runtime to a temp file containing the resolved prompt body (frontmatter stripped, tokens substituted).
 
 ### Custom Agents
 
@@ -218,7 +254,18 @@ claude: claude --model sonnet -p < $TM_PROMPT_FILE
 my-agent: my-agent --prompt-file $TM_PROMPT_FILE
 ```
 
-Custom entries merge on top of the built-in registry.
+Custom entries merge on top of the built-in registry. Every template must reference `$TM_PROMPT_FILE`.
+
+## Prompt Body Tokens
+
+The prompt body supports two self-closing tokens that get substituted just before the agent runs:
+
+| Token          | Source                               | Notes                                                                       |
+| -------------- | ------------------------------------ | --------------------------------------------------------------------------- |
+| `<PREFLIGHT/>` | Stdout of the `preflight` command    | Trimmed; UTF-8, ≤ 1 MiB                                                     |
+| `<PAYLOAD/>`   | Stdin piped to `tm dispatch <event>` | Trimmed; UTF-8, ≤ 1 MiB; event tasks only. Empty if no payload was provided |
+
+Substitution is single-pass (replacement strings are not re-scanned). When at least one token resolves to non-empty content, the resolved prompt is persisted to history as `<timestamp>.prompt.txt`.
 
 ## Environment Variables
 
@@ -227,6 +274,20 @@ Variables resolve in order (last wins):
 1. System environment
 2. `~/.config/taskmaster/.env` (global, `KEY=VALUE` format)
 3. Per-task `env` frontmatter
+4. Runtime `TM_*` variables (set by Taskmaster, see below)
+
+### Runtime `TM_*` Variables
+
+Set in the agent and preflight environment:
+
+| Variable                | When set                    | Description                                      |
+| ----------------------- | --------------------------- | ------------------------------------------------ |
+| `TM_TASK_NAME`          | always                      | Task name                                        |
+| `TM_PROMPT_FILE`        | agent only                  | Path to temp file containing the resolved prompt |
+| `TM_TRIGGER`            | when known                  | `manual`, `tick`, or `dispatch`                  |
+| `TM_RUN_TIMESTAMP`      | scheduled / dispatched runs | UTC timestamp identifying the run                |
+| `TM_EVENT_NAME`         | dispatch only               | Event name                                       |
+| `TM_EVENT_PAYLOAD_FILE` | dispatch with payload       | Path to the per-task payload file                |
 
 ## Directory Structure
 
@@ -234,8 +295,12 @@ Variables resolve in order (last wins):
 ~/.config/taskmaster/
   tasks/              Task markdown files (*.md)
   history/            Per-task run history
-    <task>/           <timestamp>.meta.json + .output.txt
-  locks/              Per-task lock files (runtime)
+    <task>/
+      <timestamp>.meta.json       Run metadata (status, durations, exit code, preflight block)
+      <timestamp>.output.txt      Agent stdout/stderr
+      <timestamp>.prompt.txt      Resolved prompt (only when a token produced content)
+      <timestamp>.preflight.txt   Preflight stdout + stderr (only when preflight ran)
+  locks/              Per-task lock + running-marker files (runtime)
   runs/               Preserved temp dirs from failed runs
   log.jsonl           Structured event log
   .env                Global environment variables (optional)
@@ -249,9 +314,9 @@ Tasks declare what the environment must provide via `requires`. Each token has a
 
 **Valid tokens:**
 
-| Token | Meaning | Probe |
-|---|---|---|
-| `network` | Internet reachable | DNS lookup against Cloudflare (`1.1.1.1`) and Google (`8.8.8.8`), 2s timeout |
+| Token      | Meaning                             | Probe                                                                                                                                                                                                                           |
+| ---------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `network`  | Internet reachable                  | DNS lookup against Cloudflare (`1.1.1.1`) and Google (`8.8.8.8`), 2s timeout                                                                                                                                                    |
 | `ac-power` | Running on wall power (not battery) | macOS: `pmset -g ps`; Linux: `/sys/class/power_supply/*/online` for `type=Mains`. Fails open: probe errors, unexpected output, or absent Mains source (desktops) all count as satisfied. Windows is not supported — fails open. |
 
 Defaults and semantics:
@@ -269,10 +334,11 @@ Event-driven tasks dispatched with `tm dispatch` honor `requires` identically to
 
 ```sh
 bun test              # run tests
-bun run check         # fmt + lint + typecheck + test
+bun run check         # fmt + lint + typecheck + test + knip + deprecated check
 bun run lint          # oxlint
 bun run fmt           # oxfmt
 bun run typecheck     # tsgo
+bun run test:integration  # *.integration-test.ts only
 ```
 
 ## License
