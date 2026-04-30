@@ -1,10 +1,11 @@
 ---
 # tm-0o9e
 title: 'Post-review fixes: tighten error observability and CLI test isolation'
-status: todo
+status: completed
 type: epic
+priority: normal
 created_at: 2026-04-30T19:20:44Z
-updated_at: 2026-04-30T19:20:44Z
+updated_at: 2026-04-30T20:31:32Z
 ---
 
 ## Problem Statement
@@ -119,3 +120,13 @@ Three coordinated changes, each shippable independently:
 - `feedback_integration_tests.md` (memory) requires `*.integration-test.ts` naming for slow tests so they stay out of the fast check loop. The new file follows that convention.
 - `feedback_bun_sfe_argv.md` (memory) requires `process.execPath + Bun.main` for resolving the binary path in tests, not `process.argv`. The integration-test helper follows that.
 - This epic groups three slices that should ship as independent PRs in dependency order: Branch 4 (config-root redirection) is a prerequisite for adding any CLI integration tests; Branches 1 and 2 are independent of each other and of Branch 4. Recommended order: 4 → 1 → 2, but 1 and 2 can land in either order.
+
+## Summary of Changes
+
+All three branches landed as independent PRs:
+
+- **Branch 1** (tm-vt9b, commit df0877a): every `recordHistory` failure now emits a `log({ event: 'error', reason: 'history-write-failed' })` line in addition to the existing stderr write, so doctor signals stay accurate under tick/dispatch and chronic disk failures become visible. Reused `event:'error'` rather than introducing a new event type so `checkLogErrors` buckets it for free.
+- **Branch 4** (tm-hsnm, commit a70ef07): `src/lib/config.ts` now resolves its base from `TM_CONFIG_DIR` when `NODE_ENV=test` so integration tests can fence themselves to a temp directory. Added `src/main.integration-test.ts` covering the four `tm run --json` envelopes and the `tm doctor --json` exit-code contract, plus the `signaled:true,exit_code:0` regression unit test next to existing `defaultSpawnPreflight` exit-classification tests.
+- **Branch 2** (tm-dxs3, commit c237ff2): the three raw `fsPromises` writes inside `executeTask` (preflight artifact, resolved-prompt artifact, agent output-dir) moved behind a single `writeHistoryArtifact` helper that returns a tagged `HistoryArtifactWriteError` with a `stage` discriminator. The error is now part of the `ExecuteError` union, so any artifact-write failure aborts the run before the agent spawns — verified by a regression test.
+
+Deferred items (per the original PRD) remain deferred: empty-catch hardening at internal-data sites, structural type refactors, stdout DoS mitigation, the broader history-artifact filename centralization sweep, and `tm history` rendering tests.
