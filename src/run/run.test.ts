@@ -1071,6 +1071,29 @@ describe('executeTask', () => {
       expect(result.preflight.error_reason).toBe('signal')
     })
 
+    // Regression: a process killed by signal can be reaped with exit_code 0.
+    // The signaled flag must take precedence over exit_code in classification.
+    test('signaled wins over exit_code 0 (killed process reaped as 0)', async () => {
+      const configDir = await makeConfigDir()
+      await writeTask(configDir, 'pf-signal-zero', preflightTask)
+
+      const result = await executeTask('pf-signal-zero', {
+        configDir,
+        deps: {
+          spawnPreflight: fakePreflight({
+            exit_code: 0,
+            signaled: true,
+          }),
+          spawnAgent: fakeSpawn(),
+        },
+      })
+
+      if (result instanceof Error) throw result
+      expect(result.kind).toBe('preflight-error')
+      if (result.kind !== 'preflight-error') return
+      expect(result.preflight.error_reason).toBe('signal')
+    })
+
     test('passes 60s timeout to preflight spawn', async () => {
       const configDir = await makeConfigDir()
       await writeTask(configDir, 'pf-timeout-cap', preflightTask)
