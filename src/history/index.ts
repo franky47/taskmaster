@@ -1,3 +1,4 @@
+export { HistoryArtifactWriteError, writeHistoryArtifact } from './artifact'
 export { purgeHistory } from './purge'
 export { buildDisplayEntries, queryGlobalHistory, queryHistory } from './query'
 export type { HistoryEntry } from './query'

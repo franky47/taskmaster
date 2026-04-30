@@ -1,7 +1,6 @@
 import type { SpawnOptions } from 'node:child_process'
 import { spawn as nodeSpawn } from 'node:child_process'
 import fs from 'node:fs'
-import fsPromises from 'node:fs/promises'
 import path from 'node:path'
 import type { Readable } from 'node:stream'
 
@@ -15,7 +14,6 @@ import {
 } from '#lib/agent'
 import {
   agentsFilePath as defaultAgentsFilePath,
-  historyDir as defaultHistoryDir,
   locksDir as defaultLocksDir,
   envFilePath,
   taskFilePath,
@@ -39,6 +37,7 @@ import type {
 } from '#lib/task'
 import { parseTaskFile } from '#lib/task'
 import type { RunId } from '#src/history'
+import { HistoryArtifactWriteError, writeHistoryArtifact } from '#src/history'
 import type {
   PayloadErrorReason,
   PreflightErrorReason,
@@ -390,6 +389,7 @@ type ExecuteError =
   | PromptFileWriteError
   | EnvFileReadError
   | EnvFileParseError
+  | HistoryArtifactWriteError
 
 export async function executeTask(
   name: string,
@@ -494,16 +494,14 @@ export async function executeTask(
 
     // Persist <ts>.preflight.txt when timestamp is provided
     if (options?.timestamp) {
-      const histDir = path.join(
-        configRoot ? path.join(configRoot, 'history') : defaultHistoryDir,
-        name,
-      )
-      await fsPromises.mkdir(histDir, { recursive: true })
-      const body = `[stdout]\n${pf.stdout}\n[stderr]\n${pf.stderr}\n`
-      await fsPromises.writeFile(
-        path.join(histDir, `${options.timestamp}.preflight.txt`),
-        body,
-      )
+      const writeResult = await writeHistoryArtifact({
+        stage: 'preflight',
+        taskName: name,
+        configRoot,
+        timestamp: options.timestamp,
+        body: `[stdout]\n${pf.stdout}\n[stderr]\n${pf.stderr}\n`,
+      })
+      if (writeResult instanceof Error) return writeResult
     }
 
     if (pf.exit_code !== 0 || error_reason !== undefined) {
@@ -544,15 +542,14 @@ export async function executeTask(
   const sub = substituteTokens(prompt, tokenValues)
   const resolvedPrompt = sub.resolved
   if (sub.nonEmptyCount > 0 && options?.timestamp) {
-    const histDir = path.join(
-      configRoot ? path.join(configRoot, 'history') : defaultHistoryDir,
-      name,
-    )
-    await fsPromises.mkdir(histDir, { recursive: true })
-    await fsPromises.writeFile(
-      path.join(histDir, `${options.timestamp}.prompt.txt`),
-      resolvedPrompt,
-    )
+    const writeResult = await writeHistoryArtifact({
+      stage: 'prompt',
+      taskName: name,
+      configRoot,
+      timestamp: options.timestamp,
+      body: resolvedPrompt,
+    })
+    if (writeResult instanceof Error) return writeResult
   }
 
   const promptPath = writePromptFile(name, startedAt, resolvedPrompt)
@@ -561,11 +558,12 @@ export async function executeTask(
   // When timestamp is available, stream output to history dir via fd passthrough
   let outputPath: string | undefined
   if (options?.timestamp) {
-    const histDir = path.join(
-      configRoot ? path.join(configRoot, 'history') : defaultHistoryDir,
-      name,
-    )
-    await fsPromises.mkdir(histDir, { recursive: true })
+    const histDir = await writeHistoryArtifact({
+      stage: 'output-dir',
+      taskName: name,
+      configRoot,
+    })
+    if (histDir instanceof Error) return histDir
     outputPath = path.join(histDir, `${options.timestamp}.output.txt`)
   }
 

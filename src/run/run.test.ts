@@ -14,6 +14,7 @@ import {
   TaskNotFoundError,
 } from '#lib/task'
 import { runIdSchema } from '#src/history'
+import { HistoryArtifactWriteError } from '#src/history'
 
 import { CwdNotFoundError } from './cwd'
 import type { ExecuteDeps, SpawnAgentDeps } from './run'
@@ -1276,6 +1277,33 @@ describe('executeTask', () => {
       const body = await fsPromises.readFile(preflightPath, 'utf-8')
       expect(body).toContain('no work')
       expect(body).toContain('noisy')
+    })
+
+    test('returns HistoryArtifactWriteError and never spawns agent when preflight artifact write fails', async () => {
+      const configDir = await makeConfigDir()
+      await writeTask(configDir, 'pf-write-fail', preflightTask)
+      const ts = runIdSchema.parse('2026-04-04T09.30.00Z')
+      // Block history dir creation: pre-create `<configDir>/history` as a file
+      await fsPromises.writeFile(path.join(configDir, 'history'), 'block')
+
+      let agentSpawned = false
+      const result = await executeTask('pf-write-fail', {
+        configDir,
+        timestamp: ts,
+        deps: {
+          spawnPreflight: fakePreflight({ exit_code: 0, stdout: 'ok' }),
+          spawnAgent: async () => {
+            agentSpawned = true
+            return { exitCode: 0, output: '', timedOut: false }
+          },
+        },
+      })
+
+      expect(result).toBeInstanceOf(HistoryArtifactWriteError)
+      if (result instanceof HistoryArtifactWriteError) {
+        expect(result.stage).toBe('preflight')
+      }
+      expect(agentSpawned).toBe(false)
     })
 
     test('preflight.txt is written even on exit 0 (agent ran)', async () => {
