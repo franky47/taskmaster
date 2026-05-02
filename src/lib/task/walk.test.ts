@@ -115,6 +115,17 @@ describe('walkTasksDir', () => {
     expect(result.warnings[0]?.error).toBeInstanceOf(TaskNameError)
   })
 
+  test('emits warning for flat file with underscore in basename (bijection guard)', async () => {
+    const tasks = await makeTasksDir()
+    await writeFile(path.join(tasks, 'foo_bar.md'))
+    const result = await walkTasksDir(tasks)
+    if (result instanceof Error) throw result
+    expect(result.entries).toEqual([])
+    expect(result.warnings).toHaveLength(1)
+    expect(result.warnings[0]?.relativePath).toBe('foo_bar.md')
+    expect(result.warnings[0]?.error).toBeInstanceOf(TaskNameError)
+  })
+
   test('emits warning for invalid segment in nested directory name', async () => {
     const tasks = await makeTasksDir()
     await writeFile(path.join(tasks, 'Bad_Dir', 'task.md'))

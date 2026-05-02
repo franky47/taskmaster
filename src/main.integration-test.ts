@@ -262,6 +262,69 @@ describe('tm run --json', () => {
     expect(envelope.taskName).toBe('pf-skip')
   })
 
+  test('tri-form input resolves to the same canonical task across slash, slash+md, and underscore', async () => {
+    const configDir = await makeIsolatedConfig()
+    const nestedDir = path.join(configDir, 'tasks', 'group')
+    await fsPromises.mkdir(nestedDir, { recursive: true })
+    await fsPromises.writeFile(
+      path.join(nestedDir, 'task.md'),
+      [
+        '---',
+        'on:',
+        '  schedule: "0 8 * * 1-5"',
+        'run: "cat $TM_PROMPT_FILE > /dev/null"',
+        '---',
+        'Body.',
+      ].join('\n'),
+    )
+
+    // Distinct timestamps per form so each invocation lands its own history
+    // record (manualTimestamp floors to the second).
+    const forms: ReadonlyArray<readonly [form: string, timestamp: string]> = [
+      ['group/task', '2026-04-06T08.00.00Z'],
+      ['group/task.md', '2026-04-06T08.00.01Z'],
+      ['group_task', '2026-04-06T08.00.02Z'],
+    ]
+    for (const [form, timestamp] of forms) {
+      const result = await runCli(
+        ['run', form, '--timestamp', timestamp, '--json'],
+        configDir,
+      )
+      expect({ form, exitCode: result.exitCode }).toEqual({
+        form,
+        exitCode: 0,
+      })
+    }
+
+    // All three runs key history under the canonical underscore name
+    const histRoot = path.join(configDir, 'history')
+    const histDirs = await fsPromises.readdir(histRoot)
+    expect(histDirs).toEqual(['group_task'])
+
+    const histFiles = await fsPromises.readdir(
+      path.join(histRoot, 'group_task'),
+    )
+    const metaFiles = histFiles.filter((f) => f.endsWith('.meta.json')).sort()
+    expect(metaFiles).toEqual([
+      '2026-04-06T08.00.00Z.meta.json',
+      '2026-04-06T08.00.01Z.meta.json',
+      '2026-04-06T08.00.02Z.meta.json',
+    ])
+
+    // JSONL log entries reference the canonical name only
+    const logBytes = await fsPromises.readFile(
+      path.join(configDir, 'log.jsonl'),
+      'utf-8',
+    )
+    const logEntrySchema = z.looseObject({ task: z.string().optional() })
+    const taskFields = logBytes
+      .trim()
+      .split('\n')
+      .map((line) => logEntrySchema.parse(JSON.parse(line)).task)
+      .filter((t): t is string => typeof t === 'string')
+    expect([...new Set(taskFields)]).toEqual(['group_task'])
+  })
+
   test('preflight-error envelope when preflight exits 2', async () => {
     const configDir = await makeIsolatedConfig()
     await writeTask(

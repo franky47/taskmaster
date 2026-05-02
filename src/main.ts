@@ -31,7 +31,7 @@ import {
 import { TaskContentionError, readRunningMarker } from './lib/lock'
 import { log } from './lib/logger'
 import { parseSinceFlag } from './lib/observability-time'
-import { toDisplayForm } from './lib/task/name'
+import { normalizeTaskName, toDisplayForm } from './lib/task/name'
 import { listTasks } from './list'
 import { getTaskLogs } from './logs'
 import { runTask } from './run'
@@ -90,7 +90,7 @@ async function main(): Promise<void> {
     )
     .action(
       async (
-        name: string,
+        rawName: string,
         opts: {
           json?: boolean
           timestamp?: string
@@ -99,6 +99,13 @@ async function main(): Promise<void> {
           payloadFile?: string
         },
       ) => {
+        const normalized = normalizeTaskName(rawName, tasksDir)
+        if (normalized instanceof Error) {
+          console.error(normalized.message)
+          process.exit(1)
+        }
+        const name = normalized.canonical
+
         let timestamp: RunId
         if (opts.timestamp) {
           const parsed = parseTimestampFlag(opts.timestamp)

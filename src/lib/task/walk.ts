@@ -3,7 +3,7 @@ import path from 'node:path'
 
 import * as errore from 'errore'
 
-import { TaskNameError, normalizeTaskName } from './name.ts'
+import { TaskNameError, normalizeWalkRelativePath } from './name.ts'
 
 const MAX_DEPTH = 10
 
@@ -109,7 +109,7 @@ async function walk(
     // whose link name lacks `.md` is not a task even if its target is `.md`.
     if (!d.name.endsWith('.md')) continue
 
-    const normalized = normalizeTaskName(rel, tasksDir)
+    const normalized = normalizeWalkRelativePath(rel, tasksDir)
     if (normalized instanceof TaskNameError) {
       acc.warnings.push({ relativePath: rel, error: normalized })
       continue

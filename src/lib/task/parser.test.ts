@@ -2,11 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { join } from 'node:path'
 
 import { FrontmatterValidationError } from './frontmatter.ts'
-import {
-  parseTaskFile,
-  TaskFileNameError,
-  TaskNotFoundError,
-} from './parser.ts'
+import { parseTaskFile, TaskNotFoundError } from './parser.ts'
 
 const FIXTURES = join(import.meta.dir, 'fixtures')
 
@@ -93,23 +89,6 @@ describe('parseTaskFile', () => {
       expect(result).not.toHaveProperty('agent')
       expect(result).not.toHaveProperty('args')
       expect(result.prompt).toBe('Run a shell command with the prompt file.')
-    })
-  })
-
-  describe('filename validation', () => {
-    test('rejects uppercase letters in filename', async () => {
-      const result = await parseTaskFile('/tmp/Bad-Name.md')
-      expect(result).toBeInstanceOf(TaskFileNameError)
-    })
-
-    test('rejects spaces in filename', async () => {
-      const result = await parseTaskFile('/tmp/bad name.md')
-      expect(result).toBeInstanceOf(TaskFileNameError)
-    })
-
-    test('rejects underscores in filename', async () => {
-      const result = await parseTaskFile('/tmp/bad_name.md')
-      expect(result).toBeInstanceOf(TaskFileNameError)
     })
   })
 

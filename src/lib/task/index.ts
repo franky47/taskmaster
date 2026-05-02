@@ -4,9 +4,4 @@ export {
   FrontmatterValidationError,
   REQUIREMENT_TOKENS,
 } from './frontmatter'
-export {
-  parseTaskFile,
-  TaskFileNameError,
-  TaskFileReadError,
-  TaskNotFoundError,
-} from './parser'
+export { parseTaskFile, TaskFileReadError, TaskNotFoundError } from './parser'

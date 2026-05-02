@@ -18,7 +18,3 @@ export const locksDir = path.join(configDir, 'locks')
 export const logFilePath = path.join(configDir, 'log.jsonl')
 export const envFilePath = path.join(configDir, '.env')
 export const agentsFilePath = path.join(configDir, 'agents.yml')
-
-export function taskFilePath(name: string): string {
-  return path.join(tasksDir, `${name}.md`)
-}

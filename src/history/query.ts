@@ -6,6 +6,7 @@ import * as errore from 'errore'
 
 import { configDir as defaultConfigDir } from '#lib/config'
 import type { RunningMarker } from '#lib/lock'
+import { taskFilePath } from '#lib/task/name'
 
 import type { HistoryMeta } from './schema'
 import { historyMetaSchema, isAgentRanMeta } from './schema'
@@ -151,8 +152,9 @@ export async function queryHistory(
 ): Promise<TaskNotFoundError | HistoryReadError | HistoryEntry[]> {
   const cfgDir = options?.configDir ?? defaultConfigDir
 
-  // Check task file exists (S6.6)
-  const taskPath = path.join(cfgDir, 'tasks', `${taskName}.md`)
+  // Check task file exists (S6.6); taskName is canonical underscore form,
+  // so route through taskFilePath for the canonical→nested file resolution.
+  const taskPath = taskFilePath(taskName, path.join(cfgDir, 'tasks'))
   try {
     await fs.access(taskPath)
   } catch {

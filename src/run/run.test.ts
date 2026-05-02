@@ -8,11 +8,7 @@ import { PassThrough } from 'node:stream'
 
 import { AgentNotFoundError } from '#lib/agent'
 import { TaskContentionError } from '#lib/lock'
-import {
-  FrontmatterValidationError,
-  TaskFileNameError,
-  TaskNotFoundError,
-} from '#lib/task'
+import { FrontmatterValidationError, TaskNotFoundError } from '#lib/task'
 import { runIdSchema } from '#src/history'
 import { HistoryArtifactWriteError } from '#src/history'
 
@@ -141,15 +137,6 @@ describe('executeTask', () => {
       deps: { spawnAgent: fakeSpawn() },
     })
     expect(result).toBeInstanceOf(TaskNotFoundError)
-  })
-
-  test('returns TaskFileNameError for invalid task name', async () => {
-    const configDir = await makeConfigDir()
-    const result = await executeTask('INVALID_NAME', {
-      configDir,
-      deps: { spawnAgent: fakeSpawn() },
-    })
-    expect(result).toBeInstanceOf(TaskFileNameError)
   })
 
   test('returns FrontmatterValidationError for invalid frontmatter', async () => {

@@ -1,7 +1,12 @@
 import { describe, expect, test } from 'bun:test'
 import path from 'node:path'
 
-import { TaskNameError, normalizeTaskName, toDisplayForm } from './name.ts'
+import {
+  TaskNameError,
+  normalizeTaskName,
+  taskFilePath,
+  toDisplayForm,
+} from './name.ts'
 
 const TASKS_DIR = '/tmp/tasks'
 
@@ -146,5 +151,29 @@ describe('toDisplayForm', () => {
 
   test('multi-level canonical converts every underscore', () => {
     expect(toDisplayForm('a_b_c')).toBe('a/b/c')
+  })
+})
+
+describe('taskFilePath', () => {
+  test('flat canonical name maps to flat path', () => {
+    expect(taskFilePath('foo', '/tasks')).toBe('/tasks/foo.md')
+  })
+
+  test('nested canonical name maps to nested path', () => {
+    expect(taskFilePath('foo_bar', '/tasks')).toBe('/tasks/foo/bar.md')
+  })
+
+  test('three-level nested canonical name', () => {
+    expect(taskFilePath('a_b_c', '/tasks')).toBe('/tasks/a/b/c.md')
+  })
+
+  test('hyphenated canonical name keeps hyphens within a segment', () => {
+    expect(taskFilePath('foo-bar', '/tasks')).toBe('/tasks/foo-bar.md')
+  })
+
+  test('hyphenated multi-segment canonical name', () => {
+    expect(taskFilePath('group_foo-bar', '/tasks')).toBe(
+      '/tasks/group/foo-bar.md',
+    )
   })
 })

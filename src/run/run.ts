@@ -16,7 +16,7 @@ import {
   agentsFilePath as defaultAgentsFilePath,
   locksDir as defaultLocksDir,
   envFilePath,
-  taskFilePath,
+  tasksDir as defaultTasksDir,
 } from '#lib/config'
 import type { EnvFileParseError, EnvFileReadError } from '#lib/env'
 import { buildEnv, loadEnvFile } from '#lib/env'
@@ -31,11 +31,11 @@ import type {
   FrontmatterParseError,
   FrontmatterValidationError,
   TaskDefinition,
-  TaskFileNameError,
   TaskFileReadError,
   TaskNotFoundError,
 } from '#lib/task'
 import { parseTaskFile } from '#lib/task'
+import { taskFilePath } from '#lib/task/name'
 import type { RunId } from '#src/history'
 import { HistoryArtifactWriteError, writeHistoryArtifact } from '#src/history'
 import type {
@@ -375,7 +375,6 @@ export async function defaultSpawnAgent(
 // Public API --
 
 type ExecuteError =
-  | TaskFileNameError
   | TaskNotFoundError
   | TaskFileReadError
   | FrontmatterParseError
@@ -396,9 +395,8 @@ export async function executeTask(
   options?: ExecuteOptions,
 ): Promise<ExecuteError | RunResult> {
   const configRoot = options?.configDir
-  const filePath = configRoot
-    ? path.join(configRoot, 'tasks', `${name}.md`)
-    : taskFilePath(name)
+  const tasksDir = configRoot ? path.join(configRoot, 'tasks') : defaultTasksDir
+  const filePath = taskFilePath(name, tasksDir)
 
   const task = await parseTaskFile(filePath)
   if (task instanceof Error) return task
