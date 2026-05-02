@@ -217,4 +217,68 @@ describe('validateTasks', () => {
       expect(result[0]!.errors.join('\n')).toContain('TM_PROMPT_FILE')
     }
   })
+
+  test('reports nested valid task with canonical name', async () => {
+    const tasksDir = await makeTmpTasksDir()
+    await fs.mkdir(path.join(tasksDir, 'group'), { recursive: true })
+    await fs.writeFile(path.join(tasksDir, 'group', 'task.md'), VALID_TASK)
+    const result = await validateTasks(tasksDir)
+    expect(result).toEqual([{ name: 'group_task', valid: true }])
+  })
+
+  test('rejects flat file with underscore in basename (bijection guard)', async () => {
+    const tasksDir = await makeTmpTasksDir()
+    await fs.writeFile(path.join(tasksDir, 'foo_bar.md'), VALID_TASK)
+    const result = await validateTasks(tasksDir)
+    if (result instanceof Error) throw result
+    expect(result).toHaveLength(1)
+    expect(result[0]!.name).toBe('foo_bar')
+    expect(result[0]!.valid).toBe(false)
+    if (result[0]!.valid === false) {
+      expect(result[0]!.errors.join('\n')).toContain('foo_bar')
+    }
+  })
+
+  test('reports invalid-segment file at depth', async () => {
+    const tasksDir = await makeTmpTasksDir()
+    await fs.mkdir(path.join(tasksDir, 'group'), { recursive: true })
+    await fs.writeFile(path.join(tasksDir, 'group', 'Bad_Name.md'), VALID_TASK)
+    const result = await validateTasks(tasksDir)
+    if (result instanceof Error) throw result
+    expect(result).toHaveLength(1)
+    expect(result[0]!.valid).toBe(false)
+    if (result[0]!.valid === false) {
+      expect(result[0]!.errors.join('\n')).toContain('Bad_Name')
+    }
+  })
+
+  test('sorts mixed canonical and slash-form entries by directory position', async () => {
+    const tasksDir = await makeTmpTasksDir()
+    await fs.mkdir(path.join(tasksDir, 'group'), { recursive: true })
+    // Invalid (slash-form name): group/Bad_Name
+    await fs.writeFile(path.join(tasksDir, 'group', 'Bad_Name.md'), VALID_TASK)
+    // Valid (canonical underscore name): group_alpha
+    await fs.writeFile(path.join(tasksDir, 'group', 'alpha.md'), VALID_TASK)
+    // Valid flat: zz
+    await writeTask(tasksDir, 'zz', VALID_TASK)
+    const result = await validateTasks(tasksDir)
+    if (result instanceof Error) throw result
+    // Both `group` entries sort together regardless of slash vs underscore name shape
+    expect(result.map((r) => r.name)).toEqual([
+      'group_alpha',
+      'group/Bad_Name',
+      'zz',
+    ])
+  })
+
+  test('reports nested file with broken frontmatter', async () => {
+    const tasksDir = await makeTmpTasksDir()
+    await fs.mkdir(path.join(tasksDir, 'group'), { recursive: true })
+    await fs.writeFile(path.join(tasksDir, 'group', 'broken.md'), INVALID_TASK)
+    const result = await validateTasks(tasksDir)
+    if (result instanceof Error) throw result
+    expect(result).toHaveLength(1)
+    expect(result[0]!.name).toBe('group_broken')
+    expect(result[0]!.valid).toBe(false)
+  })
 })

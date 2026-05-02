@@ -1,12 +1,5 @@
-import fs from 'node:fs/promises'
-import path from 'node:path'
-
-import {
-  FrontmatterValidationError,
-  parseTaskFile,
-  TaskFileNameError,
-} from '#lib/task'
-import { TasksDirReadError } from '#lib/task/walk'
+import { FrontmatterValidationError, parseTaskFile } from '#lib/task'
+import { TasksDirReadError, walkTasksDir } from '#lib/task/walk'
 
 type ValidResult = {
   name: string
@@ -24,42 +17,44 @@ export type ValidationResult = ValidResult | InvalidResult
 export async function validateTasks(
   tasksDir: string,
 ): Promise<TasksDirReadError | ValidationResult[]> {
-  const entries = await fs.readdir(tasksDir).catch((e: unknown) => {
-    if (e instanceof Error && 'code' in e && e.code === 'ENOENT') {
-      return []
-    }
-    return new TasksDirReadError({ path: tasksDir, cause: e })
-  })
-  if (entries instanceof Error) return entries
+  const walked = await walkTasksDir(tasksDir)
+  if (walked instanceof Error) return walked
 
-  const mdFiles = entries.filter((f) => f.endsWith('.md')).sort()
   const results: ValidationResult[] = []
 
-  for (const file of mdFiles) {
-    const filePath = path.join(tasksDir, file)
-    const name = file.replace(/\.md$/, '')
-    const parsed = await parseTaskFile(filePath)
+  for (const w of walked.warnings) {
+    results.push({
+      name: w.relativePath.replace(/\.md$/, ''),
+      valid: false,
+      errors: [w.error.message],
+    })
+  }
 
+  for (const entry of walked.entries) {
+    const parsed = await parseTaskFile(entry.filePath)
     if (parsed instanceof Error) {
       results.push({
-        name,
+        name: entry.canonical,
         valid: false,
         errors: extractErrors(parsed),
       })
     } else {
-      results.push({ name, valid: true })
+      results.push({ name: entry.canonical, valid: true })
     }
   }
 
+  // Invalid-by-walker entries carry the slash-form relativePath as `name`
+  // while valid entries carry the underscore-form canonical. Normalize the
+  // sort key so both surfaces order by directory position consistently.
+  results.sort((a, b) =>
+    a.name.replaceAll('/', '_').localeCompare(b.name.replaceAll('/', '_')),
+  )
   return results
 }
 
 function extractErrors(error: Error): string[] {
   if (error instanceof FrontmatterValidationError) {
     return error.errors.map((e) => `${e.key}: ${e.message}`)
-  }
-  if (error instanceof TaskFileNameError) {
-    return [error.message]
   }
   return [error.message]
 }
