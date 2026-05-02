@@ -325,6 +325,67 @@ describe('tm run --json', () => {
     expect([...new Set(taskFields)]).toEqual(['group_task'])
   })
 
+  test('tm history, tm status, tm logs accept tri-form input and render slash-form text', async () => {
+    const configDir = await makeIsolatedConfig()
+    const nestedDir = path.join(configDir, 'tasks', 'group')
+    await fsPromises.mkdir(nestedDir, { recursive: true })
+    await fsPromises.writeFile(
+      path.join(nestedDir, 'task.md'),
+      [
+        '---',
+        'on:',
+        '  schedule: "0 8 * * 1-5"',
+        'run: "cat $TM_PROMPT_FILE > /dev/null"',
+        '---',
+        'Body.',
+      ].join('\n'),
+    )
+
+    // Seed one history entry so per-task and global history have something to render
+    await runCli(
+      ['run', 'group/task', '--timestamp', '2026-04-06T08.00.00Z', '--json'],
+      configDir,
+    )
+
+    // tm history accepts all three input forms
+    for (const form of ['group/task', 'group/task.md', 'group_task']) {
+      const result = await runCli(['history', form, '--json'], configDir)
+      expect({ form, exitCode: result.exitCode }).toEqual({
+        form,
+        exitCode: 0,
+      })
+      const entries = z.array(z.unknown()).parse(JSON.parse(result.stdout))
+      expect(entries).toHaveLength(1)
+    }
+
+    // tm status text mode renders slash form
+    const statusText = await runCli(['status'], configDir)
+    expect(statusText.exitCode).toBe(0)
+    expect(statusText.stdout).toContain('group/task')
+    expect(statusText.stdout).not.toContain('group_task')
+
+    // tm status --json keeps canonical
+    const statusJson = await runCli(['status', '--json'], configDir)
+    expect(statusJson.exitCode).toBe(0)
+    const statusEntrySchema = z.looseObject({ name: z.string() })
+    const statusEntries = z
+      .array(statusEntrySchema)
+      .parse(JSON.parse(statusJson.stdout))
+    expect(statusEntries.map((e) => e.name)).toEqual(['group_task'])
+
+    // tm history (global) text mode renders slash form in headers.
+    // (The output_path line legitimately contains the canonical form since
+    // the history dir on disk is keyed by canonical.)
+    const histText = await runCli(['history'], configDir)
+    expect(histText.exitCode).toBe(0)
+    const headerLine = histText.stdout.split('\n')[0] ?? ''
+    expect(headerLine).toContain('group/task')
+
+    // tm logs accepts tri-form input (returns running-or-empty content; just exit 0)
+    const logsResult = await runCli(['logs', 'group/task'], configDir)
+    expect(logsResult.exitCode).toBe(0)
+  })
+
   test('preflight-error envelope when preflight exits 2', async () => {
     const configDir = await makeIsolatedConfig()
     await writeTask(

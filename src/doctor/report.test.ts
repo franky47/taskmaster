@@ -193,6 +193,18 @@ describe('renderReport', () => {
     expect(report).toContain('tm run backup')
   })
 
+  test('renders nested task names in slash form', () => {
+    const findings: Finding[] = [
+      { kind: 'task-never-ran', severity: 'warning', task: 'group_backup' },
+    ]
+
+    const report = renderReport(findings, checkedAt, 'darwin')
+    expect(report).toContain('## Task never ran: group/backup [warning]')
+    expect(report).toContain('tm history group/backup')
+    expect(report).toContain('tm run group/backup')
+    expect(report).not.toContain('group_backup')
+  })
+
   // -- Contention findings --
 
   test('renders contention finding with event count', () => {

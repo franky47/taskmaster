@@ -1,10 +1,11 @@
 ---
 # tm-rrzs
 title: Recursive task discovery with reversible underscore canonical names
-status: todo
+status: completed
 type: epic
+priority: normal
 created_at: 2026-05-02T18:09:04Z
-updated_at: 2026-05-02T18:09:04Z
+updated_at: 2026-05-02T19:30:11Z
 ---
 
 ## Problem Statement
@@ -201,3 +202,30 @@ are amenable to direct functional tests because they are pure or near-pure.
   the project memory note `project_tasks_stow_symlinks.md` for context.
 - The bean structure for vertical slices should reuse the existing fixture
   conventions in `src/list/` and `src/validate/` for any new walker tests.
+
+
+## Summary of Changes
+
+All five child slices delivered:
+
+- **tm-gegb** — recursive walker (`#lib/task/walk`) + name normalizer (`#lib/task/name`) + `tm list` slash-form display.
+- **tm-u40a** — `tm tick` and `tm dispatch` drop walker-produced invalid-filename warnings (those belong to `tm validate`).
+- **tm-umba** — `tm validate` consumes the recursive walker and surfaces invalid task filenames, including the flat-underscore bijection guard.
+- **tm-48a2** — `tm run` accepts tri-form names (`foo/bar`, `foo/bar.md`, `foo_bar`); lockfile, history dir, runs dir, prompt tempfile, dispatch payload tempfile, JSONL `task` field, and history `task_name` field all key on canonical underscore form. Walker upgraded to `normalizeWalkRelativePath` so a flat `tasks/foo_bar.md` is correctly rejected.
+- **tm-gals** — `tm history`, `tm logs` accept tri-form input via the normalizer; `tm history`/`tm doctor`/`tm status` text mode render task names in slash form while `--json` keeps canonical.
+
+## Architectural outcome
+
+`#lib/task/name` is the single owner of the canonical-vs-display contract:
+
+- `normalizeTaskName(input, tasksDir)` — CLI tri-form (`/` or `_` split)
+- `normalizeWalkRelativePath(rel, tasksDir)` — walker-only (`/`-only split, preserves bijection)
+- `taskFilePath(canonical, tasksDir)` — inverse mapping (canonical → nested path)
+- `toDisplayForm(canonical)` — canonical → human slash form
+
+`parseTaskFile` no longer validates filenames (segment validation is centralized in the normalizer). `TaskFileNameError` was removed.
+
+## Out-of-scope deferrals (not blocking)
+
+- `tm status <name>` (per-task detail view) — no `<name>` arg in the current CLI; needs separate design.
+- Per-task crontab emission — `schedule.ts` only computes `minCronIntervalMs`; no per-task crontab line generation exists in the tree (setup installs a single global `* * * * * tm tick`).

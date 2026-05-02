@@ -393,7 +393,7 @@ async function main(): Promise<void> {
     .option('--last <n>', 'Limit to N most recent entries')
     .action(
       async (
-        name: string | undefined,
+        rawName: string | undefined,
         opts: { json?: boolean; failures?: boolean; last?: string },
       ) => {
         let last: number | undefined
@@ -406,7 +406,7 @@ async function main(): Promise<void> {
           last = parsed.data
         }
 
-        if (name === undefined) {
+        if (rawName === undefined) {
           const result = await queryGlobalHistory({
             failures: opts.failures,
             last,
@@ -422,11 +422,18 @@ async function main(): Promise<void> {
             console.log(JSON.stringify(jsonEntries))
           } else {
             for (const entry of result) {
-              printHistoryEntry(entry, entry.task_name)
+              printHistoryEntry(entry, toDisplayForm(entry.task_name))
             }
           }
           return
         }
+
+        const normalized = normalizeTaskName(rawName, tasksDir)
+        if (normalized instanceof Error) {
+          console.error(normalized.message)
+          process.exit(1)
+        }
+        const name = normalized.canonical
 
         // Check running marker before querying history to adjust --last
         const marker = opts.failures ? null : readRunningMarker(name, locksDir)
@@ -486,7 +493,13 @@ async function main(): Promise<void> {
     .description(
       'Show output of a task (live tail if running, last output if completed)',
     )
-    .action(async (name: string) => {
+    .action(async (rawName: string) => {
+      const normalized = normalizeTaskName(rawName, tasksDir)
+      if (normalized instanceof Error) {
+        console.error(normalized.message)
+        process.exit(1)
+      }
+      const name = normalized.canonical
       const result = await getTaskLogs(name)
       if (result instanceof Error) {
         console.error(result.message)
@@ -527,7 +540,7 @@ async function main(): Promise<void> {
         console.log(JSON.stringify(statuses))
       } else {
         for (const task of statuses) {
-          console.log(task.name)
+          console.log(toDisplayForm(task.name))
           const trigger =
             'schedule' in task.on ? task.on.schedule : `event:${task.on.event}`
           console.log(`  trigger   ${trigger}`)
