@@ -3,6 +3,8 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 
+import { readLog } from '#lib/logger'
+
 import { dispatch } from './dispatch'
 
 async function makeConfigDir(): Promise<string> {
@@ -463,5 +465,48 @@ Cloud AI deploy task.
     expect(entry.reason).toBe('requirement-unmet')
     if (entry.reason !== 'requirement-unmet') return
     expect([...entry.requirement].sort()).toEqual(['ac-power', 'network'])
+  })
+
+  test('suppresses invalid-filename warnings but logs frontmatter failures with nested fixtures', async () => {
+    const configDir = await makeConfigDir()
+    const tasksDir = path.join(configDir, 'tasks')
+    // Nested valid event task
+    await fs.mkdir(path.join(tasksDir, 'group'), { recursive: true })
+    await fs.writeFile(path.join(tasksDir, 'group', 'valid.md'), EVENT_TASK)
+    // Nested invalid-segment file
+    await fs.mkdir(path.join(tasksDir, 'sub'), { recursive: true })
+    await fs.writeFile(path.join(tasksDir, 'sub', 'Bad_Name.md'), 'whatever')
+    // Nested file with broken frontmatter
+    await fs.writeFile(
+      path.join(tasksDir, 'sub', 'broken.md'),
+      `---
+on:
+  schedule: 'not a cron'
+agent: opencode
+---
+
+Body.
+`,
+    )
+
+    const before = new Date()
+    const result = await dispatch('deploy', {
+      configDir,
+      spawnRun: () => {},
+      probes: { network: async () => true },
+    })
+
+    expect(result).not.toBeInstanceOf(Error)
+    if (result instanceof Error) return
+
+    // Nested valid task is discovered and dispatched
+    expect(result.dispatched).toEqual(['group_valid'])
+
+    // Log contains the broken-frontmatter error but NOT the invalid-filename one.
+    const entries = readLog(before, path.join(configDir, 'log.jsonl'))
+    const errors = entries.filter((e) => e.event === 'error')
+    const errorTasks = errors.map((e) => e.task)
+    expect(errorTasks).toContain('sub/broken')
+    expect(errorTasks).not.toContain('sub/Bad_Name')
   })
 })

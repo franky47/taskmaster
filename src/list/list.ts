@@ -1,5 +1,6 @@
 import { parseTaskFile } from '#lib/task'
 import type { TaskDefinition } from '#lib/task'
+import { TaskNameError } from '#lib/task/name'
 import { TasksDirReadError, walkTasksDir } from '#lib/task/walk'
 
 export type TaskListEntry = Pick<
@@ -66,4 +67,11 @@ export async function listTasks(
 
   tasks.sort((a, b) => a.name.localeCompare(b.name))
   return { tasks, warnings }
+}
+
+// Invalid-filename warnings should be surfaced by `tm validate`; commands
+// running on a hot path (`tm tick`, `tm dispatch`) drop them so the JSONL
+// log isn't cluttered with the same offending file every cycle.
+export function isInvalidFilenameWarning(warning: TaskListWarning): boolean {
+  return warning.error instanceof TaskNameError
 }

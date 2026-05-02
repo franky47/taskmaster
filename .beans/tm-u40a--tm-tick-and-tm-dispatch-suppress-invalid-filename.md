@@ -1,10 +1,11 @@
 ---
 # tm-u40a
 title: tm tick and tm dispatch suppress invalid-filename warnings
-status: todo
+status: completed
 type: feature
+priority: normal
 created_at: 2026-05-02T18:13:04Z
-updated_at: 2026-05-02T18:13:04Z
+updated_at: 2026-05-02T18:35:28Z
 parent: tm-rrzs
 blocked_by:
     - tm-gegb
@@ -23,12 +24,12 @@ tick/dispatch.
 
 ## Acceptance criteria
 
-- [ ] `tm tick` and `tm dispatch` discover nested tasks via the walker.
-- [ ] Invalid-filename warnings produced by the walker are silently dropped
+- [x] `tm tick` and `tm dispatch` discover nested tasks via the walker.
+- [x] Invalid-filename warnings produced by the walker are silently dropped
       in tick and dispatch.
-- [ ] Parse and frontmatter failure warnings continue to be logged in the
+- [x] Parse and frontmatter failure warnings continue to be logged in the
       JSONL log with their existing event shape.
-- [ ] Test fixtures cover: a nested valid task, a nested invalid-segment
+- [x] Test fixtures cover: a nested valid task, a nested invalid-segment
       file, and a nested file with broken frontmatter — confirming only the
       frontmatter failure appears in tick/dispatch logs.
 
@@ -36,3 +37,9 @@ tick/dispatch.
 
 - User story 9
 - User story 10
+
+## Summary of Changes
+
+- Added a shared `isInvalidFilenameWarning(warning: TaskListWarning)` predicate in `src/list/list.ts` (alongside the warning type itself) so tick and dispatch can drop walker-produced filename warnings without duplicating the logic. The `TaskListWarning.error` is currently always either a `TaskNameError` (walker) or a parser/frontmatter error; the predicate matches the former.
+- Wired the filter into `src/tick/tick.ts` and `src/dispatch/dispatch.ts` warning loops. Parse/frontmatter failures continue to log unchanged so a typoed schedule on a real task still produces a visible JSONL error.
+- Added an integration-style test to `tick.test.ts` and `dispatch.test.ts` with three nested fixtures (valid task, invalid-segment file, broken-frontmatter file). Asserts only the frontmatter-failure entry appears in the JSONL log and that the nested valid task is dispatched. The tick variant stubs `queryHistory` because nested-canonical history lookups are scoped to tm-48a2.

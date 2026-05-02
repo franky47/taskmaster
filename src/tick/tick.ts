@@ -10,7 +10,7 @@ import type { TasksDirReadError } from '#lib/task/walk'
 import { formatTimestamp, purgeHistory, queryHistory } from '#src/history'
 import type { RunId } from '#src/history'
 import type { TaskListEntry } from '#src/list'
-import { listTasks } from '#src/list'
+import { isInvalidFilenameWarning, listTasks } from '#src/list'
 
 import { writeHeartbeat } from './heartbeat'
 
@@ -108,6 +108,7 @@ export async function tick(
   if (listResult instanceof Error) return listResult
 
   for (const w of listResult.warnings) {
+    if (isInvalidFilenameWarning(w)) continue
     log(
       { event: 'error', task: w.file.replace(/\.md$/, ''), error: w.error },
       logPath,

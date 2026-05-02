@@ -11,7 +11,7 @@ import type { TasksDirReadError } from '#lib/task/walk'
 import { manualTimestamp } from '#src/history'
 import type { RunId } from '#src/history'
 import type { TaskListEntry } from '#src/list'
-import { listTasks } from '#src/list'
+import { isInvalidFilenameWarning, listTasks } from '#src/list'
 
 // Types --
 
@@ -90,6 +90,7 @@ export async function dispatch(
   if (listResult instanceof Error) return listResult
 
   for (const w of listResult.warnings) {
+    if (isInvalidFilenameWarning(w)) continue
     log(
       { event: 'error', task: w.file.replace(/\.md$/, ''), error: w.error },
       logPath,
