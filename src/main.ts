@@ -31,6 +31,7 @@ import {
 import { TaskContentionError, readRunningMarker } from './lib/lock'
 import { log } from './lib/logger'
 import { parseSinceFlag } from './lib/observability-time'
+import { toDisplayForm } from './lib/task/name'
 import { listTasks } from './list'
 import { getTaskLogs } from './logs'
 import { runTask } from './run'
@@ -337,8 +338,9 @@ async function main(): Promise<void> {
           const trigger =
             'schedule' in task.on ? task.on.schedule : `event:${task.on.event}`
           const preflight = task.preflight ? ' [preflight]' : ''
+          const display = toDisplayForm(task.name)
           console.log(
-            `${task.name} ${trigger} ${executor} ${tag}${reqs}${preflight}`,
+            `${display} ${trigger} ${executor} ${tag}${reqs}${preflight}`,
           )
         }
       }

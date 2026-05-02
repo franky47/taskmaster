@@ -7,11 +7,11 @@ import { configDir as defaultConfigDir } from '#lib/config'
 import { readRunningMarker } from '#lib/lock'
 import type { ReadMarkerDeps } from '#lib/lock'
 import type { Requirement } from '#lib/task'
+import type { TasksDirReadError } from '#lib/task/walk'
 import { queryHistory } from '#src/history'
 import type { RunId } from '#src/history'
 import { isAgentRanMeta } from '#src/history/schema'
 import { listTasks } from '#src/list'
-import type { TasksDirReadError } from '#src/validate'
 
 // Types --
 

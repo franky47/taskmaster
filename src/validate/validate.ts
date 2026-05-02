@@ -1,13 +1,12 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 
-import * as errore from 'errore'
-
 import {
   FrontmatterValidationError,
   parseTaskFile,
   TaskFileNameError,
 } from '#lib/task'
+import { TasksDirReadError } from '#lib/task/walk'
 
 type ValidResult = {
   name: string
@@ -21,11 +20,6 @@ type InvalidResult = {
 }
 
 export type ValidationResult = ValidResult | InvalidResult
-
-export class TasksDirReadError extends errore.createTaggedError({
-  name: 'TasksDirReadError',
-  message: 'Failed to read tasks directory $path',
-}) {}
 
 export async function validateTasks(
   tasksDir: string,

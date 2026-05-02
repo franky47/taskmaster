@@ -303,4 +303,28 @@ Inbox check.
     if (result instanceof Error) throw result
     expect(result.tasks[0]).not.toHaveProperty('preflight')
   })
+
+  test('discovers nested .md files with underscore canonical names', async () => {
+    const tasksDir = await makeTmpTasksDir()
+    await fs.mkdir(path.join(tasksDir, 'group'), { recursive: true })
+    await writeTask(tasksDir, 'flat', ENABLED_TASK)
+    await fs.writeFile(path.join(tasksDir, 'group', 'nested.md'), ENABLED_TASK)
+    await fs.mkdir(path.join(tasksDir, 'a', 'b'), { recursive: true })
+    await fs.writeFile(path.join(tasksDir, 'a', 'b', 'deep.md'), ENABLED_TASK)
+    const result = await listTasks(tasksDir)
+    if (result instanceof Error) throw result
+    expect(result.tasks.map((t) => t.name)).toEqual([
+      'a_b_deep',
+      'flat',
+      'group_nested',
+    ])
+  })
+
+  test('preserves flat task canonical names unchanged', async () => {
+    const tasksDir = await makeTmpTasksDir()
+    await writeTask(tasksDir, 'foo-bar', ENABLED_TASK)
+    const result = await listTasks(tasksDir)
+    if (result instanceof Error) throw result
+    expect(result.tasks.map((t) => t.name)).toEqual(['foo-bar'])
+  })
 })

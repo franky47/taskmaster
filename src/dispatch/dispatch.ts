@@ -7,11 +7,11 @@ import { log } from '#lib/logger'
 import type { Probes } from '#lib/requirements'
 import { defaultProbes, filterByRequirements } from '#lib/requirements'
 import type { Requirement } from '#lib/task'
+import type { TasksDirReadError } from '#lib/task/walk'
 import { manualTimestamp } from '#src/history'
 import type { RunId } from '#src/history'
 import type { TaskListEntry } from '#src/list'
 import { listTasks } from '#src/list'
-import type { TasksDirReadError } from '#src/validate'
 
 // Types --
 

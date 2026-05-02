@@ -1,9 +1,6 @@
-import fs from 'node:fs/promises'
-import path from 'node:path'
-
 import { parseTaskFile } from '#lib/task'
 import type { TaskDefinition } from '#lib/task'
-import { TasksDirReadError } from '#src/validate'
+import { TasksDirReadError, walkTasksDir } from '#lib/task/walk'
 
 export type TaskListEntry = Pick<
   TaskDefinition,
@@ -28,29 +25,25 @@ type TaskListResult = {
 export async function listTasks(
   tasksDir: string,
 ): Promise<TasksDirReadError | TaskListResult> {
-  const entries = await fs.readdir(tasksDir).catch((e: unknown) => {
-    if (e instanceof Error && 'code' in e && e.code === 'ENOENT') {
-      return []
-    }
-    return new TasksDirReadError({ path: tasksDir, cause: e })
-  })
-  if (entries instanceof Error) return entries
-  if (entries.length === 0) return { tasks: [], warnings: [] }
+  const walked = await walkTasksDir(tasksDir)
+  if (walked instanceof Error) return walked
 
-  const mdFiles = entries.filter((f) => f.endsWith('.md')).sort()
   const tasks: TaskListEntry[] = []
   const warnings: TaskListWarning[] = []
 
-  for (const file of mdFiles) {
-    const filePath = path.join(tasksDir, file)
-    const parsed = await parseTaskFile(filePath)
+  for (const w of walked.warnings) {
+    warnings.push({ file: w.relativePath, error: w.error })
+  }
+
+  for (const walkEntry of walked.entries) {
+    const parsed = await parseTaskFile(walkEntry.filePath)
     if (parsed instanceof Error) {
-      warnings.push({ file, error: parsed })
+      warnings.push({ file: walkEntry.relativePath, error: parsed })
       continue
     }
 
     const entry: TaskListEntry = {
-      name: file.replace(/\.md$/, ''),
+      name: walkEntry.canonical,
       on: parsed.on,
       enabled: parsed.enabled,
       requires: parsed.requires,
@@ -71,5 +64,6 @@ export async function listTasks(
     tasks.push(entry)
   }
 
+  tasks.sort((a, b) => a.name.localeCompare(b.name))
   return { tasks, warnings }
 }

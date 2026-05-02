@@ -6,11 +6,11 @@ import { configDir as defaultConfigDir } from '#lib/config'
 import { log } from '#lib/logger'
 import type { Probes } from '#lib/requirements'
 import { defaultProbes, filterByRequirements } from '#lib/requirements'
+import type { TasksDirReadError } from '#lib/task/walk'
 import { formatTimestamp, purgeHistory, queryHistory } from '#src/history'
 import type { RunId } from '#src/history'
 import type { TaskListEntry } from '#src/list'
 import { listTasks } from '#src/list'
-import type { TasksDirReadError } from '#src/validate'
 
 import { writeHeartbeat } from './heartbeat'
 
